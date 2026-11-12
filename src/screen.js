@@ -15,7 +15,7 @@
   const ref = Referee.create((Date.now() & 0xffffff) | 1);
   const SANDBOX = /sandbox/.test(location.hash + location.search);   // ?sandbox: the VR test map (a small floor, a few weak monsters, one of each gun type at your feet). Test link only, the normal game is unchanged
   const GAME_CFG = { startGun: 'pistol_service', gunDrops: true, gearDrops: true, modDrops: true, stashOpen: true, manualGuns: true, bossRandom: true };      // the game's rules: you start with the silver pistol and monsters drop guns, armor and charms (the referee's plain defaults keep the tests steady)
-  if (SANDBOX) Object.assign(GAME_CFG, { floorSize: 44, monsterCount: 2, monsterDamage: 2, playerHp: 400, locks: false });
+  if (SANDBOX) Object.assign(GAME_CFG, { floorSize: 44, monsterCount: 2, monsterDamage: 2, playerHp: 400, keepDrops: true, doorTest: true });   // test map: the gold gate stays shut so paying at a door can be tried (you get the gold), the boss door opens when you use it, floor guns never fade
   ref.setCfg(GAME_CFG); ref.setStash(StashStore.read());          // what you put in the chest on earlier runs is still there
 
   // a link can start the run on a later wave, to try the boss: ...#wave10 (or ?wave=10)
@@ -375,7 +375,7 @@
   }
 
   /* ============ input ============ */
-  const I = { swap: false, pickup: false, mx: 0, mz: 0, lookX: 0, lookY: 0, touchX: 0, touchY: 0, fire: false, ads: false, sprint: false, slide: false, jump: false, reload: false, pick: undefined, restart: false };
+  const I = { swap: false, pickup: false, pickupId: undefined, mx: 0, mz: 0, lookX: 0, lookY: 0, touchX: 0, touchY: 0, fire: false, ads: false, sprint: false, slide: false, jump: false, reload: false, pick: undefined, restart: false };
   const keys = {};
   const mouse = { fire: false, ads: false };
   const tch = { fire: false, ads: false, sprint: false, reload: false };
@@ -577,7 +577,7 @@
     const out = {
       mx, mz, lookX: I.lookX, lookY: I.lookY, touchX: I.touchX, touchY: I.touchY, padX: pr ? pr.padX : 0, padY: pr ? pr.padY : 0,
       fire: mouse.fire || tch.fire || !!(pr && pr.fire), ads: mouse.ads || tch.ads || !!(pr && pr.ads),
-      sprint: !!(keys.ShiftLeft || keys.ShiftRight) || tch.sprint || !!(pr && pr.sprint), slide: I.slide || !!(pr && pr.slide), jump: I.jump || !!(pr && pr.jump), reload: I.reload || !!(pr && pr.reload), swap: I.swap || !!(pr && pr.swap), pickup: I.pickup, lockUse: I.lockUse !== undefined ? I.lockUse : pr && pr.lockUse, seeds: I.restart ? { map: rnd(), damage: rnd(), item: rnd() } : undefined, pick: I.pick, pickClass: I.pickClass, shopClose: I.shopClose, restart: I.restart
+      sprint: !!(keys.ShiftLeft || keys.ShiftRight) || tch.sprint || !!(pr && pr.sprint), slide: I.slide || !!(pr && pr.slide), jump: I.jump || !!(pr && pr.jump), reload: I.reload || !!(pr && pr.reload), swap: I.swap || !!(pr && pr.swap), pickup: I.pickup, pickupId: I.pickupId, lockUse: I.lockUse !== undefined ? I.lockUse : pr && pr.lockUse, seeds: I.restart ? { map: rnd(), damage: rnd(), item: rnd() } : undefined, pick: I.pick, pickClass: I.pickClass, shopClose: I.shopClose, restart: I.restart
     };
     if (xr && xr.presenting()) {                                    // VR: aim follows the right controller's ray (or your head), sent like a mouse move
       const a = xr.aim(), pl = state.player, c = ref.cfg;
@@ -587,7 +587,7 @@
       const hy = xr.headYaw();                                        // walk where your head faces, not where the gun points
       if (hy !== null && (out.mx || out.mz)) { const mv = XrInput.headMove(out.mx, out.mz, hy - (a ? a.yaw : pl.yaw)); out.mx = mv.mx; out.mz = mv.mz; }
     }
-    I.lookX = I.lookY = I.touchX = I.touchY = 0; I.slide = false; I.jump = false; I.reload = false; I.swap = false; I.pickup = false; I.lockUse = undefined; I.pick = undefined; I.pickClass = undefined; I.shopClose = false; I.restart = false;
+    I.lookX = I.lookY = I.touchX = I.touchY = 0; I.slide = false; I.jump = false; I.reload = false; I.swap = false; I.pickup = false; I.pickupId = undefined; I.lockUse = undefined; I.pick = undefined; I.pickClass = undefined; I.shopClose = false; I.restart = false;
     return out;
   }
 
@@ -635,8 +635,12 @@
   let sandboxGiven = -1;
   function sandboxGifts() {                                          // one gun of each type lies at your feet, plus gold and a couple of mods, so every reload and menu can be tried
     if (!SANDBOX || sandboxGiven === state.floorId) return; sandboxGiven = state.floorId;
-    for (const id of ['shotgun_pump', 'rifle', 'smg_compact', 'sniper_bolt', 'hmg_belt', 'pistol_cannon']) ref.giveGun(id, 1);
-    ref.giveGold(500); ref.giveMod(1); ref.giveMod(2); ref.giveGear('head', 2); state = ref.snapshot();
+    // laid out in an arc in front of you like a weapon rack (not in one pile), so each can be reached, pointed at and grabbed on its own
+    const p = state.player, m = ref.map, C = m.CELL, free = (x, z) => { const r = m.rows[Math.floor(z / C)]; const ch = r && r[Math.floor(x / C)]; return ch === '.' || ch === 'c'; };
+    const spot = (k, n) => { for (const rad of [1.7, 1.2, 0.8]) { const a = p.yaw + (k - (n - 1) / 2) * 0.36, x = p.x + Math.sin(a) * rad, z = p.z - Math.cos(a) * rad; if (free(x, z) && free(x + 0.4, z) && free(x - 0.4, z) && free(x, z + 0.4) && free(x, z - 0.4)) return [x, z]; } return [p.x, p.z]; };
+    const gifts = [['gun', 'shotgun_pump'], ['gun', 'rifle'], ['gun', 'smg_compact'], ['gun', 'sniper_bolt'], ['mod', 1], ['gear', 'head'], ['mod', 2], ['gun', 'hmg_belt'], ['gun', 'pistol_cannon']];
+    gifts.forEach(([k, v], i) => { const [x, z] = spot(i, gifts.length); if (k === 'gun') ref.giveGun(v, 1, undefined, x, z); else if (k === 'mod') ref.giveMod(v, undefined, x, z); else ref.giveGear(v, 2, undefined, x, z); });
+    ref.giveGold(1000); state = ref.snapshot();
   }
   const coop = Coop.create($, ref, { toast: (t) => toast(t), playLabel: (t, off) => { $('playLabel').textContent = t; playBtn.disabled = off; }, begin });
   // controller menus: Start pauses and resumes, A starts, picks the highlighted level-up card, and rises again after a fall
@@ -839,6 +843,13 @@
     lockKey = key; lockTxt.textContent = n.text;
     lockB.forEach((b, i) => { const a = n.actions[i]; b.hidden = !a; if (a) { b.textContent = a.label + (isTouch ? '' : i === 0 ? '  [E]' : '  [Z]'); b.classList.toggle('no', !a.afford); } });
     lockBox.classList.add('show');
+  }
+  // VR grips (xr_interact.js): take that exact item, use what you stand at (gate, door, puzzle, chest), or swap to the gun on your back
+  function vrGrab(a) {
+    if (!a) return;
+    if (a.type === 'item') { I.pickup = true; I.pickupId = a.id; }
+    else if (a.type === 'swap') I.swap = true;
+    else if (a.type === 'use') { if ((state.locks && state.locks.near) || (state.locks && state.locks.door && state.locks.door.near)) I.lockUse = 0; else if (state.player.stash.near) openStash(); }
   }
   function pressPickup() { if (state.locks && state.locks.near) { I.lockUse = 0; return; } const q = GunCard.nearest(state, 6); if (!(q && q.inReach) && state.player.stash.near) openStash(); else I.pickup = true; }
   $('bGear').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); toggleGear(); });
@@ -1209,12 +1220,12 @@
   GP.gunBody = gunBody; GP.magBase = MAG_BASE; GP.fore = HOLD;
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
-    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw });
+    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
   xr.on(() => { renderer.setAnimationLoop(frame); if (!running) begin(true); }, () => { renderer.setAnimationLoop(null); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
-    try { pollPad(dt); padMenus(); if (xr && xr.presenting() && xr.grab() && running && !panelOpen && !state.choices && !state.classChoices && !state.over) pressPickup(); } catch (e) { /* a controller hiccup must not stop the frame */ }
+    try { pollPad(dt); padMenus(); if (xr && xr.presenting()) { const ga = xr.grab(); if (ga && running && !panelOpen && !state.choices && !state.classChoices && !state.over) vrGrab(ga); } } catch (e) { /* a controller hiccup must not stop the frame */ }
     // each stage guards itself: one bad frame in the drawing code must never freeze the rules or the controller, and the first error is shown on screen so it can be read off a phone
     const stage = (name, fn) => { try { fn(); } catch (e) { if (!frameErr) { frameErr = name + ': ' + (e && e.message ? e.message : e); toastEl.textContent = 'Error in ' + frameErr; toastEl.classList.add('show'); toastT = 1e9; if (window.console) console.error(e); } } };
     if (running && !panelOpen) {

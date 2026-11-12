@@ -26,6 +26,8 @@ Keep the code neat: small focused files and functions in clear folders, never on
 - `node tests/models.test.js` : model checks (sight clear, anchors, face budget)
 - `node tests/pad.test.js` : controller checks (Hypershot layout, dead zones, right-stick turn)
 - `node tests/xr.test.js` : Meta Quest controller checks (Touch controllers become one standard pad, snap/smooth turn, aim maths)
+- `node tests/grab.test.js` : VR grabbing and doors (the exact item a hand grabs, 7 m distance grab and walls, test-map door and loot, what each hand targets, grip held like a gun, shoulder swap)
+- `NODE_PATH=<dir with puppeteer-core> node tools/xr_playtest.js [--md out.md] [--shots dir]` : full simulated Meta Quest playtest in headless Chrome (fake headset tools/xr_fake_quest.js): every pickup, door, button and menu, PASS/FAIL per check
 - `node tests/touch.test.js` : touch button settings checks (size range, what can be hidden)
 - `node tests/fx.test.js` : effect checks (look presets escalate common to legendary, sprite pool)
 - `node tests/gun.test.js` : gun look checks (smoothed shape, skins, motion)

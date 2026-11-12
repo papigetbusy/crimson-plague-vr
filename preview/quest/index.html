@@ -403,7 +403,7 @@ body.pad .card3.sel { border-color: var(--gold); background: linear-gradient(#3c
 <div class="overlay" id="start">
   <div class="card">
     <h1>Crimson Plague</h1>
-    <p>Hold the corridor. Nothing stops coming.</p><p class="buildTag">build 4bab9c4+</p>
+    <p>Hold the corridor. Nothing stops coming.</p><p class="buildTag">build e61a65f+</p>
     <div class="keys">
       <p><b>WASD</b> move</p><p><b>Mouse</b> look, <b>Click</b> fire</p>
       <p><b>Shift</b> sprint</p><p><b>Right click</b> aim</p>
@@ -2297,6 +2297,9 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     startGun: 'rifle',        // the gun a run starts with: the plain rifle (all-ones baseline) here; the game screen starts you with 'pistol_service'
     manualGuns: false,        // true = guns and gear on the floor are only taken when you press pick up (the game does this so a good gun is never swapped away by accident); tests keep the old walk-over
     gunReach: 2.6,            // how close you must be to take a gun or piece of gear with pick up
+    grabReach: 7,             // VR: how far away a gun or piece of gear you point at and grab can be (you must see it: never through a wall)
+    keepDrops: false,         // the VR test map only: guns, armor and mods on the floor never fade (normally they go after 60 s)
+    doorTest: false,          // the VR test map only: the boss door opens when you use it, so doors can be tried without fighting the boss
     stashReach: 3,            // how close you stand to the stash chest to use it
     bossRandom: false,        // a random boss on each boss floor (the game screen turns it on; tests keep the Demon Lord unless they ask)
     bossKind: '',             // force one boss: demon, bat, lich or dragon
@@ -2376,8 +2379,10 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     // the boss door opens when the boss is down and the puzzle is solved
     function tryOpenDoor() { if (bossDown && LK.solved() && !doorOpen && !R.safe) openDoor(); }
     // use what is near you (0: first action, 1: second). A friend's copy does it here and tells the host; the host and a solo game do it for real.
+    const nearDoor = () => !!M0.door && Math.hypot(P.x - M0.door.x, P.z - M0.door.z) < RL.RULES.reach + 1;
     function useLock(idx) {
-      const a = LK.use(P.x, P.z, R.gold, idx, R.keys); if (!a) return;
+      const a = LK.use(P.x, P.z, R.gold, idx, R.keys);
+      if (!a) { if (idx === 0 && cfg.doorTest && !cfg.guest && !doorOpen && !R.safe && nearDoor()) { openDoor(); R.phase = 'intermission'; spawnQ = []; monsters = []; } return; }   // test map: the door opens and the hall goes quiet so you can walk through
       const r = LK.act(a, R.gold, R.keys); if (!r) return;
       R.gold -= r.cost; R.keys -= r.key || 0; events.push(r.ev); if (cfg.guest) lockOut.push(a); else { syncGates(); tryOpenDoor(); }
     }
@@ -3018,7 +3023,14 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       wearAt(item, at);
     }
     // pick up: take the nearest gun or piece of gear lying within reach (with manualGuns on, only this press picks things up, so nothing is ever taken by accident; hearts and flames are still automatic)
-    function pickUpGun() {
+    function pickUpGun(id) {
+      if (Number.isInteger(id)) {                       // VR: the exact item your hand grabbed or pointed at, or nothing (never a different one)
+        const q = pickups.find((o) => o.id === id);
+        if (!q || (q.kind !== 'gun' && q.kind !== 'gear' && q.kind !== 'mod') || q.noPick > 0 || q.life <= 0) return;
+        const d = Math.hypot(P.x - q.x, P.z - q.z); if (d >= cfg.grabReach || (d >= cfg.gunReach && !hasLOS(P.x, P.z, q.x, q.z))) return;
+        if (q.kind === 'gun') takeGun(q); else if (q.kind === 'mod') takeMod(q); else { q.life = -1; wearBought(q.gear); }
+        return;
+      }
       let best = null, bd = cfg.gunReach;
       let bs = Infinity; const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw);
       for (const q of pickups) {
@@ -3338,7 +3350,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       coins = coins.filter((c) => c.life > 0);
       const reachPick = L.pickupRadius * (1 + (M.magnet - 1) * 0.5);
       for (const p of pickups) {
-        p.life -= dt; if (p.noPick > 0) p.noPick -= dt;
+        if (!(cfg.keepDrops && (p.kind === 'gun' || p.kind === 'gear' || p.kind === 'mod'))) p.life -= dt; if (p.noPick > 0) p.noPick -= dt;   // (the test map keeps guns and gear on the floor until you take them)
         if (Math.hypot(P.x - p.x, P.z - p.z) < reachPick) {
           if (p.kind === 'gun') { if (p.noPick > 0 || cfg.manualGuns) continue; takeGun(p); continue; }
           if (p.kind === 'gear') { if (p.noPick > 0 || cfg.manualGuns) continue; takeGear(p); continue; }
@@ -3469,7 +3481,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       // reload, then fire
       if (p.ammo > maxMag()) p.ammo = maxMag();
       if (inp.swap) swapGun();
-      if (inp.pickup && !R.over) pickUpGun();
+      if (inp.pickup && !R.over) pickUpGun(inp.pickupId);
       if (CM.freeAmmo) {                                         // Bullet Storm means no reloading: a reload already under way stops and the magazine is full, so the fire never stalls
         if (p.reloading) { p.reloading = false; p.reloadT = 0; events.push({ type: 'reloadEnd' }); }
         p.ammo = maxMag();
@@ -3588,7 +3600,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
         bossBar: boss ? { name: titleOf(boss.kind, boss.variant), variant: boss.variant || null, exposed: !!boss.exposed, hp: boss.hp, maxHp: boss.maxHp, state: boss.state } : null,
         level: { n: R.level, xp: R.xp, need: D.xpNeed(R.level) },
         orbs: orbs.map((o) => ({ id: o.id, x: o.x, z: o.z, v: o.v })),
-        pickups: pickups.map((q) => ({ id: q.id, kind: q.kind, x: q.x, z: q.z, life: q.life, gun: q.item ? WP.view(q.item, cfg) : undefined, inReach: (q.kind === 'gun' || q.kind === 'gear' || q.kind === 'mod') && q.noPick <= 0 && Math.hypot(P.x - q.x, P.z - q.z) < cfg.gunReach, gear: q.gear ? GR.view(q.gear, GEAR.worn) : undefined, mod: q.mod ? WP.modView(q.mod, W.slots[W.held]) : undefined })),
+        pickups: pickups.map((q) => ({ id: q.id, kind: q.kind, x: q.x, z: q.z, life: q.life, gun: q.item ? WP.view(q.item, cfg) : undefined, grab: (q.kind === 'gun' || q.kind === 'gear' || q.kind === 'mod') && q.noPick <= 0, inReach: (q.kind === 'gun' || q.kind === 'gear' || q.kind === 'mod') && q.noPick <= 0 && Math.hypot(P.x - q.x, P.z - q.z) < cfg.gunReach, gear: q.gear ? GR.view(q.gear, GEAR.worn) : undefined, mod: q.mod ? WP.modView(q.mod, W.slots[W.held]) : undefined })),
         classChoices: R.classChoices ? R.classChoices.map((id) => kit.card(id, R.level)) : null,
         cls: kit.view(R.level),
         choices: R.choices ? R.choices.map((id) => { const s = skillOf(id); return { id, name: s.name, desc: s.desc, stack: stackOf(id), max: s.max }; }) : null,
@@ -3605,7 +3617,9 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
         gates: lay.gates.map((g) => ({ i: g.id, x: g.x, z: g.z, nx: g.nx, nz: g.nz, open: !!S.open[g.id], price: g.price, type: g.type })),
         boss: b ? { kind: b.kind, solved: S.solved, sign: b.sign, station: b.station, text: RL.signText(b), target: b.target, pan: S.pan, spin: b.spin, sym: b.sym, wheels: S.wheels.slice(), locked: S.locked.slice(), sockets: b.sockets.map((q, i) => ({ x: q.x, y: q.y, z: q.z, nx: q.nx, nz: q.nz, hit: !!S.hit[i] })) } : null,
         keys: R.keys, keeper: (() => { const q = monsters.find((o) => o.mini); return q ? { x: q.x, z: q.z, asleep: q.state === 'guard' } : null; })(),
-        near: n, sealed: bossDown && !doorOpen && !R.safe
+        near: n, sealed: bossDown && !doorOpen && !R.safe,
+        door: M0.door ? { x: M0.door.x, z: M0.door.z, nx: M0.door.nx, nz: M0.door.nz, open: doorOpen, near: !doorOpen && !R.safe && nearDoor(), canOpen: !!cfg.doorTest && !doorOpen && !R.safe,
+          text: doorOpen ? 'Open' : cfg.doorTest ? 'Test map: grip opens it' : !bossDown ? 'Sealed: kill the boss to open it' : 'Sealed: solve the puzzle beside it' } : null
       };
     }
     // put the player somewhere (tests and tools only: the game never teleports you)
@@ -3621,15 +3635,15 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     const lockState = () => LK;                                                       // tests: the floor's locks
     function giveGold(v) { R.gold += v; }                                               // tests: some gold right now
     function giveXp(v) { gainXp(v); }                                                  // tests: some experience right now
-    function giveGun(id, rarity, wave) { dropGun(P.x, P.z, 0, WP.make(id, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a gun lies at your feet
+    function giveGun(id, rarity, wave, x, z) { dropGun(x === undefined ? P.x : x, z === undefined ? P.z : z, 0, WP.make(id, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a gun lies at your feet
     function equipGun(id, rarity) {                                                     // cheat build and tests: the gun in your hands becomes this one, full magazine
       const it = WP.make(id, rarity || 0, R.wave, rngW, cfg.classId); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0.3;
     }
     function gearView() { const t = GR.total(GEAR.worn); return { worn: GEAR.worn.map((it, i) => it ? GR.view(it, null) : { slot: GR.WEAR[i], empty: true }), def: Math.round(t.def * 1000) / 10, hp: Math.round(t.hp), vit: Math.round(t.vit * 100), regen: Math.round(t.regen * 10) / 10, speed: Math.round(t.speed * 100), magnet: Math.round(t.magnet * 100), dmg: Math.round(t.dmg * 100), rate: Math.round(t.rate * 100), crit: Math.round(t.crit * 1000) / 10, critdmg: Math.round(t.critdmg * 100), leech: Math.round(t.leech * 10) / 10, reload: Math.round(t.reload * 100) }; }
-    function giveGear(slot, rarity, wave) { dropGear(P.x, P.z, 0, GR.make(slot, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a piece of gear lies at your feet
+    function giveGear(slot, rarity, wave, x, z) { dropGear(x === undefined ? P.x : x, z === undefined ? P.z : z, 0, GR.make(slot, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a piece of gear lies at your feet
     function wearGear(item, at) { GEAR.worn[at === undefined ? GR.WEAR.indexOf(item.slot) : at] = item; M = computeMods(); P.hp = Math.min(P.hp, maxHp()); }   // tests: wear exactly this piece
     function equipItem(item) { const it = Object.assign({}, item); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0; }   // tests: hold exactly this gun item (with the affixes it carries)
-    function giveMod(rarity, wave) { dropMod(P.x, P.z, WP.MD.make(rarity, wave || R.wave, rngW)); }   // tests: a mod lies at your feet
+    function giveMod(rarity, wave, x, z) { dropMod(x === undefined ? P.x : x, z === undefined ? P.z : z, WP.MD.make(rarity, wave || R.wave, rngW)); }   // tests: a mod lies at your feet
     function addMod(item) { W.mods.push(item); }                                       // tests: this exact mod goes straight in the bag
     function setLoadout(list) { loadout = (list || []).map((e) => JSON.parse(JSON.stringify(e))); }   // blueprints for the next run (applied on reset)
     function stashEntry(i) { return R.stash[i] ? JSON.parse(JSON.stringify(R.stash[i])) : null; }   // a copy of a stashed entry, for making a blueprint
@@ -8373,7 +8387,8 @@ if (typeof module !== 'undefined') module.exports = PadInput;
      Right stick up/down                   -> scroll menus; a hard push down = second action at a gold gate / boss door puzzle
      Right stick click                     -> swap guns
      Right trigger                         -> fire (menus: click where the laser points, on release)
-     Right grip (xr_mode)                  -> grab: pick up the gun at your feet, open the stash, use a gold gate
+     Either grip (xr_interact / xr_grab)   -> grab what the hand reaches or points at, or use the gate / door / chest you stand at
+     Right hand over right shoulder + grip -> swap to the gun on your back
      A                                     -> jump   (never from a stick: stick jumps fire by accident)
      B                                     -> slide
    No D-pad on Quest. */
@@ -8711,6 +8726,213 @@ const XrMenu = (function () {
 })();
 if (typeof module !== 'undefined') module.exports = XrMenu;
 
+/* VR grabbing: which item, gate, door or chest each hand is about to take or use, and when a grip squeeze counts as a grab.
+   Pure logic (no DOM, no three.js, no clock), so tests can feed it hands and items. The VR view (xr_mode.js) draws the highlight
+   and sends the grab to the game. How the top VR shooters do it and why these numbers: docs/vr-design.md, "Grabbing and doors".
+     1. NEAR   a hand within 45 cm of an item (anywhere from the floor up to just above it) takes it       (Alyx / Pavlov hand grab, generous)
+     2. RAY    a hand pointed at an item up to 7 m away (within ~13 degrees) pulls it to you              (Contractors / Alyx distance grab)
+     3. USE    standing at a gold gate, the boss door, a puzzle or the stash chest: the grip uses it      (Pavlov / Contractors "interact")
+     4. BODY   nothing pointed at: the nearest item within 2.6 m in front of you (the old flat-game rule, so a grip never does nothing)
+   A grab is a fresh squeeze of the grip (with hysteresis, so a half-relaxed grip re-arms). If the grip is already squeezed (players hold it
+   like a gun), resting the hand on an item for 0.2 s also takes it, but only a NEAR item: gold is never spent without a fresh squeeze. */
+const XrGrab = (function () {
+  const R = { NEAR: 0.45, ITEM_TOP: 0.6, CONE: 0.23, CONE_CLOSE: 0.4, FAR: 7, BODY: 2.6, DWELL: 0.2, ON: 0.55, OFF: 0.3, SHOULDER: 0.26 };
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const len = (a) => Math.hypot(a[0], a[1], a[2]);
+  // how far a hand is from an item: the item is a short upright post from the floor to ITEM_TOP, so a hand reaching low or just above counts
+  function nearDist(p, it) { const y = Math.max(0, Math.min(R.ITEM_TOP, p[1])); return Math.hypot(p[0] - it.x, p[1] - y, p[2] - it.z); }
+  // the best target for one hand. hand = { p: [x, y, z], d: unit direction it points } in world space; items = [{ id, x, y, z }];
+  // los(x, z) says whether the item can be seen from the player (no grabbing through walls); nearOnly skips pointing (used while firing). Returns { id, mode, d } or null.
+  function pick(hand, items, los, nearOnly) {
+    if (!hand || !items || !items.length) return null;
+    let best = null;
+    for (const it of items) { const d = nearDist(hand.p, it); if (d < R.NEAR && (!best || d < best.d)) best = { id: it.id, mode: 'near', d }; }
+    if (best || nearOnly) return best;
+    let bs = Infinity;
+    for (const it of items) {
+      const v = sub([it.x, it.y, it.z], hand.p), L = len(v), t = dot(v, hand.d); if (t <= 0 || L > R.FAR || L < 1e-6) continue;
+      const ang = Math.acos(Math.max(-1, Math.min(1, t / L))), lim = Math.max(R.CONE, Math.min(R.CONE_CLOSE, Math.atan(0.45 / L)));   // close items get a wider cone (they look big)
+      if (ang > lim) continue;
+      if (los && !los(it.x, it.z)) continue;
+      const score = ang / lim + L / R.FAR * 0.35; if (score < bs) { bs = score; best = { id: it.id, mode: 'ray', d: L }; }
+    }
+    return best;
+  }
+  // the old rule as the last fallback: the nearest item within reach, the one in front of you winning (yaw 0 looks down -z)
+  function bodyPick(items, body) {
+    let best = null, bs = Infinity; const fx = Math.sin(body.yaw), fz = -Math.cos(body.yaw);
+    for (const it of items || []) {
+      const d = Math.hypot(it.x - body.x, it.z - body.z); if (d >= R.BODY) continue;
+      const ahead = d < 0.01 ? 1 : ((it.x - body.x) * fx + (it.z - body.z) * fz) / d, s = d * (1.6 - 0.6 * ahead);
+      if (s < bs) { bs = s; best = { id: it.id, mode: 'body', d }; }
+    }
+    return best;
+  }
+  // one hand's grip. step(value 0..1, target, dt) -> { grab, squeezed }. grab is true on a fresh squeeze, or (grip held) after the hand rests DWELL s on a NEAR item.
+  function createGrip() {
+    let down = false, dwellId = null, dwell = 0; const tried = new Set();
+    function step(v, target, dt) {
+      let grab = false;
+      if (!down && v >= R.ON) { down = true; grab = true; dwellId = target ? target.id : null; dwell = 0; if (target) tried.add(target.id); }
+      else if (down && v <= R.OFF) { down = false; tried.clear(); dwellId = null; }
+      else if (down && target && target.mode === 'near' && !tried.has(target.id)) {
+        if (dwellId !== target.id) { dwellId = target.id; dwell = 0; }
+        dwell += dt || 0; if (dwell >= R.DWELL) { grab = true; tried.add(target.id); }
+      } else if (down && (!target || target.mode !== 'near')) { dwellId = null; dwell = 0; }
+      return { grab, squeezed: down };
+    }
+    return { step, reset: () => { down = false; tried.clear(); dwellId = null; dwell = 0; } };
+  }
+  // the gun on your back: the right hand reaching over the right shoulder (rig space: head position + yaw only). Returns true when there.
+  function overShoulder(hand, head, headYaw) {
+    const c = Math.cos(headYaw), s = Math.sin(headYaw), ox = 0.16, oy = -0.08, oz = 0.12;   // right of, a bit below and behind the head
+    const sx = head[0] + ox * c + oz * s, sz = head[2] - ox * s + oz * c;   // rig-space yaw (three.js: positive turns left), offset turned with it
+    return Math.hypot(hand[0] - sx, hand[1] - (head[1] + oy), hand[2] - sz) < R.SHOULDER;
+  }
+  // what a grip on a gate / door / puzzle / chest would do, from the game's snapshot: { what, text, ok } or null
+  function useTarget(st) {
+    const L = st && st.locks, n = L && L.near;
+    if (n) { const a = n.actions && n.actions[0]; return { what: n.what, text: a ? (a.afford ? a.label : n.what === 'key' ? 'Needs the Key Keeper\'s key' : n.price ? 'Need ' + n.price + ' gold' : 'Not enough gold') : n.text, ok: !!(a && a.afford), x: n.x, z: n.z }; }
+    const d = L && L.door;
+    if (d && d.near && !d.open) return { what: 'door', text: d.canOpen ? 'Open the door' : (d.text || 'Sealed'), ok: !!d.canOpen, x: d.x, z: d.z };
+    const s = st && st.player && st.player.stash;
+    if (s && s.near && s.chest) return { what: 'stash', text: 'Open the stash', ok: true, x: s.chest.x, z: s.chest.z };
+    return null;
+  }
+  return { R, pick, bodyPick, nearDist, createGrip, overShoulder, useTarget };
+})();
+if (typeof module !== 'undefined') module.exports = XrGrab;
+
+/* VR hands in the world: each hand shows what its grip will take or use (a ring on the floor, a beam, and a label in the world, a light buzz
+   when a new thing comes under the hand), and a squeeze turns into one action for the game: take this exact item, use the gate / door /
+   chest / puzzle you stand at, or swap to the gun on your back (right hand over the right shoulder). The choosing is XrGrab (pure);
+   this file only reads the controllers, draws the highlight and plays the haptics. Presentation and input only: the referee still decides. */
+const XrInteract = (function () {
+  function create(o) {
+    const { THREE, dolly, camera, hands, pulse } = o;
+    const ITEM_Y = 0.35;
+    const OK = { '.': 1, c: 1, d: 1, P: 1 };
+    // a straight line on the map from the player to (x, z) without a wall in between (the referee checks again)
+    function los(st, x, z) {
+      const m = o.map && o.map(); if (!m) return true;
+      const C = m.CELL, px = st.player.x, pz = st.player.z, n = Math.ceil(Math.hypot(x - px, z - pz) / 0.25);
+      for (let i = 1; i < n; i++) { const t = i / n, cx = Math.floor((px + (x - px) * t) / C), cz = Math.floor((pz + (z - pz) * t) / C), r = m.rows[cz]; if (!r || !OK[r[cx]]) return false; }
+      return true;
+    }
+    // ---- the highlight, one per hand: a ring on the floor, a soft beam, a label that faces you, and a line from the hand when pulling from afar ----
+    function makeLabel() {
+      const cv = document.createElement('canvas'); cv.width = 768; cv.height = 160;
+      const tex = new THREE.CanvasTexture(cv), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false }));
+      sp.scale.set(0.96, 0.2, 1); sp.renderOrder = 995; sp.visible = false; dolly.parent ? dolly.parent.add(sp) : dolly.add(sp);
+      let last = '';
+      function set(a, b, col) {
+        const key = a + '|' + b + '|' + col; if (key === last) return; last = key;
+        const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height);
+        x.fillStyle = 'rgba(10,3,5,0.78)'; x.strokeStyle = col; x.lineWidth = 5; const r = 26, w = cv.width - 10, h = cv.height - 10;
+        x.beginPath(); x.moveTo(5 + r, 5); x.arcTo(5 + w, 5, 5 + w, 5 + h, r); x.arcTo(5 + w, 5 + h, 5, 5 + h, r); x.arcTo(5, 5 + h, 5, 5, r); x.arcTo(5, 5, 5 + w, 5, r); x.closePath(); x.fill(); x.stroke();
+        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = col; x.font = "700 54px 'Barlow Condensed', 'Arial Narrow', sans-serif"; x.fillText(a, cv.width / 2, 56);
+        x.fillStyle = '#ecdfc6'; x.font = "600 40px 'Barlow Condensed', 'Arial Narrow', sans-serif"; x.fillText(b, cv.width / 2, 114);
+        tex.needsUpdate = true;
+      }
+      return { sp, set };
+    }
+    const world = () => dolly.parent || dolly;
+    function makeMark(col) {
+      const g = new THREE.Group(); g.visible = false;
+      const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.022, 6, 40), mat); ring.rotation.x = Math.PI / 2; ring.position.y = 0.03; g.add(ring);
+      const beamMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.22, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.11, 1.2, 10, 1, true), beamMat); beam.position.y = 0.6; g.add(beam);
+      world().add(g);
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 1), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7, depthWrite: false, fog: false }));
+      line.visible = false; world().add(line);
+      return { g, ring, beam, mat, beamMat, line, label: makeLabel() };
+    }
+    const COL = { right: 0xffd27a, left: 0x9ee7ff, bad: 0xff5a4a };
+    const side = { right: { mark: makeMark(COL.right), grip: XrGrab.createGrip(), tgt: null, key: '' }, left: { mark: makeMark(COL.left), grip: XrGrab.createGrip(), tgt: null, key: '' } };
+    // the item's flight to your hand (Alyx-style pull), purely for show: the game has already taken it
+    const flyMat = new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0.9, fog: false, blending: THREE.AdditiveBlending, depthWrite: false });
+    const fly = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), flyMat); fly.visible = false; world().add(fly);
+    let flyT = 1, flyHand = null; const flyFrom = new THREE.Vector3();
+    let pending = null, lastAct = null;
+    const hp = new THREE.Vector3(), hd = new THREE.Vector3(), q = new THREE.Quaternion(), tmp = new THREE.Vector3(), headL = new THREE.Vector3();
+    function itemName(p) { const v = p.gun || p.gear || p.mod; return v ? v.name + (v.rarityName ? '  (' + v.rarityName + ')' : '') : p.kind; }
+    function itemColor(p) { const v = p.gun || p.gear || p.mod; return v && v.color !== undefined ? '#' + v.color.toString(16).padStart(6, '0') : '#ffd27a'; }
+    // where a use target is, from the snapshot
+    function usePos(st, u) {
+      const L = st.locks, n = L && L.near;
+      if (u.what === 'toll' || u.what === 'key') { const g = n && L.gates[n.i]; return g ? [g.x, g.z, 1.1] : null; }
+      if (u.what === 'scale' || u.what === 'wheels') { const s = L.boss && L.boss.station; return s ? [s.x - s.nx * 1.2, s.z - s.nz * 1.2, 0.8] : null; }
+      if (u.what === 'door') return [L.door.x, L.door.z, 1.4];
+      if (u.what === 'stash') return [u.x, u.z, 0.6];
+      return null;
+    }
+    function hide(s) { s.mark.g.visible = false; s.mark.line.visible = false; s.mark.label.sp.visible = false; }
+    // every frame while playing: choose each hand's target, draw it, and turn a squeeze into an action
+    function update(st, active, dt, menuOpen) {
+      if (fly.visible) { flyT += dt / 0.18; const h = flyHand && hands[flyHand]; if (flyT >= 1 || !h) fly.visible = false; else { h.grip.getWorldPosition(tmp); fly.position.lerpVectors(flyFrom, tmp, flyT * flyT); fly.scale.setScalar(1 - flyT * 0.6); } }
+      if (!active || menuOpen || !st || st.over) { for (const k in side) { hide(side[k]); side[k].tgt = null; side[k].key = ''; side[k].grip.step(0, null, dt); } return; }
+      const items = (st.pickups || []).filter((p) => (p.grab !== undefined ? p.grab : (p.kind === 'gun' || p.kind === 'gear' || p.kind === 'mod'))).map((p) => ({ id: p.id, x: p.x, y: ITEM_Y, z: p.z, p }));
+      const use = XrGrab.useTarget(st), losF = (x, z) => los(st, x, z);
+      camera.updateMatrix(); headL.copy(camera.position); tmp.set(0, 0, -1).applyQuaternion(camera.quaternion); const headYaw = Math.atan2(-tmp.x, -tmp.z);
+      for (const hand of ['right', 'left']) {
+        const s = side[hand], c = hands[hand];
+        if (!c || !c.gamepad) { hide(s); s.tgt = null; continue; }
+        const gv = c.gamepad.buttons && c.gamepad.buttons[1] ? (c.gamepad.buttons[1].value || (c.gamepad.buttons[1].pressed ? 1 : 0)) : 0;
+        // while firing, the gun hand only grabs what it touches (no pull from afar in a fight)
+        const trig = c.gamepad.buttons && c.gamepad.buttons[0] && (c.gamepad.buttons[0].pressed || c.gamepad.buttons[0].value > 0.35);
+        const support = hand === 'left' && (o.twoHand() || trig);         // left grip on the fore-end, or aiming down sights (left trigger): that hand is on the gun
+        let tgt = null;
+        if (!support) {
+          c.grip.getWorldPosition(hp); c.ray.getWorldQuaternion(q); hd.set(0, 0, -1).applyQuaternion(q);
+          if (hand === 'right' && st.player.gun && st.player.gun.other && XrGrab.overShoulder(c.grip.position.toArray(), headL.toArray(), headYaw)) tgt = { mode: 'shoulder', key: 'shoulder', text: 'Swap to ' + (st.player.gun.other.card ? st.player.gun.other.card.name : 'your other gun'), ok: true };
+          if (!tgt) { const pk = XrGrab.pick({ p: hp.toArray(), d: hd.toArray() }, items, losF, hand === 'right' && trig); if (pk) { const it = items.find((i) => i.id === pk.id); tgt = { mode: pk.mode, id: pk.id, key: pk.mode + pk.id, item: it, text: itemName(it.p), col: itemColor(it.p), ok: true }; } }
+          if (!tgt && use) { const at = usePos(st, use); tgt = { mode: 'use', key: 'u' + use.what + use.text, use, at, text: use.text, ok: use.ok }; }
+          if (!tgt && hand === 'right') { const bp = XrGrab.bodyPick(items, { x: st.player.x, z: st.player.z, yaw: st.player.yaw }); if (bp) { const it = items.find((i) => i.id === bp.id); tgt = { mode: 'body', id: bp.id, key: 'body' + bp.id, item: it, text: itemName(it.p), col: itemColor(it.p), ok: true }; } }
+        }
+        const key = tgt ? tgt.key : '';
+        if (key !== s.key) { if (tgt && tgt.mode !== 'body') pulse(hand, 0.14, 12); s.key = key; }
+        s.tgt = tgt;
+        const r = s.grip.step(support ? 0 : gv, tgt ? { id: tgt.key, mode: tgt.mode } : null, dt);
+        if (r.grab && tgt) act(hand, tgt, st);
+        if (hand === 'left' && tgt && tgt.mode === 'use' && side.right.key === key) hide(s); else draw(hand, s, tgt, hp);   // both hands at the same gate: one highlight
+      }
+    }
+    function act(hand, tgt, st) {
+      if (tgt.mode === 'shoulder') { pending = { type: 'swap', hand }; pulse(hand, 0.5, 35); }
+      else if (tgt.item) { pending = { type: 'item', id: tgt.id, hand, mode: tgt.mode }; pulse(hand, 0.65, 45); flyFrom.set(tgt.item.x, ITEM_Y, tgt.item.z); flyT = 0; flyHand = hand; fly.visible = true; }
+      else if (tgt.use) {
+        if (tgt.ok) { pending = { type: 'use', hand, what: tgt.use.what }; pulse(hand, 0.55, 40); }
+        else { pulse(hand, 0.9, 70); if (o.toast) o.toast(tgt.text); }             // a firm "no" buzz, and why, so a grip never seems to do nothing
+      }
+      lastAct = { type: pending ? pending.type : 'denied', hand, mode: tgt.mode, text: tgt.text };
+    }
+    function draw(hand, s, tgt, hpW) {
+      const m = s.mark;
+      if (!tgt || tgt.mode === 'shoulder') { hide(s); if (tgt) { m.label.set(hand === 'right' ? 'R GRIP' : 'L GRIP', tgt.text, '#' + COL[hand].toString(16)); hands[hand].grip.getWorldPosition(tmp); m.label.sp.position.copy(tmp).add(new THREE.Vector3(0, 0.18, 0)); m.label.sp.scale.set(0.5, 0.104, 1); m.label.sp.visible = true; } return; }
+      const isUse = tgt.mode === 'use', col = !tgt.ok ? COL.bad : COL[hand];
+      let x, z, y;
+      if (isUse) { if (!tgt.at) { hide(s); return; } [x, z, y] = tgt.at; } else { x = tgt.item.x; z = tgt.item.z; y = ITEM_Y; }
+      m.mat.color.setHex(col); m.beamMat.color.setHex(col);
+      m.g.position.set(x, 0, z); m.g.scale.setScalar(isUse ? 2.2 : tgt.mode === 'body' ? 0.85 : 1); m.g.visible = true;
+      m.beam.visible = !isUse; m.mat.opacity = tgt.mode === 'body' ? 0.45 : 0.9;
+      const head = isUse ? (tgt.ok ? 'GRIP: ' : 'LOCKED: ') : (hand === 'right' ? 'R GRIP: take' : 'L GRIP: take');
+      m.label.set(isUse ? head + tgt.text : head, isUse ? (tgt.ok ? '' : 'grip for details') : tgt.text, isUse ? '#' + col.toString(16).padStart(6, '0') : tgt.col);
+      m.label.sp.position.set(x, (isUse ? y + 0.9 : 1.15) + (hand === 'left' ? 0.24 : 0), z); m.label.sp.scale.set(0.96, 0.2, 1); m.label.sp.visible = true;
+      if (tgt.mode === 'ray') {                                          // a line from the hand to what it will pull
+        tmp.set(x, y, z); const L = tmp.distanceTo(hpW); m.line.position.copy(hpW).lerp(tmp, 0.5); m.line.lookAt(tmp); m.line.scale.set(1, 1, L); m.line.material.color.setHex(col); m.line.visible = true;
+      } else m.line.visible = false;
+    }
+    function take() { const p = pending; pending = null; return p; }
+    function clear() { for (const k in side) { hide(side[k]); side[k].tgt = null; side[k].key = ''; side[k].grip.reset(); } pending = null; fly.visible = false; }
+    const view = (t) => (t ? { mode: t.mode, id: t.id, text: t.text, ok: t.ok, what: t.use ? t.use.what : undefined } : null);
+    return { update, take, clear, debug: () => ({ right: view(side.right.tgt), left: view(side.left.tgt), last: lastAct }) };
+  }
+  return { create };
+})();
+if (typeof module !== 'undefined') module.exports = XrInteract;
+
 /* Meta Quest / WebXR mode: an "Enter VR" button (only shown when the browser can do immersive VR), the VR camera rig,
    the two Touch controllers (simple hand meshes and an aim laser), and a floating HUD you can read in the headset.
    Presentation and input only: it never touches the referee's rules. The game reads its input through the same
@@ -8774,6 +8996,8 @@ const XrMode = (function () {
     let twoHand = false, gripErr = -1;
     const foreW = new THREE.Vector3(), gripW = new THREE.Vector3(), sh = new THREE.Vector3(), dir2 = new THREE.Vector3(), up2 = new THREE.Vector3(), m4b = new THREE.Matrix4(), q2 = new THREE.Quaternion();
     const ZERO3 = new THREE.Vector3();
+    // grabbing and using things in the world (xr_interact.js): what each hand will take, the highlight, the squeeze
+    const inter = XrInteract.create({ THREE, dolly, camera, hands, pulse: (h, s, ms) => pulse(h, s, ms), twoHand: () => twoHand, map: o.levelMap, toast: o.toast });
     const STEER = { pistol: 0.3, smg: 0.75, rifle: 0.8, shotgun: 0.8, sniper: 0.85, hmg: 0.85 };
     function supportHand() {
       const L = hands.left, R = hands.right, g = o.gunParts && o.gunParts();
@@ -9000,9 +9224,9 @@ const XrMode = (function () {
         center('Point with the laser and pull the trigger to pick' + (st.shop ? '   Y: leave the merchant' : ''), 22, '#a89080');
         return;
       }
-      const lb = $('lockBox'); if (lb && getComputedStyle(lb).display !== 'none' && lb.offsetParent !== null) { center(txt('lockTxt'), 24, '#cfa54a'); const b0 = txt('lockB0'), b1 = txt('lockB1'); center((b0 ? 'Right grip: ' + b0 : '') + (b1 ? '    Right stick down: ' + b1 : ''), 22); }
-      const fc = $('floorCard'); if (fc && fc.offsetParent !== null && txt('floorCard')) center('Right grip: pick up  ' + txt('floorCard').slice(0, 50), 22, '#ecdfc6');
-      const sh = $('stashHint'); if (sh && !sh.hidden) center('STASH CHEST: right grip', 22, '#cfa54a');
+      const lb = $('lockBox'); if (lb && getComputedStyle(lb).display !== 'none' && lb.offsetParent !== null) { center(txt('lockTxt'), 24, '#cfa54a'); const b0 = txt('lockB0'), b1 = txt('lockB1'); center((b0 ? 'Grip: ' + b0 : '') + (b1 ? '    Right stick down: ' + b1 : ''), 22); }
+      const fc = $('floorCard'); if (fc && fc.offsetParent !== null && txt('floorCard')) center('Grip (reach or point at it): pick up  ' + txt('floorCard').slice(0, 44), 22, '#ecdfc6');
+      const sh = $('stashHint'); if (sh && !sh.hidden) center('STASH CHEST: grip', 22, '#cfa54a');
       const mm = o.map && o.map.small;                                // the corner map, bottom left of the view (hold the LEFT GRIP for the whole floor in your hand)
       if (mm && mm.width) { hx.shadowBlur = 0; hx.globalAlpha = 0.9; hx.drawImage(mm, 40, 250, 170, 170); hx.globalAlpha = 1; hx.strokeStyle = '#6a2a2e'; hx.lineWidth = 3; hx.strokeRect(40, 250, 170, 170); hx.shadowBlur = 8; line('Double-tap Y: map', 40, 222, 20, '#cfa54a'); }
       const toastE = $('padToast'); if (toastE && toastE.classList.contains('show')) center(questText(toastE.textContent), 24, '#e8c890');
@@ -9026,6 +9250,7 @@ const XrMode = (function () {
       fall(dt); mapHand(dt, running);
       placeGun(p);
       menuPanel(running, dt);
+      inter.update(st, running, dt, menuMesh.visible);
       laser(dt);
       hudT -= dt; if (hudT <= 0) { hudT = 0.1; drawHud(st, running); hudTex.needsUpdate = true; }
     }
@@ -9105,12 +9330,9 @@ const XrMode = (function () {
         try { if (a && a.pulse) a.pulse(strength, ms); else if (a && a.playEffect) a.playEffect('dual-rumble', { duration: ms, strongMagnitude: strength, weakMagnitude: strength }); } catch (e) { /* no haptics */ }
       }
     }
-    // right grip: grab. One press = pick up the gun at your feet, open the stash, or use a gold gate / the boss door (like E / A on the flat page)
-    let gripWas = false;
-    function grab() {
-      const g = hands.right && hands.right.gamepad, b = g && g.buttons && g.buttons[1], on = !!b && (b.pressed || b.value > 0.5);
-      const e = on && !gripWas; gripWas = on; return e;
-    }
+    // grips: what a squeeze did this frame (xr_interact.js): { type: 'item', id } take that exact item, { type: 'use' } use the gate / door /
+    // chest / puzzle you stand at, { type: 'swap' } the gun on your back. Either hand; the left grip on the gun's fore-end is the support hand instead.
+    function grab() { return session ? inter.take() : null; }
     function aimDir(out) { return out.set(0, 0, -1).applyQuaternion(aimQ); }
     const yBtn = XrInput.createY(); let yNow = { tap: false, hold: false, progress: 0 };
     function pad() {
@@ -9136,7 +9358,7 @@ const XrMode = (function () {
         if (renderer.xr.setFoveation) renderer.xr.setFoveation(1);
         session = s; aimInit = false; bodyYaw = o.playerYaw(); turn.reset(); hudMesh.visible = true; btn.textContent = 'EXIT VR'; btn.hidden = true;
         s.addEventListener('end', () => {
-          session = null; renderer.xr.enabled = false; vig.visible = false; hudMesh.visible = false; reticle.visible = false; menuMesh.visible = false;
+          session = null; inter.clear(); renderer.xr.enabled = false; vig.visible = false; hudMesh.visible = false; reticle.visible = false; menuMesh.visible = false;
           dolly.position.set(0, 0, 0); dolly.rotation.set(0, 0, 0); if (gun.parent !== camera) camera.add(gun);
           for (const m of (o.arms || [])) m.visible = true; if (mapHeld && o.map) o.map.open(false); mapHeld = false; mapMesh.visible = false;
           btn.textContent = 'ENTER VR'; btn.hidden = false; if (onEnd) onEnd();
@@ -9167,7 +9389,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, debug: () => ({ pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();
@@ -9829,7 +10051,7 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   const ref = Referee.create((Date.now() & 0xffffff) | 1);
   const SANDBOX = /sandbox/.test(location.hash + location.search);   // ?sandbox: the VR test map (a small floor, a few weak monsters, one of each gun type at your feet). Test link only, the normal game is unchanged
   const GAME_CFG = { startGun: 'pistol_service', gunDrops: true, gearDrops: true, modDrops: true, stashOpen: true, manualGuns: true, bossRandom: true };      // the game's rules: you start with the silver pistol and monsters drop guns, armor and charms (the referee's plain defaults keep the tests steady)
-  if (SANDBOX) Object.assign(GAME_CFG, { floorSize: 44, monsterCount: 2, monsterDamage: 2, playerHp: 400, locks: false });
+  if (SANDBOX) Object.assign(GAME_CFG, { floorSize: 44, monsterCount: 2, monsterDamage: 2, playerHp: 400, keepDrops: true, doorTest: true });   // test map: the gold gate stays shut so paying at a door can be tried (you get the gold), the boss door opens when you use it, floor guns never fade
   ref.setCfg(GAME_CFG); ref.setStash(StashStore.read());          // what you put in the chest on earlier runs is still there
 
   // a link can start the run on a later wave, to try the boss: ...#wave10 (or ?wave=10)
@@ -10189,7 +10411,7 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   }
 
   /* ============ input ============ */
-  const I = { swap: false, pickup: false, mx: 0, mz: 0, lookX: 0, lookY: 0, touchX: 0, touchY: 0, fire: false, ads: false, sprint: false, slide: false, jump: false, reload: false, pick: undefined, restart: false };
+  const I = { swap: false, pickup: false, pickupId: undefined, mx: 0, mz: 0, lookX: 0, lookY: 0, touchX: 0, touchY: 0, fire: false, ads: false, sprint: false, slide: false, jump: false, reload: false, pick: undefined, restart: false };
   const keys = {};
   const mouse = { fire: false, ads: false };
   const tch = { fire: false, ads: false, sprint: false, reload: false };
@@ -10391,7 +10613,7 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
     const out = {
       mx, mz, lookX: I.lookX, lookY: I.lookY, touchX: I.touchX, touchY: I.touchY, padX: pr ? pr.padX : 0, padY: pr ? pr.padY : 0,
       fire: mouse.fire || tch.fire || !!(pr && pr.fire), ads: mouse.ads || tch.ads || !!(pr && pr.ads),
-      sprint: !!(keys.ShiftLeft || keys.ShiftRight) || tch.sprint || !!(pr && pr.sprint), slide: I.slide || !!(pr && pr.slide), jump: I.jump || !!(pr && pr.jump), reload: I.reload || !!(pr && pr.reload), swap: I.swap || !!(pr && pr.swap), pickup: I.pickup, lockUse: I.lockUse !== undefined ? I.lockUse : pr && pr.lockUse, seeds: I.restart ? { map: rnd(), damage: rnd(), item: rnd() } : undefined, pick: I.pick, pickClass: I.pickClass, shopClose: I.shopClose, restart: I.restart
+      sprint: !!(keys.ShiftLeft || keys.ShiftRight) || tch.sprint || !!(pr && pr.sprint), slide: I.slide || !!(pr && pr.slide), jump: I.jump || !!(pr && pr.jump), reload: I.reload || !!(pr && pr.reload), swap: I.swap || !!(pr && pr.swap), pickup: I.pickup, pickupId: I.pickupId, lockUse: I.lockUse !== undefined ? I.lockUse : pr && pr.lockUse, seeds: I.restart ? { map: rnd(), damage: rnd(), item: rnd() } : undefined, pick: I.pick, pickClass: I.pickClass, shopClose: I.shopClose, restart: I.restart
     };
     if (xr && xr.presenting()) {                                    // VR: aim follows the right controller's ray (or your head), sent like a mouse move
       const a = xr.aim(), pl = state.player, c = ref.cfg;
@@ -10401,7 +10623,7 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
       const hy = xr.headYaw();                                        // walk where your head faces, not where the gun points
       if (hy !== null && (out.mx || out.mz)) { const mv = XrInput.headMove(out.mx, out.mz, hy - (a ? a.yaw : pl.yaw)); out.mx = mv.mx; out.mz = mv.mz; }
     }
-    I.lookX = I.lookY = I.touchX = I.touchY = 0; I.slide = false; I.jump = false; I.reload = false; I.swap = false; I.pickup = false; I.lockUse = undefined; I.pick = undefined; I.pickClass = undefined; I.shopClose = false; I.restart = false;
+    I.lookX = I.lookY = I.touchX = I.touchY = 0; I.slide = false; I.jump = false; I.reload = false; I.swap = false; I.pickup = false; I.pickupId = undefined; I.lockUse = undefined; I.pick = undefined; I.pickClass = undefined; I.shopClose = false; I.restart = false;
     return out;
   }
 
@@ -10449,8 +10671,12 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   let sandboxGiven = -1;
   function sandboxGifts() {                                          // one gun of each type lies at your feet, plus gold and a couple of mods, so every reload and menu can be tried
     if (!SANDBOX || sandboxGiven === state.floorId) return; sandboxGiven = state.floorId;
-    for (const id of ['shotgun_pump', 'rifle', 'smg_compact', 'sniper_bolt', 'hmg_belt', 'pistol_cannon']) ref.giveGun(id, 1);
-    ref.giveGold(500); ref.giveMod(1); ref.giveMod(2); ref.giveGear('head', 2); state = ref.snapshot();
+    // laid out in an arc in front of you like a weapon rack (not in one pile), so each can be reached, pointed at and grabbed on its own
+    const p = state.player, m = ref.map, C = m.CELL, free = (x, z) => { const r = m.rows[Math.floor(z / C)]; const ch = r && r[Math.floor(x / C)]; return ch === '.' || ch === 'c'; };
+    const spot = (k, n) => { for (const rad of [1.7, 1.2, 0.8]) { const a = p.yaw + (k - (n - 1) / 2) * 0.36, x = p.x + Math.sin(a) * rad, z = p.z - Math.cos(a) * rad; if (free(x, z) && free(x + 0.4, z) && free(x - 0.4, z) && free(x, z + 0.4) && free(x, z - 0.4)) return [x, z]; } return [p.x, p.z]; };
+    const gifts = [['gun', 'shotgun_pump'], ['gun', 'rifle'], ['gun', 'smg_compact'], ['gun', 'sniper_bolt'], ['mod', 1], ['gear', 'head'], ['mod', 2], ['gun', 'hmg_belt'], ['gun', 'pistol_cannon']];
+    gifts.forEach(([k, v], i) => { const [x, z] = spot(i, gifts.length); if (k === 'gun') ref.giveGun(v, 1, undefined, x, z); else if (k === 'mod') ref.giveMod(v, undefined, x, z); else ref.giveGear(v, 2, undefined, x, z); });
+    ref.giveGold(1000); state = ref.snapshot();
   }
   const coop = Coop.create($, ref, { toast: (t) => toast(t), playLabel: (t, off) => { $('playLabel').textContent = t; playBtn.disabled = off; }, begin });
   // controller menus: Start pauses and resumes, A starts, picks the highlighted level-up card, and rises again after a fall
@@ -10653,6 +10879,13 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
     lockKey = key; lockTxt.textContent = n.text;
     lockB.forEach((b, i) => { const a = n.actions[i]; b.hidden = !a; if (a) { b.textContent = a.label + (isTouch ? '' : i === 0 ? '  [E]' : '  [Z]'); b.classList.toggle('no', !a.afford); } });
     lockBox.classList.add('show');
+  }
+  // VR grips (xr_interact.js): take that exact item, use what you stand at (gate, door, puzzle, chest), or swap to the gun on your back
+  function vrGrab(a) {
+    if (!a) return;
+    if (a.type === 'item') { I.pickup = true; I.pickupId = a.id; }
+    else if (a.type === 'swap') I.swap = true;
+    else if (a.type === 'use') { if ((state.locks && state.locks.near) || (state.locks && state.locks.door && state.locks.door.near)) I.lockUse = 0; else if (state.player.stash.near) openStash(); }
   }
   function pressPickup() { if (state.locks && state.locks.near) { I.lockUse = 0; return; } const q = GunCard.nearest(state, 6); if (!(q && q.inReach) && state.player.stash.near) openStash(); else I.pickup = true; }
   $('bGear').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); toggleGear(); });
@@ -11023,12 +11256,12 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   GP.gunBody = gunBody; GP.magBase = MAG_BASE; GP.fore = HOLD;
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
-    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw });
+    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
   xr.on(() => { renderer.setAnimationLoop(frame); if (!running) begin(true); }, () => { renderer.setAnimationLoop(null); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
-    try { pollPad(dt); padMenus(); if (xr && xr.presenting() && xr.grab() && running && !panelOpen && !state.choices && !state.classChoices && !state.over) pressPickup(); } catch (e) { /* a controller hiccup must not stop the frame */ }
+    try { pollPad(dt); padMenus(); if (xr && xr.presenting()) { const ga = xr.grab(); if (ga && running && !panelOpen && !state.choices && !state.classChoices && !state.over) vrGrab(ga); } } catch (e) { /* a controller hiccup must not stop the frame */ }
     // each stage guards itself: one bad frame in the drawing code must never freeze the rules or the controller, and the first error is shown on screen so it can be read off a phone
     const stage = (name, fn) => { try { fn(); } catch (e) { if (!frameErr) { frameErr = name + ': ' + (e && e.message ? e.message : e); toastEl.textContent = 'Error in ' + frameErr; toastEl.classList.add('show'); toastT = 1e9; if (window.console) console.error(e); } } };
     if (running && !panelOpen) {

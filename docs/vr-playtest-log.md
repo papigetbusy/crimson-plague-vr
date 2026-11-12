@@ -1,0 +1,119 @@
+# VR playtest log (simulated Meta Quest 3)
+
+How it is tested: `tools/xr_playtest.js` opens the built page in headless Chrome with a fake Quest (`tools/xr_fake_quest.js`: a WebXR immersive-vr session, a head and two Touch controllers with xr-standard buttons, sticks and haptics). It moves the hands to real items, gates and doors in the level, squeezes grips, pulls triggers, clicks sticks and points the laser at menu buttons, then reads the game's own state to see what really happened. Screenshots go to the folder given with `--shots`.
+
+## Everything you can pick up or use (audit of the code, 2026-11-12)
+| Thing | Where it comes from | How it is taken / used | In VR before the fix |
+|---|---|---|---|
+| Gun on the floor | monster drops, the boss, the gun you swap away, test-map rack | pick up (game: manual only, so nothing is swapped by accident); fades after 60 s | right grip only; took the nearest within 2.6 m of your feet, not the one you reached for |
+| Armor (head, chest, boots, charms) | drops, test map | pick up (goes on even if worse, on purpose) | same as guns |
+| Gun mod | drops, test map | pick up into the bag (6 places) | same as guns |
+| Heart (heal) and flame (frenzy) | drops | walk over them (automatic) | worked |
+| Coins and XP orbs | every kill | pulled to you and taken automatically | worked |
+| Gold gate (toll) | across corridors on every floor | pay the price at it (5 m reach) | right grip only, no highlight, no reason when short of gold; on the test map all gates were already open |
+| Key gate | floor 3+, last gate | use the Key Keeper's key | right grip only |
+| Boss door | every floor | opens by itself when the boss is dead and the puzzle is solved | grip did nothing and said nothing; on the test map this was the only closed door, so "doors don't open" |
+| Scale / Fortune Wheels | beside the boss door | first action = grip, second (take gold back) = hard push down on the right stick | right grip only |
+| Coin Sockets | in the halls | shoot them | worked |
+| Safe-room door | after the boss | open; walk through | worked |
+| Stash chest | safe room | grip at it opens the stash menu | right grip only |
+| Merchant | safe room | walk up: the shop opens | worked |
+
+## Before the fix (build e61a65f), 2026-11-12
+26 of 46 checks passed. Notes on the ones that need reading: the "shoulder swap" in the first run only "passed" because the grip grabbed a floor gun near your feet (that is the bug); the stash and merchant rows first failed because the boss's level-up cards were open (the test now picks them with the laser); the safe-room door row failed because of the test's teleport (fixed in the harness, not a game bug).
+
+| # | Area | Check | Result | Seen / why |
+|---|---|---|---|---|
+| 1 | pickup | Right grip with your hand at your side takes a gun lying at your feet | PASS | pistol -> shotgun |
+| 2 | pickup | Reaching a hand to an item highlights it | **FAIL** | no highlight existed |
+| 3 | pickup | Light buzz when a hand touches something grabbable | **FAIL** | 0 pulses |
+| 4 | pickup | Right hand reaching down + grip takes THAT gun | **FAIL** | took a different gun (nearest to the feet, not the hand) |
+| 5 | pickup | Firm buzz when the grab lands | **FAIL** | no haptic on pickup |
+| 6 | pickup | Left hand reaching down + left grip takes that gun | **FAIL** | the left grip never grabbed anything |
+| 7 | pickup | Pointing at an item 5 m away highlights it | **FAIL** | no distance grab |
+| 8 | pickup | Point + grip pulls it from 5 m | **FAIL** | out of the 2.6 m reach; grip took another gun instead |
+| 9 | pickup | Grip already held (like a gun), hand reaches an item: taken | **FAIL** | a grab only counted the instant the grip went down |
+| 10 | pickup | Gun mod: reach + grip | PASS | (it was the nearest item) |
+| 11 | pickup | Left grip on the fore-end = two-handed hold | PASS | |
+| 12 | pickup | Right hand over the shoulder + grip swaps to the back gun | **FAIL** | grabbed a floor gun instead |
+| 13 | pickup | Test-map guns still there after a minute | **FAIL** | floor loot fades after 60 s, the test map's gifts too (found in code, proved in tests/grab.test.js) |
+| 14 | doors | Gold gate without enough gold says why | **FAIL** | nothing happened, no buzz, no message |
+| 15 | doors | Gate highlighted when you stand at it | **FAIL** | |
+| 16 | doors | LEFT grip at the gate pays and opens it | **FAIL** | left grip unused |
+| 17 | doors | RIGHT grip at the gate pays and opens it | PASS | |
+| 18 | doors | Walk through the open gate | PASS | |
+| 19 | doors | Sealed boss door says what opens it | **FAIL** | grip did nothing, said nothing |
+| 20 | doors | Test map: grip opens the boss door | **FAIL** | sealed until the boss dies (the only closed door on the test map) |
+| 21 | doors | Walk into the open boss door: safe room | PASS | (opened by killing the boss in the test) |
+| 22 | doors | Stash chest: grip opens it | PASS | |
+| 23 | doors | Y closes the stash | PASS | |
+| 24 | doors | Merchant: walk up, shop opens | PASS | |
+| 25 | doors | Y leaves the shop | PASS | |
+| 26-45 | controls | Move, sprint (full push and click), A jump, B slide, fire, X reload, ADS, turn, right stick forward does nothing, stick-click swap, Y pause, laser click, Y back, double-tap Y map, Y closes map, hold Y Gear, menu scroll, Y closes Gear, no script errors | PASS | all worked |
+
+## After the fix, 2026-11-12 (run twice, same result)
+| # | Area | Check | Result | Seen |
+|---|---|---|---|---|
+| 1 | pickup | Right grip with your hand at your side takes a gun lying at your feet | PASS | pistol_service -> pistol_service, floor items 9 -> 8 |
+| 2 | pickup | Reaching a hand to an item highlights it (you can see what you will grab) | PASS | hover={"mode":"near","id":10,"text":"Bolt Rifle  (Rare)","ok":true} |
+| 3 | pickup | A light buzz in that hand when it touches something you can grab | PASS | 1 pulses |
+| 4 | pickup | Right hand reaching down + grip takes THAT gun (sniper) | PASS | held sniper_bolt |
+| 5 | pickup | A firm buzz when the grab lands | PASS | [{"hand":"right","s":0.65,"ms":45,"f":75}] |
+| 6 | pickup | Left hand reaching down + left grip takes THAT gun (it lands in your gun hand) | PASS | held smg_compact |
+| 7 | pickup | Pointing a hand at an item 5 m away highlights it (distance grab) | PASS | hover={"mode":"ray","id":12,"text":"Belt MG  (Rare)","ok":true} |
+| 8 | pickup | Point + grip pulls that item from 5 m away (distance grab) | PASS | held hmg_belt |
+| 9 | pickup | Grip already squeezed (held like a gun) and hand reaches an item: it is still taken (armor) | PASS | taken |
+| 10 | pickup | Gun mod: reach + grip puts it in your bag | PASS |  |
+| 11 | pickup | Left grip on the gun's fore-end = two-handed hold | PASS | twoHand=true |
+| 12 | pickup | While firing, the gun hand does not light up far items; let go and it does | PASS | firing: {"mode":"body","id":21,"text":"Bloodforged Cuirass  (Epic)","ok":true} / after: ray |
+| 13 | pickup | Coins: walking near them picks them up by themselves | PASS | gold 1000 -> 1008 |
+| 14 | pickup | Right hand over your right shoulder + grip swaps to the gun on your back (picks nothing up) | PASS | sniper_bolt (back pistol_service) -> pistol_service, floor items 15 -> 15 |
+| 15 | doors | Gold gate with too little gold stays shut, and tells you why (buzz + message) | PASS | gold 0, pulses 1, hint {"right":{"mode":"use","text":"Need 80 gold","ok":false,"what":"toll"},"left":{" |
+| 16 | doors | Gate is highlighted when you stand at it (shows the price) | PASS | {"right":{"mode":"use","text":"Pay 80 gold","ok":true,"what":"toll"},"left":{"mode":"use","text":"Pay 80 gold","ok":true |
+| 17 | doors | LEFT grip at the gate pays and opens it | PASS | open=true |
+| 18 | doors | Opening a gate gives a buzz | PASS | 3 pulses |
+| 19 | doors | Walk through the open gate (left stick forward) | PASS | side 2.2 -> -6.6 |
+| 20 | doors | Sealed boss door: grip tells you what opens it (buzz + message; it stays shut until the boss is down) | PASS | open=false pulses=1 hint={"mode":"use","text":"Sealed: kill the boss to open it","ok":false,"what":"door"} |
+| 21 | doors | Test map: grip at the boss door opens it | PASS | open=true |
+| 22 | doors | Standing in front of the door is not already through it (test setup) | PASS |  |
+| 23 | doors | Walk into the open boss door: the safe room | PASS | safe=true |
+| 24 | doors | Stash chest: stand at it, grip opens it (menu in front of you) | PASS | near=true menu=true |
+| 25 | doors | Y closes the stash | PASS |  |
+| 26 | doors | Merchant: walk up and the shop opens in VR | PASS | {"shop":true,"menu":true} |
+| 27 | doors | Y leaves the shop | PASS |  |
+| 28 | doors | Safe room door: walk through to the next floor | PASS | safe=false floor=2 |
+| 29 | controls | Left stick forward walks | PASS | 1.87 m |
+| 30 | controls | Left stick all the way forward sprints | PASS | sprinting=true |
+| 31 | controls | Left stick click sprints | PASS | sprinting=true |
+| 32 | controls | A jumps | PASS | eye 1.70 -> max 3.81 |
+| 33 | controls | B slides | PASS | sliding=true |
+| 34 | controls | Right trigger fires | PASS | ammo 12 -> 9 |
+| 35 | controls | X reloads (animation on the gun) | PASS | reloading=true |
+| 36 | controls | Left trigger aims down sights | PASS | adsT=1.00 |
+| 37 | controls | Right stick sideways turns | PASS | yaw 1.57 -> 3.52 |
+| 38 | controls | Right stick forward does nothing in play (no surprise jump or turn) | PASS |  |
+| 39 | controls | Right stick click swaps guns | PASS | rifle -> pistol_service |
+| 40 | controls | Tap Y pauses (menu in front of you) | PASS | menu=true |
+| 41 | controls | Laser + trigger presses a menu button (RESUME) | PASS | hover=RESUME, menu after=false |
+| 42 | controls | Y backs out of the pause menu | PASS |  |
+| 43 | controls | Double-tap Y shows the map | PASS | map=true |
+| 44 | controls | Tap Y closes the map without pausing | PASS |  |
+| 45 | controls | Hold Y opens the Gear menu | PASS | menu=true |
+| 46 | controls | Right stick scrolls a long menu | PASS | scroll 0 -> 180 of 180 |
+| 47 | controls | Y closes the Gear menu | PASS |  |
+| 48 | controls | No script errors during the run | PASS |  |
+
+48/48 passed
+
+Unit checks: `node tests/grab.test.js` (32 checks) and every other test in tests/ pass.
+
+## Final check on the committed build
+
+`sh tools/xr_check_all.sh` (guard, build, every unit test, full fake-Quest run): **48/48**. One earlier run showed "B slides" failing 1 time in 4. Cause: the test pressed B while the player was still in the air from the jump test, and the game doesn't allow a slide in mid-air (that's correct). The test now waits for the player to land. After that it passed 4/4 controls-only runs plus the full run. It also shows a jump lasts a long time (about half a second or more in the air), which ties into the jump-height comfort item below.
+
+## Still needs a real Quest
+- How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
+- Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.
+- Haptic strength on real Touch Plus controllers (the browser may ignore very short pulses).
+- The over-the-shoulder swap spot (16 cm right, 12 cm behind the head) on a real body.
+- Jumping: A lifts the view by about 2 m (the game's own jump); check it is comfortable in a headset.

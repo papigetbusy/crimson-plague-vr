@@ -32,6 +32,8 @@ jobs:
         run: node tests/pad.test.js
       - name: Meta Quest controller checks
         run: node tests/xr.test.js
+      - name: VR grab and door checks
+        run: node tests/grab.test.js
       - name: Touch button settings checks
         run: node tests/touch.test.js
       - name: Effect checks

@@ -14,7 +14,8 @@
      Right stick up/down                   -> scroll menus; a hard push down = second action at a gold gate / boss door puzzle
      Right stick click                     -> swap guns
      Right trigger                         -> fire (menus: click where the laser points, on release)
-     Right grip (xr_mode)                  -> grab: pick up the gun at your feet, open the stash, use a gold gate
+     Either grip (xr_interact / xr_grab)   -> grab what the hand reaches or points at, or use the gate / door / chest you stand at
+     Right hand over right shoulder + grip -> swap to the gun on your back
      A                                     -> jump   (never from a stick: stick jumps fire by accident)
      B                                     -> slide
    No D-pad on Quest. */

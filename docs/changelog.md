@@ -1,4 +1,5 @@
 # Changelog (newest first, one plain line each)
+- 2026-11-12: VR grabbing and doors rebuilt (Grok, branch grok/quest3-controllers, not on main): either hand grabs the exact item it reaches or points at (up to 7 m), works with the grip held, highlight + label + haptics, grip uses gates/door/chest with a reason when it can't, shoulder swap; test map keeps its loot, shuts the gold gate and lets the boss door open; a full fake-Quest playtest (tools/xr_playtest.js) passes 48/48.
 - 2026-11-04: Meta Quest 3 support (by Grok while Claude is away, branch grok/quest3-controllers, not on main): an Enter VR button in the Quest browser, Touch controllers drive move/turn/fire/aim/menus through the existing controller code, gun in your right hand, a floating HUD; phone, mouse and gamepad unchanged. Try it at preview/quest/.
 - 2026-10-21: The 20 guns are now made from the free CC0 Quaternius pack models, with your colours and glow, a thinner red-dot border, and unique details on every gun (not pushed yet).
 - 2026-10-21: Demon Lord remade from scratch in code (v3): black and gold plate, horned helm, ember sigil, bat wings, cape; the game now uses it.

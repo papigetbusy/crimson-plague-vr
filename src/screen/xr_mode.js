@@ -61,6 +61,8 @@ const XrMode = (function () {
     let twoHand = false, gripErr = -1;
     const foreW = new THREE.Vector3(), gripW = new THREE.Vector3(), sh = new THREE.Vector3(), dir2 = new THREE.Vector3(), up2 = new THREE.Vector3(), m4b = new THREE.Matrix4(), q2 = new THREE.Quaternion();
     const ZERO3 = new THREE.Vector3();
+    // grabbing and using things in the world (xr_interact.js): what each hand will take, the highlight, the squeeze
+    const inter = XrInteract.create({ THREE, dolly, camera, hands, pulse: (h, s, ms) => pulse(h, s, ms), twoHand: () => twoHand, map: o.levelMap, toast: o.toast });
     const STEER = { pistol: 0.3, smg: 0.75, rifle: 0.8, shotgun: 0.8, sniper: 0.85, hmg: 0.85 };
     function supportHand() {
       const L = hands.left, R = hands.right, g = o.gunParts && o.gunParts();
@@ -287,9 +289,9 @@ const XrMode = (function () {
         center('Point with the laser and pull the trigger to pick' + (st.shop ? '   Y: leave the merchant' : ''), 22, '#a89080');
         return;
       }
-      const lb = $('lockBox'); if (lb && getComputedStyle(lb).display !== 'none' && lb.offsetParent !== null) { center(txt('lockTxt'), 24, '#cfa54a'); const b0 = txt('lockB0'), b1 = txt('lockB1'); center((b0 ? 'Right grip: ' + b0 : '') + (b1 ? '    Right stick down: ' + b1 : ''), 22); }
-      const fc = $('floorCard'); if (fc && fc.offsetParent !== null && txt('floorCard')) center('Right grip: pick up  ' + txt('floorCard').slice(0, 50), 22, '#ecdfc6');
-      const sh = $('stashHint'); if (sh && !sh.hidden) center('STASH CHEST: right grip', 22, '#cfa54a');
+      const lb = $('lockBox'); if (lb && getComputedStyle(lb).display !== 'none' && lb.offsetParent !== null) { center(txt('lockTxt'), 24, '#cfa54a'); const b0 = txt('lockB0'), b1 = txt('lockB1'); center((b0 ? 'Grip: ' + b0 : '') + (b1 ? '    Right stick down: ' + b1 : ''), 22); }
+      const fc = $('floorCard'); if (fc && fc.offsetParent !== null && txt('floorCard')) center('Grip (reach or point at it): pick up  ' + txt('floorCard').slice(0, 44), 22, '#ecdfc6');
+      const sh = $('stashHint'); if (sh && !sh.hidden) center('STASH CHEST: grip', 22, '#cfa54a');
       const mm = o.map && o.map.small;                                // the corner map, bottom left of the view (hold the LEFT GRIP for the whole floor in your hand)
       if (mm && mm.width) { hx.shadowBlur = 0; hx.globalAlpha = 0.9; hx.drawImage(mm, 40, 250, 170, 170); hx.globalAlpha = 1; hx.strokeStyle = '#6a2a2e'; hx.lineWidth = 3; hx.strokeRect(40, 250, 170, 170); hx.shadowBlur = 8; line('Double-tap Y: map', 40, 222, 20, '#cfa54a'); }
       const toastE = $('padToast'); if (toastE && toastE.classList.contains('show')) center(questText(toastE.textContent), 24, '#e8c890');
@@ -313,6 +315,7 @@ const XrMode = (function () {
       fall(dt); mapHand(dt, running);
       placeGun(p);
       menuPanel(running, dt);
+      inter.update(st, running, dt, menuMesh.visible);
       laser(dt);
       hudT -= dt; if (hudT <= 0) { hudT = 0.1; drawHud(st, running); hudTex.needsUpdate = true; }
     }
@@ -392,12 +395,9 @@ const XrMode = (function () {
         try { if (a && a.pulse) a.pulse(strength, ms); else if (a && a.playEffect) a.playEffect('dual-rumble', { duration: ms, strongMagnitude: strength, weakMagnitude: strength }); } catch (e) { /* no haptics */ }
       }
     }
-    // right grip: grab. One press = pick up the gun at your feet, open the stash, or use a gold gate / the boss door (like E / A on the flat page)
-    let gripWas = false;
-    function grab() {
-      const g = hands.right && hands.right.gamepad, b = g && g.buttons && g.buttons[1], on = !!b && (b.pressed || b.value > 0.5);
-      const e = on && !gripWas; gripWas = on; return e;
-    }
+    // grips: what a squeeze did this frame (xr_interact.js): { type: 'item', id } take that exact item, { type: 'use' } use the gate / door /
+    // chest / puzzle you stand at, { type: 'swap' } the gun on your back. Either hand; the left grip on the gun's fore-end is the support hand instead.
+    function grab() { return session ? inter.take() : null; }
     function aimDir(out) { return out.set(0, 0, -1).applyQuaternion(aimQ); }
     const yBtn = XrInput.createY(); let yNow = { tap: false, hold: false, progress: 0 };
     function pad() {
@@ -423,7 +423,7 @@ const XrMode = (function () {
         if (renderer.xr.setFoveation) renderer.xr.setFoveation(1);
         session = s; aimInit = false; bodyYaw = o.playerYaw(); turn.reset(); hudMesh.visible = true; btn.textContent = 'EXIT VR'; btn.hidden = true;
         s.addEventListener('end', () => {
-          session = null; renderer.xr.enabled = false; vig.visible = false; hudMesh.visible = false; reticle.visible = false; menuMesh.visible = false;
+          session = null; inter.clear(); renderer.xr.enabled = false; vig.visible = false; hudMesh.visible = false; reticle.visible = false; menuMesh.visible = false;
           dolly.position.set(0, 0, 0); dolly.rotation.set(0, 0, 0); if (gun.parent !== camera) camera.add(gun);
           for (const m of (o.arms || [])) m.visible = true; if (mapHeld && o.map) o.map.open(false); mapHeld = false; mapMesh.visible = false;
           btn.textContent = 'ENTER VR'; btn.hidden = false; if (onEnd) onEnd();
@@ -454,7 +454,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, debug: () => ({ pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();

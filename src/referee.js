@@ -90,6 +90,9 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     startGun: 'rifle',        // the gun a run starts with: the plain rifle (all-ones baseline) here; the game screen starts you with 'pistol_service'
     manualGuns: false,        // true = guns and gear on the floor are only taken when you press pick up (the game does this so a good gun is never swapped away by accident); tests keep the old walk-over
     gunReach: 2.6,            // how close you must be to take a gun or piece of gear with pick up
+    grabReach: 7,             // VR: how far away a gun or piece of gear you point at and grab can be (you must see it: never through a wall)
+    keepDrops: false,         // the VR test map only: guns, armor and mods on the floor never fade (normally they go after 60 s)
+    doorTest: false,          // the VR test map only: the boss door opens when you use it, so doors can be tried without fighting the boss
     stashReach: 3,            // how close you stand to the stash chest to use it
     bossRandom: false,        // a random boss on each boss floor (the game screen turns it on; tests keep the Demon Lord unless they ask)
     bossKind: '',             // force one boss: demon, bat, lich or dragon
@@ -169,8 +172,10 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     // the boss door opens when the boss is down and the puzzle is solved
     function tryOpenDoor() { if (bossDown && LK.solved() && !doorOpen && !R.safe) openDoor(); }
     // use what is near you (0: first action, 1: second). A friend's copy does it here and tells the host; the host and a solo game do it for real.
+    const nearDoor = () => !!M0.door && Math.hypot(P.x - M0.door.x, P.z - M0.door.z) < RL.RULES.reach + 1;
     function useLock(idx) {
-      const a = LK.use(P.x, P.z, R.gold, idx, R.keys); if (!a) return;
+      const a = LK.use(P.x, P.z, R.gold, idx, R.keys);
+      if (!a) { if (idx === 0 && cfg.doorTest && !cfg.guest && !doorOpen && !R.safe && nearDoor()) { openDoor(); R.phase = 'intermission'; spawnQ = []; monsters = []; } return; }   // test map: the door opens and the hall goes quiet so you can walk through
       const r = LK.act(a, R.gold, R.keys); if (!r) return;
       R.gold -= r.cost; R.keys -= r.key || 0; events.push(r.ev); if (cfg.guest) lockOut.push(a); else { syncGates(); tryOpenDoor(); }
     }
@@ -811,7 +816,14 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       wearAt(item, at);
     }
     // pick up: take the nearest gun or piece of gear lying within reach (with manualGuns on, only this press picks things up, so nothing is ever taken by accident; hearts and flames are still automatic)
-    function pickUpGun() {
+    function pickUpGun(id) {
+      if (Number.isInteger(id)) {                       // VR: the exact item your hand grabbed or pointed at, or nothing (never a different one)
+        const q = pickups.find((o) => o.id === id);
+        if (!q || (q.kind !== 'gun' && q.kind !== 'gear' && q.kind !== 'mod') || q.noPick > 0 || q.life <= 0) return;
+        const d = Math.hypot(P.x - q.x, P.z - q.z); if (d >= cfg.grabReach || (d >= cfg.gunReach && !hasLOS(P.x, P.z, q.x, q.z))) return;
+        if (q.kind === 'gun') takeGun(q); else if (q.kind === 'mod') takeMod(q); else { q.life = -1; wearBought(q.gear); }
+        return;
+      }
       let best = null, bd = cfg.gunReach;
       let bs = Infinity; const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw);
       for (const q of pickups) {
@@ -1131,7 +1143,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       coins = coins.filter((c) => c.life > 0);
       const reachPick = L.pickupRadius * (1 + (M.magnet - 1) * 0.5);
       for (const p of pickups) {
-        p.life -= dt; if (p.noPick > 0) p.noPick -= dt;
+        if (!(cfg.keepDrops && (p.kind === 'gun' || p.kind === 'gear' || p.kind === 'mod'))) p.life -= dt; if (p.noPick > 0) p.noPick -= dt;   // (the test map keeps guns and gear on the floor until you take them)
         if (Math.hypot(P.x - p.x, P.z - p.z) < reachPick) {
           if (p.kind === 'gun') { if (p.noPick > 0 || cfg.manualGuns) continue; takeGun(p); continue; }
           if (p.kind === 'gear') { if (p.noPick > 0 || cfg.manualGuns) continue; takeGear(p); continue; }
@@ -1262,7 +1274,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       // reload, then fire
       if (p.ammo > maxMag()) p.ammo = maxMag();
       if (inp.swap) swapGun();
-      if (inp.pickup && !R.over) pickUpGun();
+      if (inp.pickup && !R.over) pickUpGun(inp.pickupId);
       if (CM.freeAmmo) {                                         // Bullet Storm means no reloading: a reload already under way stops and the magazine is full, so the fire never stalls
         if (p.reloading) { p.reloading = false; p.reloadT = 0; events.push({ type: 'reloadEnd' }); }
         p.ammo = maxMag();
@@ -1381,7 +1393,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
         bossBar: boss ? { name: titleOf(boss.kind, boss.variant), variant: boss.variant || null, exposed: !!boss.exposed, hp: boss.hp, maxHp: boss.maxHp, state: boss.state } : null,
         level: { n: R.level, xp: R.xp, need: D.xpNeed(R.level) },
         orbs: orbs.map((o) => ({ id: o.id, x: o.x, z: o.z, v: o.v })),
-        pickups: pickups.map((q) => ({ id: q.id, kind: q.kind, x: q.x, z: q.z, life: q.life, gun: q.item ? WP.view(q.item, cfg) : undefined, inReach: (q.kind === 'gun' || q.kind === 'gear' || q.kind === 'mod') && q.noPick <= 0 && Math.hypot(P.x - q.x, P.z - q.z) < cfg.gunReach, gear: q.gear ? GR.view(q.gear, GEAR.worn) : undefined, mod: q.mod ? WP.modView(q.mod, W.slots[W.held]) : undefined })),
+        pickups: pickups.map((q) => ({ id: q.id, kind: q.kind, x: q.x, z: q.z, life: q.life, gun: q.item ? WP.view(q.item, cfg) : undefined, grab: (q.kind === 'gun' || q.kind === 'gear' || q.kind === 'mod') && q.noPick <= 0, inReach: (q.kind === 'gun' || q.kind === 'gear' || q.kind === 'mod') && q.noPick <= 0 && Math.hypot(P.x - q.x, P.z - q.z) < cfg.gunReach, gear: q.gear ? GR.view(q.gear, GEAR.worn) : undefined, mod: q.mod ? WP.modView(q.mod, W.slots[W.held]) : undefined })),
         classChoices: R.classChoices ? R.classChoices.map((id) => kit.card(id, R.level)) : null,
         cls: kit.view(R.level),
         choices: R.choices ? R.choices.map((id) => { const s = skillOf(id); return { id, name: s.name, desc: s.desc, stack: stackOf(id), max: s.max }; }) : null,
@@ -1398,7 +1410,9 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
         gates: lay.gates.map((g) => ({ i: g.id, x: g.x, z: g.z, nx: g.nx, nz: g.nz, open: !!S.open[g.id], price: g.price, type: g.type })),
         boss: b ? { kind: b.kind, solved: S.solved, sign: b.sign, station: b.station, text: RL.signText(b), target: b.target, pan: S.pan, spin: b.spin, sym: b.sym, wheels: S.wheels.slice(), locked: S.locked.slice(), sockets: b.sockets.map((q, i) => ({ x: q.x, y: q.y, z: q.z, nx: q.nx, nz: q.nz, hit: !!S.hit[i] })) } : null,
         keys: R.keys, keeper: (() => { const q = monsters.find((o) => o.mini); return q ? { x: q.x, z: q.z, asleep: q.state === 'guard' } : null; })(),
-        near: n, sealed: bossDown && !doorOpen && !R.safe
+        near: n, sealed: bossDown && !doorOpen && !R.safe,
+        door: M0.door ? { x: M0.door.x, z: M0.door.z, nx: M0.door.nx, nz: M0.door.nz, open: doorOpen, near: !doorOpen && !R.safe && nearDoor(), canOpen: !!cfg.doorTest && !doorOpen && !R.safe,
+          text: doorOpen ? 'Open' : cfg.doorTest ? 'Test map: grip opens it' : !bossDown ? 'Sealed: kill the boss to open it' : 'Sealed: solve the puzzle beside it' } : null
       };
     }
     // put the player somewhere (tests and tools only: the game never teleports you)
@@ -1414,15 +1428,15 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     const lockState = () => LK;                                                       // tests: the floor's locks
     function giveGold(v) { R.gold += v; }                                               // tests: some gold right now
     function giveXp(v) { gainXp(v); }                                                  // tests: some experience right now
-    function giveGun(id, rarity, wave) { dropGun(P.x, P.z, 0, WP.make(id, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a gun lies at your feet
+    function giveGun(id, rarity, wave, x, z) { dropGun(x === undefined ? P.x : x, z === undefined ? P.z : z, 0, WP.make(id, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a gun lies at your feet
     function equipGun(id, rarity) {                                                     // cheat build and tests: the gun in your hands becomes this one, full magazine
       const it = WP.make(id, rarity || 0, R.wave, rngW, cfg.classId); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0.3;
     }
     function gearView() { const t = GR.total(GEAR.worn); return { worn: GEAR.worn.map((it, i) => it ? GR.view(it, null) : { slot: GR.WEAR[i], empty: true }), def: Math.round(t.def * 1000) / 10, hp: Math.round(t.hp), vit: Math.round(t.vit * 100), regen: Math.round(t.regen * 10) / 10, speed: Math.round(t.speed * 100), magnet: Math.round(t.magnet * 100), dmg: Math.round(t.dmg * 100), rate: Math.round(t.rate * 100), crit: Math.round(t.crit * 1000) / 10, critdmg: Math.round(t.critdmg * 100), leech: Math.round(t.leech * 10) / 10, reload: Math.round(t.reload * 100) }; }
-    function giveGear(slot, rarity, wave) { dropGear(P.x, P.z, 0, GR.make(slot, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a piece of gear lies at your feet
+    function giveGear(slot, rarity, wave, x, z) { dropGear(x === undefined ? P.x : x, z === undefined ? P.z : z, 0, GR.make(slot, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a piece of gear lies at your feet
     function wearGear(item, at) { GEAR.worn[at === undefined ? GR.WEAR.indexOf(item.slot) : at] = item; M = computeMods(); P.hp = Math.min(P.hp, maxHp()); }   // tests: wear exactly this piece
     function equipItem(item) { const it = Object.assign({}, item); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0; }   // tests: hold exactly this gun item (with the affixes it carries)
-    function giveMod(rarity, wave) { dropMod(P.x, P.z, WP.MD.make(rarity, wave || R.wave, rngW)); }   // tests: a mod lies at your feet
+    function giveMod(rarity, wave, x, z) { dropMod(x === undefined ? P.x : x, z === undefined ? P.z : z, WP.MD.make(rarity, wave || R.wave, rngW)); }   // tests: a mod lies at your feet
     function addMod(item) { W.mods.push(item); }                                       // tests: this exact mod goes straight in the bag
     function setLoadout(list) { loadout = (list || []).map((e) => JSON.parse(JSON.stringify(e))); }   // blueprints for the next run (applied on reset)
     function stashEntry(i) { return R.stash[i] ? JSON.parse(JSON.stringify(R.stash[i])) : null; }   // a copy of a stashed entry, for making a blueprint

@@ -107,7 +107,8 @@ Because the left grip is the support hand again, the map moved off it: first to 
 | Right stick up/down | Scrolls menus only. A hard push down works a gold gate / boss door puzzle |
 | Right stick click | Swap guns |
 | Right trigger | Fire. In menus: point and release on a button |
-| Right grip | Pick up the gun at your feet, open the stash, use a gold gate |
+| Either grip | **Grab / use** (see "Grabbing and doors" below): reach a hand to a gun, armor or mod and squeeze to take that exact one; or point a hand at it (up to 7 m) and squeeze to pull it to you; at a gold gate, the boss door, a puzzle or the stash chest, squeeze to use it. A ring, a beam and a label show what the squeeze will do, with a light buzz when a new thing comes under your hand. The left grip on the gun's fore-end is still the support hand |
+| Right hand over your right shoulder + grip | Swap to the gun on your back (same as right stick click) |
 | A | Jump |
 | B | Slide |
 
@@ -118,3 +119,36 @@ Why this layout: see rows 1–5 and 15–18 above. Jump is on a button so a drif
 Reload: see "Crimson Plague reload, per weapon" above. An empty gun dry-clicks until you reload (by hand, or with X). Ammo still comes back on the game's own timer, so the rules and numbers do not change.
 
 Other options: `?perf` (fps counter), `?xrscale=0.6..1` (render resolution, default 0.8), `?vignette`, `?gaze` (aim with the head).
+
+## Grabbing and doors (research round 4, 2026-11-12)
+The owner's playtest of e61a65f: "can't pick stuff up, can't open doors, the buttons don't feel like Pavlov, Contractors, Onward or Alyx". What those games actually do:
+
+- **Half-Life: Alyx.** Grip = grab, hand-sized forgiving zones. The gravity gloves are the famous part: point at an item until it glows, lock on, flick the wrist, catch it. Valve's own notes: the item glows so "both the player and the game are on the same page"; each stage has its own sound; the flight is corrected toward your hand so you can look away. Doors open **both ways** (push or pull from either side) because "getting through a barrier matters more than real door mechanics". Sources: Road to VR "VR Design Unpacked", DigiPen interview with Kerry Davis, Engadget interview.
+- **Pavlov.** Grip grabs weapons, items and doors; holding the grip keeps the gun (Quest default "Hold" grip mode; a "Toggle grip" setting exists). Items under your hand highlight blue before you grab. Holsters on the body; auto sprint. Sources: Pavlov wiki Game Settings, r/PavlovGame, Steam discussions.
+- **Contractors.** Point your hand at an item, a white circle appears on it, press grip and it flies to your hand (distance grab is the normal way to loot the floor in Showdown). Players' advice: stand about a metre away, palm toward it; complaints are about the selection being unclear without a laser, so a visible marker matters. Mags can be moved to the trigger so the grip never takes the wrong thing. Sources: r/ContractorsVR, UploadVR beginner's guide.
+- **Onward.** Milsim: grip grabs guns, trigger grabs small items (grenades, mags); a "grip/trigger" setting exists because players grabbed the wrong item. Doors: reach the handle and squeeze. Grip mode: proximity (snaps when near) or click. Sources: r/OnwardVR, UploadVR field guide, Ready VR One guide.
+- **H3VR.** Everything by hand: grab the doorknob and turn it, from either side. Too fiddly for us (the owner said not H3VR hyper-sim).
+- **Meta's guidelines** (Interaction SDK, "Grab" best practices): always show which object is targeted before the grab (hover state), confirm a grab with sound/haptics, use magnetism for distance grabs, and do not rely on distance grab alone; combine it with direct hand grab. Distance-grab selection uses a cone from the wrist and picks the most centred object; a short detection delay avoids false picks.
+
+**What was wrong in our build (tested with the fake headset, see docs/vr-playtest-log.md):**
+1. Only the right grip did anything, and it ignored where your hand was: it took whichever gun was nearest your feet within 2.6 m. Reaching for a gun with either hand, or pointing at one, did nothing (or took a different one).
+2. A grab only counted on the exact moment the grip went down. Players hold the right grip all the time (it's how you hold a gun in Pavlov), so after the first squeeze nothing could ever be picked up.
+3. No highlight, no buzz, no message: you could not tell what a squeeze would do, or why it did nothing.
+4. On the test map, the guns at your feet **disappeared after 60 seconds** (the game's normal rule for floor loot), so by the time you had looked around there was nothing left to pick up. They were also all in one pile.
+5. Doors: on the test map every gold gate was already open, and the only closed door was the boss door, which by the game's rules stays sealed until the boss is dead. Nothing told you that. The left grip did nothing at a gate.
+
+**What we built (Alyx/Contractors-style, forgiving, with an always-works fallback):**
+| Step | What happens | Numbers |
+|---|---|---|
+| Near grab | Reach either hand to an item (anywhere from the floor to just above it) and squeeze: you take that exact item | 45 cm from your hand |
+| Distance grab | Point either hand at an item and squeeze: it flies to your hand (a gold line shows what you are pointing at) | up to 7 m, within about 13° (wider for close items); never through walls |
+| Use | Standing at a gold gate, the boss door, the Scale/Wheels or the stash chest: squeeze either grip to pay / open / spin / open the stash | the game's own reach (5 m from a gate) |
+| Fallback | Nothing pointed at: the right grip takes the nearest item within 2.6 m in front of you (the old rule), so a squeeze never does nothing | 2.6 m |
+| Grip held like a gun | If the grip is already squeezed, resting the hand on an item for 0.2 s takes it. Only near items: gold is never spent and nothing is pulled from afar without a fresh squeeze | 0.2 s |
+| Highlight | A ring on the floor, a soft beam and a label in the world ("R GRIP: take / Bolt Rifle (Rare)", "GRIP: Pay 80 gold", "LOCKED: Sealed: kill the boss to open it"). Red when it can't be done | |
+| Haptics | Light tick when a new thing comes under your hand, firm pulse on a grab, strong buzz + message when it can't be done (not enough gold, sealed door) | 0.14 / 0.65 / 0.9 strength |
+| Fights | While you hold the trigger the gun hand only grabs what it touches (no pulling from afar mid-fight); while aiming down sights the left hand never grabs | |
+| Holster swap | Right hand over your right shoulder + grip: swap to the gun on your back (Pavlov/Onward-style back slot); right stick click still works | 26 cm zone |
+| Grip hysteresis | A squeeze counts at 55% and re-arms when you ease off below 30%, so a loose grip never flickers | |
+
+**Doors:** gates and the boss door open with the grip from wherever you stand at them (like Alyx's "doors open both ways": no handle to find, no push/pull to guess). The boss door in the real game still needs the boss dead (and its puzzle solved); the grip now tells you that instead of doing nothing. **On the VR test map only** (`?sandbox`): the gold gate is shut again (you get 1000 gold to pay it), the boss door opens when you grip it so you can walk to the safe room (stash chest and merchant) and on to floor 2, and floor loot never fades. The test map's guns lie in an arc in front of you like a weapon rack.
