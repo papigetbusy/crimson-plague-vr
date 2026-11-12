@@ -15,7 +15,7 @@ const HELPERS = () => {
   const look = (from, toW) => { const t = toLocal(toW[0], toW[1], toW[2]); const d = new T.Vector3(t[0] - from[0], t[1] - from[1], t[2] - from[2]).normalize(); const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, -1), d); return [q.x, q.y, q.z, q.w]; };
   const menuMesh = () => { let m = null; rig().traverse((o) => { if (o.isMesh && o.renderOrder === 1001 && o.geometry && o.geometry.type === 'PlaneGeometry' && o.visible) m = o; }); return m; };
   const menuPoint = (u, v) => { const m = menuMesh(); if (!m) return null; const p = new T.Vector3(u - 0.5, v - 0.5, 0); m.updateMatrixWorld(true); m.localToWorld(p); return [p.x, p.y, p.z]; };
-  const menuFind = (re) => { const r = new RegExp(re, 'i'); for (let v = 0.97; v > 0.02; v -= 0.015) for (let u = 0.03; u < 0.98; u += 0.015) { const t = G.xr.menuHit(u, v); if (t && r.test(t)) return [u, v, t]; } return null; };
+  const menuFind = (re) => { const r = new RegExp(re, 'i'); const t = G.xr.menuTiles().find((q) => q.inView && !q.disabled && r.test(q.title)); return t ? [t.u, t.v, t.title] : null; };   // the middle of the tile (an edge can miss by a hair)
   const titles = () => { const s = new Set(); for (let v = 0.97; v > 0.02; v -= 0.03) for (let u = 0.03; u < 0.98; u += 0.03) { const t = G.xr.menuHit(u, v); if (t) s.add(t); } return [...s]; };
   // an open spot: a floor cell whose neighbours within r cells are all floor, at least 10 m from `avoid`
   const openSpot = (r, avoid) => { const m = G.ref.map, C = m.CELL; const ok = (ch) => ch === '.' || ch === 'c';
@@ -154,6 +154,7 @@ async function doorGroup() {
   const G = 'doors';
   let S = await open('');
   try {
+    await S.ev(() => window.__game.begin(true)); await S.frames(10);   // the real game opens on its start menu in VR
     const gate = await S.ev(() => { const s = window.__game.ref.snapshot(); return s.locks.gates.find((g) => !g.open) || null; });
     if (!gate) { rec(G, 'A closed gold gate on floor 1', false, 'none'); } else {
       const side = await S.ev((g) => { const r = window.__game.ref; for (const s of [1, -1]) { r.place(g.x + g.nx * 2.2 * s, g.z + g.nz * 2.2 * s); if (r.snapshot().locks.near) return s; } return 1; }, gate);
@@ -306,9 +307,11 @@ async function controlsGroup() {
   } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
 }
 
+const MORE = require('./xr_playtest_more.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, held });
 (async () => {
-  const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ['pickup', 'doors', 'controls'];
-  for (const [n, f] of [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup]]) if (want.includes(n)) { try { await f(); } catch (e) { rec(n, 'group ran to the end', false, String(e && e.message || e).slice(0, 200)); } }
+  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup]];
+  const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ALL.map((g) => g[0]);
+  for (const [n, f] of ALL) if (want.includes(n)) { try { await f(); } catch (e) { rec(n, 'group ran to the end', false, String(e && e.message || e).slice(0, 200)); } }
   const bad = results.filter((r) => !r.pass);
   console.log('\n' + (results.length - bad.length) + '/' + results.length + ' passed');
   if (mdOut) {

@@ -111,6 +111,25 @@ Unit checks: `node tests/grab.test.js` (32 checks) and every other test in tests
 
 `sh tools/xr_check_all.sh` (guard, build, every unit test, full fake-Quest run): **48/48**. One earlier run showed "B slides" failing 1 time in 4. Cause: the test pressed B while the player was still in the air from the jump test, and the game doesn't allow a slide in mid-air (that's correct). The test now waits for the player to land. After that it passed 4/4 controls-only runs plus the full run. It also shows a jump lasts a long time (about half a second or more in the air), which ties into the jump-height comfort item below.
 
+## Overnight round, 2026-11-12 evening (owner: "all mechanics, all menus, gun mods, stashes")
+
+New playtest groups (in `tools/xr_playtest_more.js`, run by `tools/xr_playtest.js`):
+- **game**: the real game (not the test map). Start menu → pick a class with the laser → Enter the hall → shoot a monster dead → ammo and X reload → level-up cards → double-tap Y map → Y pause → Codex from pause (scroll, Y back) → Y resume → safe room → merchant buy → Y leave → die → YOU FELL → RISE AGAIN.
+- **menus**: the Gear menu and gun mods (fit to the gun in your hands, take off, fit to the gun on your back), and the stash chest (open with grip, put in, take out, save game, Y close).
+
+### Before (first run of the new groups, before any fixes): 31 of 40 passed
+| Found | Why | Fix |
+|---|---|---|
+| Putting the headset on at the title skipped the start menu and started a Gunslinger run straight away (no class pick in VR) | entering VR always called "begin" | VR now opens on the start menu (class buttons + Enter the hall, laser + trigger). A paused run and the test map still carry straight on |
+| "Save game here" in the stash did nothing when the laser was on the tile's edge | the playtest aimed at tile edges (rounding put the laser 1 pixel outside); also a press failed if the menu redrew while the trigger was down | the playtest now aims at the middle of each tile; a press now counts for the same tile even after a redraw |
+| ✔, · and ▼ showed as garbage letters (e.g. "Cannot: âœ” Saved") on a server that doesn't say the page is UTF-8 | the page had no `<meta charset>` | added `<meta charset="utf-8">` |
+| Level-up "still open" after 10 picks, map/pause/codex checks after it | test gave 5000 XP = many level-ups at once | test now gives exactly one level |
+| Double-tap Y flaky in the game group | the slow fake headset took longer than the 0.3 s double-tap window between taps | test uses the same tight tap pattern as the controls group |
+
+### After batch 1: 90 of 90 (guard, build, all unit tests incl. new tests/vrflow.test.js, full fake-Quest run)
+Gun mods in VR: **work** (open Gear with hold Y, fit to the gun in hands, take off, fit to the gun on your back, Y closes, play resumes).
+Stash in VR: **works** (grip at the chest, put in, take out into your hands, Save game here, Y closes).
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.

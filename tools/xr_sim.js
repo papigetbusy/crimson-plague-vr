@@ -1,31 +1,33 @@
 // Driver for the fake Quest (tools/xr_fake_quest.js): serves the repo, opens a built page in headless Chrome, enters VR, moves the head and hands, presses buttons. Needs puppeteer-core (NODE_PATH) and Chrome.
 const puppeteer = require('puppeteer-core'), fs = require('fs'), path = require('path'), http = require('http');
 const FAKE = fs.readFileSync(path.join(__dirname, 'xr_fake_quest.js'), 'utf8');
+const FAKE_PEER = fs.readFileSync(path.join(__dirname, 'xr_fake_peer.js'), 'utf8');
 const THREE_LOCAL = fs.existsSync('/workspace/three128.min.js') ? fs.readFileSync('/workspace/three128.min.js') : null;
 function serve(root, port) {
   return new Promise((res) => {
-    const srv = http.createServer((q, r) => { let p = decodeURIComponent(q.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html'; const f = path.join(root, p); fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html' : f.endsWith('.js') ? 'text/javascript' : 'application/octet-stream' }); r.end(d); }); });
+    const srv = http.createServer((q, r) => { let p = decodeURIComponent(q.url.split('?')[0]); if (p === '/favicon.ico') { r.writeHead(204); r.end(); return; } if (p.endsWith('/')) p += 'index.html'; const f = path.join(root, p); fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html' : f.endsWith('.js') ? 'text/javascript' : 'application/octet-stream' }); r.end(d); }); });
     srv.listen(0, () => res(srv));
   });
 }
 const BTN = { trigger: 0, grip: 1, stick: 3, a: 4, x: 4, b: 5, y: 5 };
 async function launch(o) {
   o = o || {};
-  const srv = await serve(o.root); const port = srv.address().port;
-  const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--window-size=1600,800'] });
+  const srv = o.share ? o.share.srv : await serve(o.root); const port = srv.address().port;
+  const browser = o.share ? o.share.browser : await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--window-size=1600,800', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
   const page = await browser.newPage();
   await page.setViewport({ width: o.w || 1400, height: o.h || 700 });
   const logs = [];
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') logs.push(m.type() + ': ' + m.text()); });
   page.on('pageerror', (e) => logs.push('pageerror: ' + e.message));
+  page.on('response', (r) => { if (r.status() >= 400) logs.push('http ' + r.status() + ': ' + r.url().slice(0, 120)); });
   await page.setRequestInterception(true);
-  page.on('request', (r) => { const u = r.url(); if (/three\.min\.js/.test(u) && THREE_LOCAL) return r.respond({ status: 200, contentType: 'text/javascript', body: THREE_LOCAL }); if (/peerjs/.test(u)) return r.respond({ status: 200, contentType: 'text/javascript', body: 'window.__peerFailed=true' }); r.continue(); });
+  page.on('request', (r) => { const u = r.url(); if (/three\.min\.js/.test(u) && THREE_LOCAL) return r.respond({ status: 200, contentType: 'text/javascript', body: THREE_LOCAL }); if (/peerjs/.test(u)) return r.respond({ status: 200, contentType: 'text/javascript', body: o.fakePeer ? FAKE_PEER : 'window.__peerFailed=true' }); r.continue(); });
   await page.evaluateOnNewDocument(FAKE);
   await page.goto('http://localhost:' + port + '/' + (o.page || 'site/index.html') + (o.query !== undefined ? o.query : '?sandbox'), { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game && document.getElementById('vrBtn') && !document.getElementById('vrBtn').hidden, { timeout: 120000 });
   const S = {
-    page, browser, logs,
-    async close() { await browser.close(); srv.close(); },
+    page, browser, logs, srv,
+    async close() { if (o.share) { await page.close(); return; } await browser.close(); srv.close(); },
     ev: (fn, ...a) => page.evaluate(fn, ...a),
     async frames(n) { const f0 = await page.evaluate(() => window.__fx.frames); await page.waitForFunction((t) => window.__fx.frames >= t, { timeout: 120000, polling: 20 }, f0 + n); },
     async enterVR() { await page.click('#vrBtn'); await page.waitForFunction(() => window.__game.xr.presenting(), { timeout: 30000 }); await S.frames(20); },

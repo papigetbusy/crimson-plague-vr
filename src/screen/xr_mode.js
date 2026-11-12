@@ -242,20 +242,22 @@ const XrMode = (function () {
         c.ray.updateMatrixWorld(); rO.setFromMatrixPosition(c.ray.matrixWorld); rD.set(0, 0, -1).transformDirection(c.ray.matrixWorld);
         rc.set(rO, rD); const hit = rc.intersectObject(menuMesh, false)[0];
         c.laser.visible = true; const len = hit ? hit.distance : 1.2; c.laser.scale.z = len; c.laser.position.z = -len / 2;
-        const t = hit && hit.uv ? vm.hit(hit.uv.x, hit.uv.y) : null;
+        const t = hit && hit.uv ? vm.hit(hit.uv.x, hit.uv.y) : null; laserUv[c.hand] = hit && hit.uv ? [+hit.uv.x.toFixed(3), +hit.uv.y.toFixed(3)] : null;
         c.laser.material = t ? laserMatHi : laserMat;
         if (hit && hit.uv) {
           if (on && !T.on) { T.t = t; T.v0 = hit.uv.y; T.last = hit.uv.y; T.drag = false; }
           else if (on && T.on) { if (Math.abs(hit.uv.y - T.v0) > 0.035) T.drag = true; if (T.drag) vm.scrollBy((hit.uv.y - T.last) * XrMenu.H * 1.2); T.last = hit.uv.y; }
           if (c.hand === 'right' || !cursor.visible) { cursor.visible = true; cursor.position.copy(hit.point); dolly.worldToLocal(cursor.position); cursor.quaternion.copy(menuMesh.quaternion); cursor.translateZ(0.004); cursor.scale.setScalar(on ? 0.83 : 1); }
         }
-        if (!on && T.on) { if (!T.drag && T.t && T.t === t) { press(T.t); pulse(c.hand, 0.35, 25); } T.t = null; T.drag = false; }
+        if (!on && T.on) { if (!T.drag && T.t && t && (T.t === t || (T.t.title === t.title && T.t.x === t.x && T.t.y === t.y))) {   // the same tile, even if the menu was redrawn while the trigger was down
+           press(T.t); pulse(c.hand, 0.35, 25); } T.t = null; T.drag = false; }
         T.on = on;
         if (t && (c.hand === 'right' || !hov)) { hov = t; hovHand = c.hand; }
       }
       if (vm.setHover(hov) && hov) pulse(hovHand, 0.1, 8);
       if (menuMesh.visible) { const rs = XrInput.rightStick(hands.right && hands.right.gamepad); if (Math.abs(rs.y) > 0.2) vm.scrollBy(rs.y * 1100 * lastDt); }
     }
+    const laserUv = { left: null, right: null };
     let hudT = 0;
     const txt = (id) => { const e = $(id); return e ? (e.textContent || '').replace(/\s+/g, ' ').trim() : ''; };
     const shown = (id) => { const e = $(id); return !!e && !e.hidden && getComputedStyle(e).display !== 'none'; };
@@ -454,7 +456,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();
