@@ -27,13 +27,13 @@ module.exports = function (X) {
       if (d.m && (!want || d.id === want)) { first = { f, id: d.id, ms: fm.ms, stages: fm.stages, s: await sm(S) }; break; }
       base.push(fm.ms); await S.frames(1);
     }
-    if (after) await after();
-    if (!first) { rec(G, label + ': opens', false, 'no panel after ' + (maxF || 120) + ' frames'); return null; }
+    if (!first) { if (after) await after(); rec(G, label + ': opens', false, 'no panel after ' + (maxF || 120) + ' frames'); return null; }
     let k = first.s, n = 0; const ks = [k.menuK.toFixed(2)];
     for (; n < 40 && (k.menuK < 1 || k.opacity < 1 || Math.abs(k.scale - 1) > 1e-3); n++) { await S.frames(1); k = await sm(S); if (n < 8) ks.push(k.menuK.toFixed(2)); }
+    if (after) await after();
     const typ = base.length ? base.slice().sort((a, b) => a - b)[Math.floor(base.length / 2)] : 0;
-    const k1 = Math.min(1, Math.min(first.s.dt, 0.05) / 0.15);         // one frame's worth of the 150 ms fade (the sim's frames are 17-50 ms; a Quest's 8-14 ms)
-    rec(G, label + ': opens with a fade/grow (starts clear and small, eases to full over ~150 ms) and it finishes', first.s.menuK <= k1 + 0.02 && first.s.menuK < 1 && first.s.scale < 0.995 && k.menuK === 1 && k.opacity === 1 && Math.abs(k.scale - 1) < 1e-3, 'menu ' + first.id + '; frame ' + (first.s.dt * 1000).toFixed(0) + ' ms; first frame opacity ' + first.s.opacity.toFixed(2) + ' scale ' + first.s.scale.toFixed(3) + '; menuK ' + ks.join(' ') + ' ... full after ' + (n + 1) + ' frames');
+    const o = k.open || {};
+    rec(G, label + ': opens with a fade/grow (first frame mostly clear and small, eases to full in ~150 ms) and it finishes', o.id === first.id && o.k0 >= 0 && o.k0 < 0.6 && first.s.scale < 0.995 && o.ms >= 90 && o.ms <= 320 && k.menuK === 1 && k.opacity === 1 && Math.abs(k.scale - 1) < 1e-3, 'menu ' + first.id + '; first frame fade ' + (o.k0 >= 0 ? o.k0.toFixed(2) : '-') + ' (frames here ' + (first.s.dt * 1000).toFixed(0) + ' ms), full after ' + (o.ms || 0).toFixed(0) + ' ms; menuK ' + ks.join(' '));
     const top = Object.entries(first.stages).sort((a, b) => b[1] - a[1]).slice(0, 3).map((e) => e[0] + ' ' + e[1].toFixed(1)).join(', ');
     X.openMs = X.openMs || []; X.openMs.push({ menu: label, ms: +first.ms.toFixed(1), typical: +typ.toFixed(1) });
     rec(G, label + ': the frame that opens it stays short (sim CPU, under 40 ms incl. software rendering)', first.ms < 40, first.ms.toFixed(1) + ' ms (normal frames here ~' + typ.toFixed(1) + ' ms; ' + top + ')');
@@ -67,6 +67,16 @@ module.exports = function (X) {
     if (!t) return null;
     const w = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), t); await pointAt(S, 'right', w); await S.frames(6); await S.pulses();
     await S.press('right', 'trigger', 4); await S.frames(wait || 14); const p = await S.pulses(); await rest(S); return { title: t[2], pulses: p };
+  }
+  async function clickLast(S, re, wait) {                                // the LAST tile matching (e.g. the mod bag's "Put in stash"), scrolling down to it
+    await toTop(S);
+    for (let k = 0; k < 16; k++) {
+      const t = await S.ev((re) => { const r = new RegExp(re, 'i'), all = window.__game.xr.menuTiles().filter((q) => !q.disabled && !q.exit && r.test(q.title)), l = all[all.length - 1]; return l ? [l.u, l.v, l.title, l.inView] : null; }, re);
+      if (!t) return null;
+      if (t[3]) { const w = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), t); await pointAt(S, 'right', w); await S.frames(6); await S.pulses(); await S.press('right', 'trigger', 4); await S.frames(wait || 14); const p = await S.pulses(); await rest(S); return { title: t[2], pulses: p }; }
+      await S.hand('right', { ax: [0, 0, 0, 0.6] }); await S.frames(5); await S.hand('right', { ax: [0, 0, 0, 0] }); for (let j = 0; j < 30 && (await sm(S)).scrollV !== 0; j++) await S.frames(1);
+    }
+    return null;
   }
   async function scrollCheck(S, label) {
     const d0 = await debug(S); if (!(d0.maxScroll > 40)) return false;
@@ -179,15 +189,16 @@ module.exports = function (X) {
         await S.ev((c) => window.__game.ref.place(c.x - 4, c.z, -Math.PI / 2), sf.m); await S.frames(20);
       } else rec(G, 'Merchant: safe room reached', false, JSON.stringify(sf));
       if (sf.safe && sf.ch) {
+        await S.ev(() => { const r = window.__game.ref; r.giveMod(2); const p = r.snapshot().pickups.filter((q) => q.kind === 'mod').pop(); if (p && p.mod) r.addMod(p.mod); });
         await S.ev((c) => window.__game.ref.place(c.x - 1.5, c.z, Math.PI / 2), sf.ch); await S.frames(8); await pointAt(S, 'right', [sf.ch.x, 0.6, sf.ch.z]);
         await watchOpen(S, 'Stash', () => S.hold('right', 'grip', true), 'stashMenu', async () => { await S.hold('right', 'grip', false); await S.frames(2); });
         await rest(S);
         await hoverCheck(S, 'Stash', 'Put in stash|Save game here|.');
         await scrollCheck(S, 'Stash');
         await shot(S, 'smooth_stash');
-        const n0 = await S.ev(() => window.__game.ref.stashList ? window.__game.ref.stashList().length : -1);
-        const put = await click(S, 'Put in stash', 20); const n1 = await S.ev(() => window.__game.ref.stashList ? window.__game.ref.stashList().length : -1);
-        rec(G, 'Stash: laser + trigger still stores an item', !!put && n1 > n0, n0 + ' -> ' + n1);
+        const n0 = await S.ev(() => window.__game.ref.stashList().length);
+        const put = await clickLast(S, 'Put in stash', 20); const n1 = await S.ev(() => window.__game.ref.stashList().length);
+        rec(G, 'Stash: laser + trigger still stores a mod from the bag (the game keeps your last gun out)', !!put && n1 > n0, n0 + ' -> ' + n1 + ' ' + JSON.stringify(put) + ' tiles ' + (await S.ev(() => window.__pt.titles())).join(', ').slice(0, 120));
         await S.press('left', 'y', 4); await S.frames(2); await closedCheck(S, 'Stash', 'Y');
       }
       // 9. game over
@@ -206,10 +217,14 @@ module.exports = function (X) {
       await S.frames(20); await watchOpen(S, 'Pause again (laser check)', () => S.seq('left', 'y', [[1, 3], [0, 1]]), 'start');
       const pt = await S.ev(() => window.__pt.menuPoint(0.5, 0.5)); await pointAt(S, 'right', pt); await S.frames(10);
       const base = await S.ev((f) => window.__pt.look(f, window.__pt.menuPoint(0.5, 0.5)), [0.18, -0.42, -0.32]);
-      const jit = []; for (let i = 0; i < 12; i++) { const a = (i % 2 ? 1 : -1) * 0.006; const q = await S.ev((b, a) => { const T = window.__game.THREE, q = new T.Quaternion(b[0], b[1], b[2], b[3]).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), a)); return [q.x, q.y, q.z, q.w]; }, base, a); await S.hand('right', { p: [0.18, -0.42, -0.32], q }); await S.frames(1); jit.push((await sm(S)).laserDir); }
+      // a tremor that flips EVERY rendered frame (driven inside the page, frame-exact), the last 16 frames measured
+      const jit = await S.ev((b) => new Promise((res) => { const T = window.__game.THREE, d = window.__fx.hands.right, out = []; let f0 = window.__fx.frames, i = 0;
+        const qa = (a) => { const q = new T.Quaternion(b[0], b[1], b[2], b[3]).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), a)); return [q.x, q.y, q.z, q.w]; };
+        d.q = qa(-0.006); const tick = () => { if (window.__fx.frames !== f0) { f0 = window.__fx.frames; out.push(window.__game.xr.smooth().laserDir); i++; d.q = qa((i % 2 ? 1 : -1) * 0.006); } if (i >= 40) { d.q = b; res(out.slice(-16)); } else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }), base);
       const spread = (() => { let mx = 0; for (const a of jit) for (const b of jit) if (a && b) mx = Math.max(mx, Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))); return mx; })();
+      await S.hand('right', { q: base }); await S.frames(3);
       const fdt = (await sm(S)).dt;
-      rec(G, 'Laser: a 0.7 degree hand tremor moves the beam less (steady; at 72-120 Hz see tests/menusmooth.test.js: 10-16%)', spread < 0.012 * 0.75, 'beam wobble ' + (spread * 57.3).toFixed(2) + ' deg for a ' + (0.012 * 57.3).toFixed(2) + ' deg hand wobble at the sim\'s ' + (1 / fdt).toFixed(0) + ' fps');
+      rec(G, 'Laser: a 0.7 degree hand tremor that flips every frame moves the beam less (the sim\'s 17-50 ms frames let more through; at 72-120 Hz it is 10-16%, tests/menusmooth.test.js)', spread < 0.012 * 0.75, 'beam wobble ' + (spread * 57.3).toFixed(2) + ' deg for a ' + (0.012 * 57.3).toFixed(2) + ' deg hand wobble at the sim\'s ' + (1 / fdt).toFixed(0) + ' fps');
       const tR = await S.ev(() => window.__pt.menuFind('^RESUME')); const wR = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), tR); await pointAt(S, 'right', wR);
       const hv1 = (await debug(S)).hover;
       rec(G, 'Laser: a quick point at RESUME is followed at once (hover within 3 frames, no lag on the click)', hv1 === tR[2], 'hover ' + hv1);
