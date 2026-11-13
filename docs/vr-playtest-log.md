@@ -185,6 +185,9 @@ New tool `tools/xr_coop_real.js`: two windows on the real PeerJS server (no fake
 | 263 draw calls per eye mid-fight (Quest 3 wants well under ~200) | every torch was 6 separate meshes (22 sconces + 6 braziers), and the floor was cut into 12 x 12-cell chunks per texture (about 55 in view) | in VR the torches are drawn as 12 instanced meshes in all (glow becomes a camera-facing additive quad, same look: checked side by side at 2 m, `torch_compare.png`), and the floor uses merged 2 x 2-chunk meshes (same quads, fog hides the extra reach). Mid-fight test: **263 -> 133 per eye**; standing in the full game ~110 -> ~75. `window.__noInst = true` switches back to compare |
 | (found while doing it) calling `renderer.xr.getCamera()` mid-frame broke sprinting and laser clicks | in three r128 it moves the camera to the headset pose as a side effect | not used; the glow faces the player's eye point |
 
+### Batch 6: Comfort settings on the VR pause menu
+Three new tiles on the Y pause menu, saved on the headset between visits (a link flag like `?snap` or `?vignette` still wins): **SPEED: NORMAL / COMFORT (slower)** (4.5 m/s walk, 7 m/s sprint instead of 6.2 / 10; only in VR, put back on leaving VR), **TURN: SMOOTH / SNAP** (45 degree steps), **VIGNETTE: OFF / ON**. Defaults unchanged. Mechanics group: 16/16 (toggles, saved, walk tops out at 7 m/s, one snap push = 46 degrees, all back off).
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.

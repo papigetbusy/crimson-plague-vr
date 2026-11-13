@@ -52,7 +52,7 @@ body {
 #downMsg span { display: block; font-family: var(--body); font-weight: 700; font-size: clamp(13px, 3vh, 18px); letter-spacing: 0.08em; color: var(--ink); }
 #coopBtn { margin-top: 6px; font-family: var(--body); font-weight: 700; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #bfe0ff; background: transparent; border: 1px solid #4a7aa8; padding: 8px 16px; cursor: pointer; touch-action: manipulation; }
 #coopPanel { margin: 8px auto 4px; max-width: 520px; padding: 8px 10px; border: 1px solid #4a7aa8; background: rgba(10, 20, 34, 0.55); }
-.vrOnly { display: none !important; } body.xr #vrExtras { display: flex !important; gap: 8px; justify-content: center; order: 6; } body.xr #coopKeys { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 4px; flex-basis: 100%; }
+.vrOnly { display: none !important; } body.xr #vrExtras, body.xr #vrComfort { display: flex !important; gap: 8px; justify-content: center; order: 6; } body.xr #coopKeys { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 4px; flex-basis: 100%; }
 #coopMenu { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
 #coopPanel button, #coopPanel input { font-family: var(--body); font-weight: 700; font-size: 14px; color: var(--ink); background: #12202e; border: 1px solid #4a7aa8; padding: 7px 12px; }
 #coopPanel input { width: 7em; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
@@ -431,6 +431,7 @@ body.pad .card3.sel { border-color: var(--gold); background: linear-gradient(#3c
     <button id="play" type="button"><span id="playLabel">ENTER THE HALL</span></button>
     <button id="codexBtn" type="button">CODEX: how everything works</button>
     <div id="vrExtras" class="vrOnly"><button id="vrSound" type="button">SOUND: ON</button><button id="vrNewRun" type="button">NEW RUN (start over)</button></div>
+    <div id="vrComfort" class="vrOnly"><button id="vrSpeed" type="button">SPEED: NORMAL</button><button id="vrTurn" type="button">TURN: SMOOTH</button><button id="vrVig" type="button">VIGNETTE: OFF</button></div>
   </div>
 </div>
 <div class="overlay" id="codex" hidden><div class="cxwrap"><header><b>CODEX</b><input type="search" placeholder="Search: a gun, monster, affix, class..." aria-label="Search the Codex"><button type="button" class="cxclose">Close</button></header><div class="cxmain"><nav class="cxtabs"></nav><div class="cxbody"></div></div></div></div>

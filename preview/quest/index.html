@@ -52,7 +52,7 @@ body {
 #downMsg span { display: block; font-family: var(--body); font-weight: 700; font-size: clamp(13px, 3vh, 18px); letter-spacing: 0.08em; color: var(--ink); }
 #coopBtn { margin-top: 6px; font-family: var(--body); font-weight: 700; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #bfe0ff; background: transparent; border: 1px solid #4a7aa8; padding: 8px 16px; cursor: pointer; touch-action: manipulation; }
 #coopPanel { margin: 8px auto 4px; max-width: 520px; padding: 8px 10px; border: 1px solid #4a7aa8; background: rgba(10, 20, 34, 0.55); }
-.vrOnly { display: none !important; } body.xr #vrExtras { display: flex !important; gap: 8px; justify-content: center; order: 6; } body.xr #coopKeys { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 4px; flex-basis: 100%; }
+.vrOnly { display: none !important; } body.xr #vrExtras, body.xr #vrComfort { display: flex !important; gap: 8px; justify-content: center; order: 6; } body.xr #coopKeys { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 4px; flex-basis: 100%; }
 #coopMenu { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
 #coopPanel button, #coopPanel input { font-family: var(--body); font-weight: 700; font-size: 14px; color: var(--ink); background: #12202e; border: 1px solid #4a7aa8; padding: 7px 12px; }
 #coopPanel input { width: 7em; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
@@ -405,7 +405,7 @@ body.pad .card3.sel { border-color: var(--gold); background: linear-gradient(#3c
 <div class="overlay" id="start">
   <div class="card">
     <h1>Crimson Plague</h1>
-    <p>Hold the corridor. Nothing stops coming.</p><p class="buildTag">build b86eeb5</p>
+    <p>Hold the corridor. Nothing stops coming.</p><p class="buildTag">build 6bdec38+</p>
     <div class="keys">
       <p><b>WASD</b> move</p><p><b>Mouse</b> look, <b>Click</b> fire</p>
       <p><b>Shift</b> sprint</p><p><b>Right click</b> aim</p>
@@ -431,6 +431,7 @@ body.pad .card3.sel { border-color: var(--gold); background: linear-gradient(#3c
     <button id="play" type="button"><span id="playLabel">ENTER THE HALL</span></button>
     <button id="codexBtn" type="button">CODEX: how everything works</button>
     <div id="vrExtras" class="vrOnly"><button id="vrSound" type="button">SOUND: ON</button><button id="vrNewRun" type="button">NEW RUN (start over)</button></div>
+    <div id="vrComfort" class="vrOnly"><button id="vrSpeed" type="button">SPEED: NORMAL</button><button id="vrTurn" type="button">TURN: SMOOTH</button><button id="vrVig" type="button">VIGNETTE: OFF</button></div>
   </div>
 </div>
 <div class="overlay" id="codex" hidden><div class="cxwrap"><header><b>CODEX</b><input type="search" placeholder="Search: a gun, monster, affix, class..." aria-label="Search the Codex"><button type="button" class="cxclose">Close</button></header><div class="cxmain"><nav class="cxtabs"></nav><div class="cxbody"></div></div></div></div>
@@ -9077,7 +9078,17 @@ const XrMode = (function () {
     const dolly = new THREE.Group(); dolly.name = 'xrDolly';
     scene.add(dolly); scene.remove(camera); dolly.add(camera);       // flat screen: the rig sits at 0,0,0 with no turn, so nothing changes
     let session = null, bodyYaw = 0, onStart = null, onEnd = null;
-    const turn = XrInput.createTurn(opts.snap, opts.snapDeg * Math.PI / 180);
+    // Comfort settings (VR pause menu): snap or smooth turn, the vignette, slower walking. Kept between visits; a link flag (?snap, ?vignette) wins.
+    const COMFORT_KEY = 'cp.vrComfort';
+    const comfort = (() => { let c = {}; try { c = JSON.parse(localStorage.getItem(COMFORT_KEY) || '{}') || {}; } catch (e) { c = {}; } return { snap: /[?&#]snap\b/.test(q) ? true : !!c.snap, vignette: /[?&#]vignette\b/.test(q) ? true : !!c.vignette, slow: !!c.slow }; })();
+    opts.snap = comfort.snap; opts.vignette = comfort.vignette;
+    let turn = XrInput.createTurn(opts.snap, opts.snapDeg * Math.PI / 180);
+    function setComfort(k, v) {
+      if (!(k in comfort)) return; comfort[k] = !!v;
+      if (k === 'snap') { opts.snap = comfort.snap; turn = XrInput.createTurn(opts.snap, opts.snapDeg * Math.PI / 180); }
+      if (k === 'vignette') { opts.vignette = comfort.vignette; if (!opts.vignette) { moveK = 0; vig.visible = false; vig.material.opacity = 0; } }
+      try { localStorage.setItem(COMFORT_KEY, JSON.stringify(comfort)); } catch (e) { /* private mode: just this visit */ }
+    }
     const TURN_SPEED = opts.turn;                                   // smooth turn, radians a second at full tilt (?turn=6 faster); a curve keeps small pushes gentle
     const hands = { left: null, right: null };
     const tmpS = new THREE.Vector3(), v3 = new THREE.Vector3(), q4 = new THREE.Quaternion(), fwd = new THREE.Vector3(), aimQ = new THREE.Quaternion(), aimP = new THREE.Vector3(), headQ = new THREE.Quaternion();
@@ -9560,7 +9571,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { comfort: () => Object.assign({}, comfort), setComfort, poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();
@@ -11021,6 +11032,17 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   // VR has no tuning panel (it needs a mouse): its two useful buttons are on the VR pause menu instead
   const vrSoundLabel = () => { $('vrSound').textContent = 'SOUND: ' + (view.sound ? 'ON' : 'OFF'); };
   $('vrSound').addEventListener('click', () => { $('tuneSound').click(); vrSoundLabel(); }); vrSoundLabel();
+  // VR comfort (pause menu): slower walking (4.5 / 7 m/s instead of the game's 6.2 / 10), snap or smooth turn, vignette. Saved by xr_mode.js.
+  const COMFY = { walkSpeed: 4.5, sprintSpeed: 7 }; let vrSpeedSaved = null;
+  function applyVrSpeed() {
+    const want = !!(xr && xr.presenting() && xr.comfort().slow);
+    if (want && !vrSpeedSaved) { vrSpeedSaved = { walkSpeed: ref.cfg.walkSpeed, sprintSpeed: ref.cfg.sprintSpeed }; ref.setCfg(COMFY); }
+    else if (!want && vrSpeedSaved) { ref.setCfg(vrSpeedSaved); vrSpeedSaved = null; }
+  }
+  const comfortLabels = () => { if (!xr) return; const c = xr.comfort(); $('vrSpeed').textContent = c.slow ? 'SPEED: COMFORT (slower)' : 'SPEED: NORMAL'; $('vrTurn').textContent = c.snap ? 'TURN: SNAP' : 'TURN: SMOOTH'; $('vrVig').textContent = 'VIGNETTE: ' + (c.vignette ? 'ON' : 'OFF'); };
+  $('vrSpeed').addEventListener('click', () => { if (!xr) return; xr.setComfort('slow', !xr.comfort().slow); applyVrSpeed(); comfortLabels(); });
+  $('vrTurn').addEventListener('click', () => { if (!xr) return; xr.setComfort('snap', !xr.comfort().snap); comfortLabels(); });
+  $('vrVig').addEventListener('click', () => { if (!xr) return; xr.setComfort('vignette', !xr.comfort().vignette); comfortLabels(); });
   $('vrNewRun').addEventListener('click', () => { if (coop.mode !== 'off') { toast('Leave the room to start over'); return; } ref.reset(); state = ref.snapshot(); if (started) begin(true); });
   function togglePanel() {
     panelOpen = !panelOpen; panel.hidden = !panelOpen;
@@ -11434,8 +11456,8 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
     gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
-  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
-  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
+  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); applyVrSpeed(); comfortLabels(); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
+  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); applyVrSpeed(); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
@@ -11464,7 +11486,7 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
 })();
 
 </script>

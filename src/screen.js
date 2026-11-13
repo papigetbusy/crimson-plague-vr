@@ -814,6 +814,17 @@
   // VR has no tuning panel (it needs a mouse): its two useful buttons are on the VR pause menu instead
   const vrSoundLabel = () => { $('vrSound').textContent = 'SOUND: ' + (view.sound ? 'ON' : 'OFF'); };
   $('vrSound').addEventListener('click', () => { $('tuneSound').click(); vrSoundLabel(); }); vrSoundLabel();
+  // VR comfort (pause menu): slower walking (4.5 / 7 m/s instead of the game's 6.2 / 10), snap or smooth turn, vignette. Saved by xr_mode.js.
+  const COMFY = { walkSpeed: 4.5, sprintSpeed: 7 }; let vrSpeedSaved = null;
+  function applyVrSpeed() {
+    const want = !!(xr && xr.presenting() && xr.comfort().slow);
+    if (want && !vrSpeedSaved) { vrSpeedSaved = { walkSpeed: ref.cfg.walkSpeed, sprintSpeed: ref.cfg.sprintSpeed }; ref.setCfg(COMFY); }
+    else if (!want && vrSpeedSaved) { ref.setCfg(vrSpeedSaved); vrSpeedSaved = null; }
+  }
+  const comfortLabels = () => { if (!xr) return; const c = xr.comfort(); $('vrSpeed').textContent = c.slow ? 'SPEED: COMFORT (slower)' : 'SPEED: NORMAL'; $('vrTurn').textContent = c.snap ? 'TURN: SNAP' : 'TURN: SMOOTH'; $('vrVig').textContent = 'VIGNETTE: ' + (c.vignette ? 'ON' : 'OFF'); };
+  $('vrSpeed').addEventListener('click', () => { if (!xr) return; xr.setComfort('slow', !xr.comfort().slow); applyVrSpeed(); comfortLabels(); });
+  $('vrTurn').addEventListener('click', () => { if (!xr) return; xr.setComfort('snap', !xr.comfort().snap); comfortLabels(); });
+  $('vrVig').addEventListener('click', () => { if (!xr) return; xr.setComfort('vignette', !xr.comfort().vignette); comfortLabels(); });
   $('vrNewRun').addEventListener('click', () => { if (coop.mode !== 'off') { toast('Leave the room to start over'); return; } ref.reset(); state = ref.snapshot(); if (started) begin(true); });
   function togglePanel() {
     panelOpen = !panelOpen; panel.hidden = !panelOpen;
@@ -1227,8 +1238,8 @@
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
     gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
-  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
-  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
+  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); applyVrSpeed(); comfortLabels(); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
+  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); applyVrSpeed(); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
@@ -1257,5 +1268,5 @@
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
 })();

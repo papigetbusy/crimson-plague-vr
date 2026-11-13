@@ -140,6 +140,7 @@ module.exports = function (X) {
       rec(G, 'Falling shows YOU FELL in front of you', over && go.menu && go.menuId === 'gameover', 'over=' + over + ' menu=' + go.menuId + ' tiles: ' + gt.join(', ').slice(0, 80));
       await shot(S, 'gameover');
       const ra = await clickTile(S, 'RISE AGAIN', { wait: 40 });
+      if ((await S.ev(() => window.__game.xr.debug().menuId)) === 'stashMenu') await yTap(S);   // the stash still holds things, so the new run opens it at the door first (right); Y enters the hall
       const af = await S.ev(() => { const s = window.__game.ref.snapshot(); return { over: s.over, hp: s.player.hp, max: s.player.maxHp, wave: s.wave.n, run: window.__game.running(), menu: window.__game.xr.menuShown() }; });
       rec(G, 'Laser + trigger on RISE AGAIN starts a new run', !!ra && !af.over && af.hp === af.max && af.run && !af.menu, JSON.stringify(af));
       const errs = await errsOf(S); rec(G, 'No script errors in the full run', errs.length === 0, errs.join(' | ').slice(0, 200));
@@ -330,12 +331,71 @@ module.exports = function (X) {
       const snd1 = await S.ev(() => window.__game.view.sound);
       rec(G, 'Pause menu in VR: SOUND toggles the sound (the flat Tuning panel needs a mouse)', !!sb && snd1 !== snd0, snd0 + ' -> ' + snd1);
       await clickTile(S, '^SOUND');
+      // comfort: slower walking, snap turn, vignette, from the pause menu; saved for next time
+      const c0 = await S.ev(() => window.__game.xr.comfort());
+      const cs = await clickTile(S, '^SPEED'), ct = await clickTile(S, '^TURN'), cv = await clickTile(S, '^VIGNETTE');
+      const c1 = await S.ev(() => ({ c: window.__game.xr.comfort(), walk: window.__game.ref.cfg.walkSpeed, sprint: window.__game.ref.cfg.sprintSpeed, saved: localStorage.getItem('cp.vrComfort'), labels: ['vrSpeed', 'vrTurn', 'vrVig'].map((i) => document.getElementById(i).textContent) }));
+      await shot(S, 'comfort_menu');
+      rec(G, 'Pause menu in VR: COMFORT speed, TURN and VIGNETTE toggle with the laser, and are saved', !!cs && !!ct && !!cv && !c0.slow && c1.c.slow && c1.c.snap !== c0.snap && c1.c.vignette !== c0.vignette && /"slow":true/.test(c1.saved || ''), JSON.stringify(c1).slice(0, 220));
+      rec(G, 'Comfort speed: walk 4.5 m/s, sprint 7 m/s in VR', c1.walk === 4.5 && c1.sprint === 7, c1.walk + ' / ' + c1.sprint);
+      await yTap(S);
+      const y0 = (await S.state()).player.yaw; await S.hand('right', { ax: [0, 0, 1, 0] }); await S.frames(12); await S.hand('right', { ax: [0, 0, 0, 0] }); await S.frames(10);
+      const y1 = (await S.state()).player.yaw; let dy = Math.abs(y1 - y0); if (dy > Math.PI) dy = 2 * Math.PI - dy;
+      rec(G, 'Snap turn: one push turns one 45 degree step (not a smooth spin)', dy > 0.6 && dy < 1.0, 'turned ' + (dy * 180 / Math.PI).toFixed(0) + ' deg');
+      const O2 = await S.ev(() => window.__pt.openSpot(4, null) || window.__pt.openSpot(3, null)); await S.ev((O) => window.__game.ref.place(O[0], O[1], Math.PI / 2), O2); await S.frames(3);
+      let top = 0; await S.hand('left', { ax: [0, 0, 0, -1] }); for (let i = 0; i < 10; i++) { await S.frames(1); top = Math.max(top, (await S.state()).player.speed); } await S.hand('left', { ax: [0, 0, 0, 0] }); await S.frames(5);
+      rec(G, 'Comfort speed: full forward tops out at the slower sprint (7 m/s, not 10)', top > 3 && top <= 7.05, 'top ' + top.toFixed(2) + ' m/s');
+      const vg = await S.ev(() => window.__game.xr.vigOn());
+      await yTap(S); await clickTile(S, '^SPEED'); await clickTile(S, '^TURN'); await clickTile(S, '^VIGNETTE');
+      const c2 = await S.ev(() => ({ c: window.__game.xr.comfort(), walk: window.__game.ref.cfg.walkSpeed, sprint: window.__game.ref.cfg.sprintSpeed }));
+      rec(G, 'Comfort off again: back to the game speeds (6.2 / 10) and the old turn', !c2.c.slow && c2.walk === 6.2 && c2.sprint === 10 && c2.c.snap === c0.snap && c2.c.vignette === c0.vignette, JSON.stringify(c2) + ' vignette seen while walking=' + vg);
       await S.ev(() => window.__game.ref.giveXp(50)); 
       const nr = await clickTile(S, '^NEW RUN', { wait: 30 });
-      const af = await S.ev(() => { const s = window.__game.ref.snapshot(); return { wave: s.wave.n, lvl: s.level.n, run: window.__game.running(), menu: window.__game.xr.menuShown() }; });
+      if ((await S.ev(() => window.__game.xr.debug().menuId)) === 'stashMenu') await yTap(S);   // the stash still holds things, so the new run opens it at the door first (right); Y enters the hall
+      const af = await S.ev(() => { const s = window.__game.ref.snapshot(); return { wave: s.wave.n, lvl: s.level.n, run: window.__game.running(), menu: window.__game.xr.menuShown(), id: window.__game.xr.debug().menuId, tiles: window.__game.xr.debug().exits }; });
       rec(G, 'Pause menu in VR: NEW RUN starts over and play carries on', !!nr && af.wave === 1 && af.run && !af.menu, JSON.stringify(af));
       const errs = await errsOf(S); rec(G, 'No script errors in the mechanics run', errs.length === 0, errs.join(' | ').slice(0, 200));
     } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
   }
-  return { gameGroup, menusGroup, feelGroup, mechanicsGroup, clickTile, allTiles, shot };
+  // reload on every gun type in VR: X starts it, the animation plays on the gun (magazine out and in, shells one by one, the bolt worked), the magazine
+  // ends full, and holding X with a full magazine inspects the gun
+  async function reloadGroup() {
+    const G = 'reload';
+    const S = await open('?sandbox');
+    try {
+      await toOpen(S); await S.ev(() => window.__game.ref.clearWave()); await S.frames(5);
+      for (const id of ['pistol_service', 'smg_compact', 'rifle', 'shotgun_pump', 'sniper_bolt', 'hmg_belt']) {
+        await S.ev((id) => window.__game.ref.equipGun(id, 1), id); await S.frames(30);
+        await S.hold('right', 'trigger', true); await S.frames(id === 'sniper_bolt' || id === 'shotgun_pump' ? 3 : 8); await S.hold('right', 'trigger', false); await S.frames(id === 'sniper_bolt' ? 40 : 20);
+        const a0 = await S.ev(() => { const p = window.__game.ref.snapshot().player; return { ammo: p.ammo, mag: p.magSize, rl: p.reloading }; });
+        const d0 = (await debug(S)).dropN;
+        await S.press('left', 'x', 4);
+        let started = false, magOff = 0, shellOn = 0, lastShell = false, lastMag = true, bolt = 0, n = 0, pulses = 0;
+        await S.pulses();
+        for (; n < 400; n++) {
+          await S.frames(1);
+          const r = await S.ev(() => ({ rl: window.__game.ref.snapshot().player.reloading, ...window.__game.rl() }));
+          if (r.rl) started = true; else if (started) break;
+          if (!r.mag && lastMag) magOff++; lastMag = r.mag;
+          if (r.shell && !lastShell) shellOn++; lastShell = r.shell;
+          bolt = Math.max(bolt, Math.abs(r.charge));
+        }
+        pulses = (await S.pulses()).length;
+        const a1 = await S.ev(() => { const p = window.__game.ref.snapshot().player; return { ammo: p.ammo, mag: p.magSize }; });
+        const d1 = (await debug(S)).dropN, type = id.split('_')[0];
+        let anim;
+        if (type === 'shotgun') anim = shellOn >= 1 ? 'shells pushed in one by one: ' + shellOn : null;
+        else anim = magOff >= 1 && d1 > d0 ? 'magazine out (dropped ' + (d1 - d0) + ') and back in' : null;
+        if (type === 'sniper' && !(bolt > 0.01)) anim = null;
+        rec(G, id + ': X reloads with the animation on the gun' + (type === 'sniper' ? ' (and the bolt is worked)' : ''), started && !!anim && a1.ammo === a1.mag, (anim || 'mag off ' + magOff + ', shells ' + shellOn + ', drops ' + (d1 - d0)) + '; ammo ' + a0.ammo + ' -> ' + a1.ammo + '/' + a1.mag + (bolt ? ', bolt ' + bolt.toFixed(3) : '') + ', ' + pulses + ' buzzes');
+      }
+      // inspect: hold X with a full magazine
+      await S.ev(() => window.__game.ref.equipGun('rifle', 1)); await S.frames(30);
+      await S.hold('left', 'x', true); let ins = 0; for (let i = 0; i < 90; i++) { await S.frames(1); ins = Math.max(ins, (await S.ev(() => window.__game.rl().insp))); } await S.hold('left', 'x', false); await S.frames(5);
+      const rlNow = await S.ev(() => window.__game.ref.snapshot().player.reloading);
+      rec(G, 'Hold X with a full magazine: the gun is inspected (no reload)', ins > 0 && !rlNow, 'inspect ' + ins.toFixed(2));
+      const errs = await errsOf(S); rec(G, 'No script errors in the reload run', errs.length === 0, errs.join(' | ').slice(0, 200));
+    } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
+  }
+  return { gameGroup, menusGroup, feelGroup, mechanicsGroup, reloadGroup, clickTile, allTiles, shot };
 };
