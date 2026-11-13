@@ -49,6 +49,10 @@ module.exports = function (X) {
         return { n: list.length, list, ads: G.ref.snapshot().player.adsT, dot: d };
       });
       await shot(S, 'mesh_1911_ads');
+      // owner rule: in VR you see the gun only. While aiming with both hands (where the support glove used to show), no glove, forearm or placeholder controller hand is drawn
+      const hands = await S.ev(() => { const G = window.__game, d = G.xr.debug(); const ph = []; G.xr.rig.traverse((o) => { if (!o.isMesh) return; for (let p = o; p; p = p.parent) if (!p.visible) return; const gp = o.geometry && o.geometry.parameters || {};
+        if ((o.geometry.type === 'BoxGeometry' && gp.width === 0.045 && gp.depth === 0.11) || (o.geometry.type === 'TorusGeometry' && gp.radius === 0.04)) ph.push(o.geometry.type); }); return { armsHidden: d.armsHidden, gloveOn: d.gloveOn, placeholders: ph }; });
+      rec(G, 'In VR no hand, glove or forearm is drawn on the 1911 (aiming with both hands too): only the gun', hands.armsHidden && !hands.gloveOn && hands.placeholders.length === 0, JSON.stringify(hands));
       await S.hold('right', 'trigger', true); await S.frames(3); await S.hold('right', 'trigger', false); await S.frames(2);
       const r = await S.ev(() => { const G = window.__game, sh = G.lastShot(), d = G.xr.feel().dot; if (!sh || !d) return { ok: false }; const V = G.THREE.Vector3, o = new V(sh.ox, sh.oy, sh.oz), e = new V(sh.ex, sh.ey, sh.ez), dir = e.clone().sub(o).normalize(), q = new V(d[0], d[1], d[2]).sub(o), err = q.clone().sub(dir.clone().multiplyScalar(q.dot(dir))).length();   // how far the dot is off the shot's line (along-the-line depth on a grazing wall does not matter to the eye)
         return { ok: err <= 0.06 + 0.01 * (sh.t || 10), err, hit: sh.hit, t: sh.t, o: [sh.ox, sh.oy, sh.oz].map((v) => +v.toFixed(2)), e: [sh.ex, sh.ey, sh.ez].map((v) => +v.toFixed(2)), d: d.map((v) => +v.toFixed(2)), mons: G.ref.snapshot().monsters.length }; });
