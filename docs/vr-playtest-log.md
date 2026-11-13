@@ -211,11 +211,22 @@ The owner could not see the e410342 red dot on a real Quest 3: the sprite was 10
 - Sim: unit tests all pass (1,078 checks), full fake-Quest run 171/171. The mid-fight draw-call check is noisy (one frame: 63-259 per eye across runs; the base build 22e4dfe also swings 182-217).
 - Harness fixes: the 1911 base is 1,000 triangles (check lowered to 600); the kit costs one draw per visible block (check: up to 8 per eye).
 
+## Menu smoothing in VR, 2026-11-13 (phase 2)
+- Every VR menu (start/class pick, pause, codex, level-up, shop, gear, stash, game over, and the hand-held map) now fades and grows in over about 150 ms, and fades out the same way when closed. Switching from one menu to another dips out and back in, so old and new content never show together.
+- Hover: a gold frame glides to the card or button the laser points at (cards and real buttons only, never titles, text or labels) and fades in; a light haptic tick on every hover change, the usual stronger tick on a click. The hover frame floats above the page, so pointing never redraws the menu.
+- Laser: lightly smoothed (one-euro style: steady when the hand is still, quick when it moves, big jumps taken at once, the trigger never waits for the smoothing).
+- Scrolling: the stick scrolls with a soft speed curve and glides to a stop; dragging the list with the trigger held lets it coast gently after release.
+- No hitch on open: the cards are drawn once when a menu's content changes, the menu texture has no mipmaps to rebuild. Open-frame cost in the sim 1-5 ms (normal frames 0-4 ms).
+- Layout, content and what every button does are exactly the original game's. Menus stay world-locked, laser point-and-click, and Y backs out of every menu (level-up still needs a pick, as in the original).
+- Sim (new `smooth` group, real game): 65/65 - every menu opens, closes, backs out with Y, scrolls, clicks still work, nothing stays stuck, the fades finish, open-frame time under 40 ms. Pickup, doors, controls, feel (red dot), meshes and menus re-checked: 94/94. New unit test tests/menusmooth.test.js (laser filter at 72/90/120 Hz, settle time, snap, source checks).
+- Known: scrolling still redraws the menu texture each scrolling frame (as before); without mipmaps small text may shimmer slightly at a distance; the sim's frames are 17-50 ms, so its laser steadiness number is looser than on a 72-120 Hz headset.
+
 ## Still needs a real Quest
 - Frame rate of the full-game kit on the Quest 3 GPU (about 690k triangles per frame, both eyes, at the worst spot in the biggest floors), and how the ivory grips read under orange torchlight (from above they can look skin-toned).
 - The 1911 mesh and Crimson Halls on the Quest's own GPU: grip feel, size in the hand, brightness of the kit next to the old walls.
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.
+- How the menu fades, hover frame, laser smoothing and scroll glide feel on the headset, and whether the hover tick is too light or too strong.
 - Haptic strength on real Touch Plus controllers (the browser may ignore very short pulses).
 - The over-the-shoulder swap spot (16 cm right, 12 cm behind the head) on a real body.
 - Jumping: A lifts the view by about 2 m (the game's own jump); check it is comfortable in a headset.
