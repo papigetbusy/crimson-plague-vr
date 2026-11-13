@@ -189,7 +189,9 @@ module.exports = function (X) {
         await S.ev((c) => window.__game.ref.place(c.x - 4, c.z, -Math.PI / 2), sf.m); await S.frames(20);
       } else rec(G, 'Merchant: safe room reached', false, JSON.stringify(sf));
       if (sf.safe && sf.ch) {
-        await S.ev(() => { const r = window.__game.ref; r.giveMod(2); const p = r.snapshot().pickups.filter((q) => q.kind === 'mod').pop(); if (p && p.mod) r.addMod(p.mod); });
+        { // a mod for the bag, picked up the VR way (reach down + grip), so the stash has something it may take (the game keeps your last gun out)
+          const at = await S.ev(() => { const r = window.__game.ref, p = r.snapshot().player; r.giveMod(2); const m = r.snapshot().pickups.filter((q) => q.kind === 'mod').pop(); return [m.x, 0.15, m.z]; });
+          const lp = await S.ev((w) => window.__pt.toLocal(w[0], w[1], w[2]), at); await S.hand('right', { p: lp, q: [-0.38, 0, 0, 0.92] }); await S.frames(4); await S.press('right', 'grip', 6); await S.frames(10); await rest(S); }
         await S.ev((c) => window.__game.ref.place(c.x - 1.5, c.z, Math.PI / 2), sf.ch); await S.frames(8); await pointAt(S, 'right', [sf.ch.x, 0.6, sf.ch.z]);
         await watchOpen(S, 'Stash', () => S.hold('right', 'grip', true), 'stashMenu', async () => { await S.hold('right', 'grip', false); await S.frames(2); });
         await rest(S);
