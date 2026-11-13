@@ -22,12 +22,15 @@ const GlbGuns = (function () {
   // polished steel (a GLB material with metalness >= 0.5, e.g. Wrok's blued 1911 base: metallic 1, roughness 0.3): a metal needs something to
   // reflect, or it reads black. A tiny warm torch-hall gradient turned into a PMREM once (envFrom) gives it its sheen; a little self-light keeps it readable.
   function steelMat(THREE, src, map) {
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: map || null, metalness: Math.min(1, src.metalness), roughness: Math.max(0.22, src.roughness), envMapIntensity: 1.25, emissive: 0x161618, emissiveMap: map || null, side: THREE.DoubleSide });
+    // the blued atlas is very dark (about 7-46 of 255), and a metal's colour is its reflection tinted by that atlas, so the tint is lifted
+    // (color 1.3) and the reflection raised (1.7); metalness and roughness stay Wrok's (1 and 0.3)
+    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, map: map || null, metalness: Math.min(1, src.metalness), roughness: Math.max(0.22, src.roughness), envMapIntensity: 1.7, emissive: 0x18181c, emissiveMap: map || null, side: THREE.DoubleSide });
+    m.color.setScalar(1.3); return m;
   }
   function envFrom(THREE, renderer) {
     const c = document.createElement('canvas'); c.width = 64; c.height = 32; const x = c.getContext('2d');
     const g = x.createLinearGradient(0, 0, 0, 32);                       // top to bottom: dark vault, warm torch band, bright streak, red-brown floor
-    g.addColorStop(0, '#141016'); g.addColorStop(0.32, '#3a2620'); g.addColorStop(0.44, '#d8945a'); g.addColorStop(0.5, '#fff0d8'); g.addColorStop(0.56, '#c06a3a'); g.addColorStop(0.7, '#3a1a16'); g.addColorStop(1, '#100a0a');
+    g.addColorStop(0, '#2a2228'); g.addColorStop(0.3, '#5a4034'); g.addColorStop(0.42, '#e8a868'); g.addColorStop(0.5, '#fff6e6'); g.addColorStop(0.58, '#d07a44'); g.addColorStop(0.72, '#4a2620'); g.addColorStop(1, '#1a1010');
     x.fillStyle = g; x.fillRect(0, 0, 64, 32);
     x.fillStyle = 'rgba(255,190,120,0.9)'; for (const px of [8, 30, 52]) x.fillRect(px, 9, 3, 6);   // three torch flames round the room
     const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping;
@@ -125,7 +128,9 @@ const GlbGuns = (function () {
             try {
               const map = firstMap(gltf.scene), r = { scene: gltf.scene, spec, mat: lookMat(THREE, map) };
               let metal = null; gltf.scene.traverse((m) => { if (!metal && m.isMesh && m.material && m.material.metalness >= 0.5) metal = m.material; });
-              if (metal) { r.mat.userData.steel = steelMat(THREE, metal, map); if (env) r.mat.userData.steel.envMap = env; steels.push(r.mat.userData.steel); }
+              if (metal) { r.mat.userData.steel = steelMat(THREE, metal, map); if (env) r.mat.userData.steel.envMap = env; steels.push(r.mat.userData.steel);
+                // next to the steel, the rest (the ivory grips) is toned down and cooled: near-white ivory under an orange torch blew out to a skin-coloured block that read as a hand
+                r.mat.color.setRGB(0.5, 0.5, 0.58); r.mat.emissive.setHex(0x1c1c1e); r.mat.specular.setHex(0x151412); }
               parts(THREE, r.scene, spec, 1, r.mat);              // a dry run: a GLB missing its magazine fails here, not mid-game
               ready[id] = r; if (onReady) onReady(id);
             } catch (e) { fail(id, e); }
