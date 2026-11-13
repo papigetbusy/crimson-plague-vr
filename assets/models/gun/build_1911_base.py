@@ -303,6 +303,8 @@ def build(out_dir):
     M.new_empty('muzzle', Vector((0, M.Y_BORE, M.Z_MUZZLE)), parent=root)
     well = M.new_empty('mag_well', mag_well_g, parent=root)
     M.new_empty('rear_sight', Vector((0, M.Y_SLIDE_TOP + 0.0055, M.Z_SLIDE_REAR - 0.006)), parent=root)
+    # Top of the front blade (same convention as rear_sight: empty sits on the sight).
+    M.new_empty('front_sight', Vector((0, M.Y_SLIDE_TOP - 0.0002 + 0.007, M.Z_SLIDE_FRONT + 0.010)), parent=root)
     mag = objs['magazine']
     M.set_origin_world(mag, G(mag_well_g))
     mw = mag.matrix_world.copy(); mag.parent = well; mag.matrix_world = mw
