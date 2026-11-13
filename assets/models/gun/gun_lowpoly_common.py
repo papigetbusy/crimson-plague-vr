@@ -43,8 +43,8 @@ WOOD = {   # weathered reddish-brown
     'f_light': (108, 58, 36), 'f_high': (146, 100, 70), 'f_grime': (52, 40, 32),
 }
 POLYMER = {  # worn black polymer
-    'f_shadow': (10, 10, 11), 'f_dark': (17, 17, 19), 'f_mid': (29, 29, 32),
-    'f_light': (44, 44, 48), 'f_high': (82, 82, 86), 'f_grime': (48, 44, 38),
+    'f_shadow': (7, 7, 8), 'f_dark': (12, 12, 14), 'f_mid': (20, 20, 22),
+    'f_light': (31, 31, 34), 'f_high': (62, 62, 66), 'f_grime': (38, 35, 30),
 }
 # Atlas regions (x0, y0, x1, y1) in UV pixel space, y up.
 REGION = {
@@ -150,7 +150,7 @@ def paint_atlas(path, furn='wood', seed=1):
                         and (x - x0) % 16 < 10:
                     c = 'f_shadow'
                 d = edge_d(x, y, r)
-                if 0 <= d <= 2 and _vn(x, y, 3, seed + 6) > (0.35 + 0.1 * d):
+                if 0 <= d <= 2 and _vn(x, y, 3, seed + 6) > (0.35 + 0.1 * d + (0.2 if furn != 'wood' else 0)):
                     c = 'f_high'                                   # rubbed edge
                 put(x, y, c)
 
