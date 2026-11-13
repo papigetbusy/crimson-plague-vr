@@ -19,6 +19,21 @@ const GlbGuns = (function () {
     if (map) { map.magFilter = THREE.NearestFilter; map.minFilter = THREE.NearestFilter; map.generateMipmaps = false; map.encoding = THREE.LinearEncoding; map.needsUpdate = true; }
     return new THREE.MeshPhongMaterial({ color: 0xffffff, map: map || null, emissive: 0x303030, emissiveMap: map || null, specular: 0x2a2828, shininess: 24, side: THREE.DoubleSide });
   }
+  // polished steel (a GLB material with metalness >= 0.5, e.g. Wrok's blued 1911 base: metallic 1, roughness 0.3): a metal needs something to
+  // reflect, or it reads black. A tiny warm torch-hall gradient turned into a PMREM once (envFrom) gives it its sheen; a little self-light keeps it readable.
+  function steelMat(THREE, src, map) {
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: map || null, metalness: Math.min(1, src.metalness), roughness: Math.max(0.22, src.roughness), envMapIntensity: 1.25, emissive: 0x161618, emissiveMap: map || null, side: THREE.DoubleSide });
+  }
+  function envFrom(THREE, renderer) {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 32; const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, 32);                       // top to bottom: dark vault, warm torch band, bright streak, red-brown floor
+    g.addColorStop(0, '#141016'); g.addColorStop(0.32, '#3a2620'); g.addColorStop(0.44, '#d8945a'); g.addColorStop(0.5, '#fff0d8'); g.addColorStop(0.56, '#c06a3a'); g.addColorStop(0.7, '#3a1a16'); g.addColorStop(1, '#100a0a');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 32);
+    x.fillStyle = 'rgba(255,190,120,0.9)'; for (const px of [8, 30, 52]) x.fillRect(px, 9, 3, 6);   // three torch flames round the room
+    const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping;
+    const pm = new THREE.PMREMGenerator(renderer), env = pm.fromEquirectangular(t).texture; pm.dispose(); t.dispose();
+    return env;
+  }
   function firstMap(scene) { let m = null; scene.traverse((o) => { if (!m && o.isMesh && o.material && o.material.map) m = o.material.map; }); return m; }
 
   // take node n out of the model and keep its place, relative to the point pivot (model units)
@@ -45,7 +60,7 @@ const GlbGuns = (function () {
     const root = src.clone(true);
     root.position.set(0, 0, 0); root.quaternion.set(0, 0, 0, 1); root.scale.set(1, 1, 1); root.updateMatrixWorld(true);
     let tris = 0;
-    root.traverse((m) => { if (!m.isMesh) return; m.material = mat; m.frustumCulled = false; const g = m.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; });
+    root.traverse((m) => { if (!m.isMesh) return; m.material = (mat.userData.steel && m.material && m.material.metalness >= 0.5) ? mat.userData.steel : mat; m.frustumCulled = false; const g = m.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; });
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
     const at = (name) => { const n = name && root.getObjectByName(name); return n ? new THREE.Vector3().setFromMatrixPosition(n.matrixWorld) : null; };
     const grip = V(spec.grip || [0, 0, 0]);
@@ -92,31 +107,42 @@ const GlbGuns = (function () {
     const guns = (data && data.manifest && data.manifest.guns) || {};
     const ready = {}, failed = {};
     let started = false;
-    const fail = (id, e) => { failed[id] = String((e && e.message) || e); delete ready[id]; console.warn('GLB gun ' + id + ' could not load, using the voxel gun: ' + failed[id]); };
+    const steels = []; let env = null;
+    const failOut = (id, e) => { failed[id] = String((e && e.message) || e); delete ready[id]; console.warn('GLB gun ' + id + ' could not load, using the voxel gun: ' + failed[id]); };
     function start(onReady) {
       if (started) return; started = true;
       if (forced) { console.warn('GLB guns off (?voxelguns): using the voxel guns'); return; }
       if (!Object.keys(guns).length) return;
       if (!THREE.GLTFLoader) { console.warn('GLB guns: no GLTFLoader in this page, using the voxel guns'); return; }
       for (const id of Object.keys(guns)) {
-        const spec = guns[id], b64 = data.files && data.files[spec.file];
-        if (!b64) { fail(id, 'no embedded file ' + spec.file); continue; }
+        const spec0 = guns[id];
+        const tryFile = (file, next) => {
+        const spec = Object.assign({}, spec0, file === spec0.file ? {} : (spec0.fallbackSpec || {}), { file }), b64 = data.files && data.files[file];
+        const fail = (id, e) => { if (next) { console.warn('GLB gun ' + id + ': ' + file + ' did not load (' + ((e && e.message) || e) + '), trying ' + next); tryFile(next, null); } else failOut(id, e); };
+        if (!b64) { fail(id, 'no embedded file ' + file); return; }
         try {
           new THREE.GLTFLoader().parse(decode(b64), '', (gltf) => {
             try {
-              const r = { scene: gltf.scene, spec, mat: lookMat(THREE, firstMap(gltf.scene)) };
+              const map = firstMap(gltf.scene), r = { scene: gltf.scene, spec, mat: lookMat(THREE, map) };
+              let metal = null; gltf.scene.traverse((m) => { if (!metal && m.isMesh && m.material && m.material.metalness >= 0.5) metal = m.material; });
+              if (metal) { r.mat.userData.steel = steelMat(THREE, metal, map); if (env) r.mat.userData.steel.envMap = env; steels.push(r.mat.userData.steel); }
               parts(THREE, r.scene, spec, 1, r.mat);              // a dry run: a GLB missing its magazine fails here, not mid-game
               ready[id] = r; if (onReady) onReady(id);
             } catch (e) { fail(id, e); }
           }, (e) => fail(id, e));
         } catch (e) { fail(id, e); }
+        };
+        tryFile(spec0.file, spec0.fallback || null);                  // the manifest's file, then its fallback (the older 1911), then the voxel gun
       }
     }
     const has = (id) => !forced && !!ready[id];
+    const fail = failOut;
+    // the steel's reflection: made once from the renderer (screen.js calls this as soon as there is one)
+    function setRenderer(renderer) { if (env || !renderer) return; try { env = envFrom(THREE, renderer); for (const m of steels) { m.envMap = env; m.needsUpdate = true; } } catch (e) { console.warn('GLB guns: no steel reflection (' + e.message + ')'); } }
     function build(id, k) { const r = ready[id]; if (!r || forced) return null; try { return parts(THREE, r.scene, r.spec, k, r.mat); } catch (e) { fail(id, e); return null; } }
     // gun units per model metre: true size in a headset (the view scales every gun by gunScale), the voxel gun's size on a flat screen
     const scaleFor = (id, vr, gunScale) => (vr ? 1 / (gunScale || 1) : ((guns[id] && guns[id].flatScale) || 1));
-    return { start, has, build, scaleFor, ids: Object.keys(guns), status: () => ({ ready: Object.keys(ready), failed: Object.assign({}, failed), forced, loader: !!THREE.GLTFLoader }) };
+    return { start, has, build, scaleFor, setRenderer, file: (id) => ready[id] && ready[id].spec.file, envReady: () => !!env, ids: Object.keys(guns), status: () => ({ ready: Object.keys(ready), failed: Object.assign({}, failed), forced, loader: !!THREE.GLTFLoader }) };
   }
   return { create, parts, decode, lookMat, GRIP_TARGET };
 })();

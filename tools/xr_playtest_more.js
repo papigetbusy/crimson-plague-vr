@@ -16,7 +16,10 @@ module.exports = function (X) {
   // find a tile whose title matches (scrolling down through a long menu), point the laser at it and pull the trigger. Returns the tile's title, or null.
   async function clickTile(S, re, o) {
     o = o || {}; if (!o.noTop) await scrollTop(S);
-    for (let k = 0; k < 14; k++) {
+    const settle = async () => { let a = (await debug(S)).scroll; for (let i = 0; i < 40; i++) { await S.frames(3); const b = (await debug(S)).scroll; if (b === a) return; a = b; } };   // let a gliding list (scroll momentum) come to rest
+    let up = false;
+    for (let k = 0; k < 20; k++) {
+      await settle();
       const t = await S.ev((re) => window.__pt.menuFind(re), re);
       if (t) {
         const w = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), t); await pointAt(S, 'right', w); await S.frames(4);
@@ -25,8 +28,8 @@ module.exports = function (X) {
         if (!hv && o.why) o.why.push(JSON.stringify({ t, w, d: await debug(S).then((d) => ({ pos: d.menuPos, sc: d.menuScale, scroll: d.scroll, id: d.menuId })) }));
         await S.press('right', 'trigger', 4); await S.frames(o.wait || 14); await rest(S); return { title: t[2], hover: hv };
       }
-      const d = await debug(S); if (!d.menu || d.scroll >= d.maxScroll) break;
-      await S.hand('right', { ax: [0, 0, 0, 1] }); await S.frames(6); await S.hand('right', { ax: [0, 0, 0, 0] }); await S.frames(2);
+      const d = await debug(S); if (!d.menu) break; if (d.scroll >= d.maxScroll) { if (up) break; up = true; }   // at the bottom: look back up once (a glide can pass the tile)
+      await S.hand('right', { ax: [0, 0, 0, up ? -0.6 : 1] }); await S.frames(6); await S.hand('right', { ax: [0, 0, 0, 0] }); await S.frames(2);
     }
     return null;
   }

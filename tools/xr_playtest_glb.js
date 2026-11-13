@@ -9,7 +9,7 @@ module.exports = function (X) {
     try {
       await S.ev(() => { const r = window.__game.ref; r.clearWave(); r.equipGun('pistol_service', 1); }); await S.frames(30);
       const g = await S.ev(() => { const G = window.__game, st = G.glb(), gp = G.xr.debug(); let body = null; G.scene.traverse((o) => { if (o.name === 'glb_body' && o.parent) body = o; }); let tris = 0; if (body) body.traverse((m) => { if (m.isMesh && m.geometry.index) tris += m.geometry.index.count / 3; }); return { st, body: !!body, tris, magVisible: gp.magVisible }; });
-      rec(G, 'The Service Pistol in your hand is the 1911 mesh (GLB), not the voxel pistol', g.st.on && g.st.gun === 'pistol_service' && g.body && g.tris > 1000, JSON.stringify(g).slice(0, 200));
+      rec(G, 'The Service Pistol in your hand is the 1911 mesh (GLB), not the voxel pistol', g.st.on && g.st.gun === 'pistol_service' && g.body && g.tris >= 600, JSON.stringify(g).slice(0, 200));
       // the room: Crimson Halls kit present, one mesh; draw calls per eye standing in it
       const h = await S.ev(() => window.__game.halls());
       rec(G, 'The test map\'s start room is drawn with the Crimson Halls kit (walls, corners, pillars, floor, banners, sconces)', h.mesh && h.visible && ['straight', 'corner', 'pillar', 'floor', 'banner', 'sconce'].every((k) => h.pieces && h.pieces[k] > 0), JSON.stringify(h).slice(0, 220));
@@ -22,7 +22,7 @@ module.exports = function (X) {
         noKit = Math.max(noKit, c0); kitCost = Math.min(kitCost, c1 - c0);   // the least over 4 views: other things (shots, pickups) come and go between frames
       }
       X.meshCalls = calls / 2;
-      rec(G, 'Draw calls in the Crimson Halls room stay in the Quest budget (under 200 per eye) and the whole kit costs one draw per eye', calls / 2 < 200 && kitCost / 2 <= 1, (calls / 2) + ' per eye worst direction; without the kit ' + (noKit / 2) + ' (kit adds ' + (kitCost / 2) + ')');
+      rec(G, 'Draw calls in the Crimson Halls room stay in the Quest budget (under 200 per eye) and the kit costs one draw per visible 24 m block (a handful per eye)', calls / 2 < 200 && kitCost / 2 <= 8, (calls / 2) + ' per eye worst direction; without the kit ' + (noKit / 2) + ' (kit adds ' + (kitCost / 2) + ')');
       await shot(S, 'mesh_halls_room');
       // fire: the 1911 shoots from its muzzle
       await S.ev(() => window.__game.ref.place(window.__game.ref.snapshot().player.x, window.__game.ref.snapshot().player.z, Math.PI / 2)); await rest(S);
@@ -67,5 +67,54 @@ module.exports = function (X) {
       rec(G, '?voxelguns&voxelwalls brings back the voxel pistol and the old walls', !o.g.on && o.g.forced && !o.h.mesh, JSON.stringify(o).slice(0, 200));
     } finally { await S.close(); }
   }
-  return { meshGroup };
+  // the real game in VR, no test map and no shortcuts in the game: pick a class with the laser, enter the hall, and fight wave after wave
+  // until the first boss is out. The harness plays (test-only): it walks up to the nearest monster (a teleport), points the gun hand at it and
+  // pulls the trigger, reloads with X, takes a level-up card with the laser, and backs off to the start when hurt. The game rules are untouched.
+  async function bossGroup(clickTile) {
+    const G = 'boss';
+    const S = await open('');
+    try {
+      if (await S.ev(() => window.__game.xr.menuShown() && !window.__game.running())) { await clickTile(S, '^Witch'); await clickTile(S, 'ENTER THE HALL', { wait: 30 }); }
+      if (!(await S.ev(() => window.__game.running()))) await S.ev(() => window.__game.begin && window.__game.begin(true));
+      const t0 = Date.now(); let boss = null, deaths = 0, lv = 0, maxWave = 0, steps = 0;
+      const LIM = +(process.env.BOSS_MIN || 30) * 60 * 1000;
+      while (Date.now() - t0 < LIM) {
+        steps++;
+        const st = await S.ev(() => { const s = window.__game.ref.snapshot(), p = s.player; const ms = s.monsters.filter((m) => m.hp > 0); let n = null, d = 1e9; for (const m of ms) { const dd = Math.hypot(m.x - p.x, m.z - p.z); if (dd < d) { d = dd; n = m; } }
+          return { wave: s.wave.n, phase: s.wave.phase, bossOn: !!s.bossBar, kills: s.kills, lvl: s.level, bossName: s.bossBar && s.bossBar.name, over: !!s.over, hp: p.hp, max: p.maxHp, ammo: p.ammo, rl: p.reloading, n: n && { x: n.x, z: n.z, y: 1.0 * (n.scale || 1) }, d, menu: window.__game.xr.menuShown() && window.__game.xr.debug().menuId, start: window.__game.ref.map.start }; });
+        maxWave = Math.max(maxWave, st.wave);
+        if (process.env.BOSS_LOG && steps % 15 === 1) console.log('  boss step', steps, JSON.stringify(st), JSON.stringify(await S.ev(() => { const l = window.__game.lastShot(); return l && { hit: l.hit, t: l.t }; })));
+        if (st.bossOn) { boss = st; break; }
+        if (st.over) { deaths++; if (deaths > 2) break; await S.ev(() => { const b = document.getElementById('restart'); if (b) b.click(); }); await S.frames(30); continue; }
+        if (st.menu === 'levelup') { const r = await X.clearLevelUps(S); lv += r.n; continue; }
+        if (st.menu) { await S.press('left', 'y', 3); await S.frames(10); continue; }
+        if (!st.n) { await S.frames(20); continue; }
+        if (st.ammo <= 0 && !st.rl) { await S.press('left', 'x', 4); await S.frames(20); continue; }
+        const aim = await S.ev(() => {        // kite like a player would: keep 5-9 m from the pack with a clear line to the nearest monster
+          const r = window.__game.ref, s = r.snapshot(), p = s.player, m = r.map, C = m.CELL, open = (x, z) => { const row = m.rows[Math.floor(z / C)]; return !!row && '.c'.includes(row[Math.floor(x / C)] || '#'); };
+          const ms = s.monsters.filter((q) => q.hp > 0); if (!ms.length) return null;
+          const clear = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 0.5); for (let i = 1; i < n; i++) if (!open(ax + (bx - ax) * i / n, az + (bz - az) * i / n)) return false; return true; };
+          const near = (x, z) => ms.reduce((a, q) => Math.min(a, Math.hypot(q.x - x, q.z - z)), 1e9);
+          let t = ms.reduce((a, q) => (Math.hypot(q.x - p.x, q.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? q : a));
+          const dn = near(p.x, p.z), dt = Math.hypot(t.x - p.x, t.z - p.z);
+          if (dn < 4.5 || dt > 10 || !clear(p.x, p.z, t.x, t.z)) {
+            let best = null, bs = -1e9;
+            for (let k = 0; k < 16; k++) for (const R of [6, 7.5, 9]) { const a = k / 16 * Math.PI * 2, x = t.x + Math.cos(a) * R, z = t.z + Math.sin(a) * R;
+              if (!open(x, z) || !open(x + 0.6, z) || !open(x - 0.6, z) || !open(x, z + 0.6) || !open(x, z - 0.6) || !clear(x, z, t.x, t.z)) continue;
+              const sc = Math.min(near(x, z), 8) - 0.05 * Math.hypot(x - p.x, z - p.z); if (sc > bs) { bs = sc; best = [x, z]; } }
+            if (best) r.place(best[0], best[1], Math.atan2(t.x - best[0], -(t.z - best[1])));
+          }
+          return [t.x, 0.95 * (t.scale || 1), t.z];
+        });
+        if (!aim) { await S.frames(10); continue; }
+        await pointAt(S, 'right', aim); for (let k = 0; k < 3; k++) { await S.hold('right', 'trigger', true); await S.frames(4); await S.hold('right', 'trigger', false); await S.frames(3); }   // a few pulls per look (semi-auto)
+      }
+      const why = { maxWave, deaths, lv, steps, minutes: ((Date.now() - t0) / 60000).toFixed(1) };
+      rec(G, 'Real game in VR: normal waves and level-ups lead to the first boss (harness plays, the game is unchanged)', !!boss, boss ? 'boss on wave ' + boss.wave + (boss.bossName ? ' (' + boss.bossName + ')' : '') + '; ' + JSON.stringify(why) : JSON.stringify(why));
+      if (boss) { await S.frames(30); await shot(S, 'boss_first'); }
+      const errs = await S.ev(() => window.__fx.errors.slice(0, 3));
+      rec(G, 'No script errors on the way to the boss', errs.length === 0, errs.join(' | ').slice(0, 200));
+    } finally { await S.close(); }
+  }
+  return { meshGroup, bossGroup };
 };

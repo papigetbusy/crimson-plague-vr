@@ -3,8 +3,9 @@
   "monsters": [],
   "guns": {
     "pistol_service": {
-      "file": "gun/pistol_1911_ps2.glb",
-      "note": "PS2-style low-poly M1911 (1,335 tris, 256px atlas). To try Wrok's next model, change only \"file\" (e.g. gun/pistol_1911_base.glb); the numbers below are this model's grip, slide and red-dot fit and may need a nudge.",
+      "file": "gun/pistol_1911_base.glb",
+      "fallback": "gun/pistol_1911_ps2.glb",
+      "note": "Wrok's blued 1911 base skin (1,311 tris; steel metallic 1 / roughness 0.3 gets a small torch-hall reflection; ivory grips). If it does not load, \"fallback\" (the first PS2 1911) is used, then the voxel pistol. Swap models by changing only \"file\"; grip, slide and red-dot numbers fit both 1911s (same anchors).",
       "root": "pistol_1911",
       "grip": [
         0,

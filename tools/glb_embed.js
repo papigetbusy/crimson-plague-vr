@@ -5,12 +5,12 @@ function load(root) {
   const mf = path.join(root, 'assets', 'models', 'manifest.json');
   const manifest = fs.existsSync(mf) ? JSON.parse(fs.readFileSync(mf, 'utf8')) : {};
   const guns = manifest.guns || {}, files = {};
-  for (const id of Object.keys(guns)) {
-    const f = path.join(root, 'assets', 'models', guns[id].file);
-    if (!fs.existsSync(f)) { console.warn('glb_embed: ' + id + ' -> missing ' + guns[id].file + ' (the voxel gun stays)'); continue; }
+  for (const id of Object.keys(guns)) for (const file of [guns[id].file, guns[id].fallback].filter(Boolean)) {   // the gun's GLB and its fallback
+    const f = path.join(root, 'assets', 'models', file);
+    if (!fs.existsSync(f)) { console.warn('glb_embed: ' + id + ' -> missing ' + file + ' (the fallback or voxel gun stays)'); continue; }
     const buf = fs.readFileSync(f);
-    if (buf.length < 20 || buf.readUInt32LE(0) !== 0x46546c67) { console.warn('glb_embed: ' + guns[id].file + ' is not a GLB (the voxel gun stays)'); continue; }
-    files[guns[id].file] = buf.toString('base64');
+    if (buf.length < 20 || buf.readUInt32LE(0) !== 0x46546c67) { console.warn('glb_embed: ' + file + ' is not a GLB'); continue; }
+    files[file] = buf.toString('base64');
   }
   const env = manifest.env || {};                                   // mesh wall kits (crimson_halls.js): every piece of each kit
   for (const id of Object.keys(env)) for (const f of Object.values(env[id].pieces || {})) {

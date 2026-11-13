@@ -78,7 +78,7 @@ const WorldView = (function () {
       chunkMeshes = [];
       for (const c of bigMeshes) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
       bigMeshes = [];
-      if (kitMesh) { scene.remove(kitMesh); kitMesh.geometry.dispose(); kitMesh = null; }
+      if (kitMesh) { scene.remove(kitMesh); for (const m of kitMesh.children) m.geometry.dispose(); kitMesh = null; }
       if (door) { scene.remove(door.grp); door = null; }
     }
 
@@ -136,7 +136,10 @@ const WorldView = (function () {
       for (const c of chunkMeshes) c.mesh.visible = !instOn && Math.hypot(c.x - cam.x, c.z - cam.z) < reach;
       for (const c of bigMeshes) c.mesh.visible = instOn && Math.hypot(c.x - cam.x, c.z - cam.z) < reach + bigExtra;
       for (const m of worldMats) m.color.setRGB(br * (1 + 0.5 * fb), br * (1 + 0.28 * fb), br * (1 + 0.1 * fb));
-      if (kitMesh) kitMesh.material.color.setRGB(br * (1 + 0.5 * fb), br * (1 + 0.28 * fb), br * (1 + 0.1 * fb));
+      if (kitMesh) {                                                    // the wall kit: one shared material, blocks beyond the fog are skipped
+        const kb = kitMesh.children; if (kb.length) kb[0].material.color.setRGB(br * (1 + 0.5 * fb), br * (1 + 0.28 * fb), br * (1 + 0.1 * fb));
+        for (const m of kb) { const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); const b = g.boundingBox, dx = Math.max(b.min.x - cam.x, 0, cam.x - b.max.x), dz = Math.max(b.min.z - cam.z, 0, cam.z - b.max.z); m.visible = dx * dx + dz * dz < reach * reach; }   // nearest point of the block's square inside the fog
+      }
       // the nearest torches of each kind get the pooled props
       for (const kind of ['sconce', 'brazier']) {
         const pool = kind === 'brazier' ? brazierPool : sconcePool; near.length = 0;

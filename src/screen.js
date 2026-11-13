@@ -114,7 +114,7 @@
   let charge, mag, CHARGE_Z = 0, muzzle;
   let CHARGE_MAX = Infinity, CHARGE_KICK = 0.04, SLIDE_LOCK = 0;   // how far the moving part may slide back, its kick per shot, and (mesh guns) how far it locks back on an empty magazine
   // mesh guns (assets/models/manifest.json, src/screen/glb_guns.js): shown instead of the voxel gun once decoded; ?voxelguns keeps the voxel ones
-  const glbGuns = GlbGuns.create(THREE, { query: location.search + location.hash });
+  const glbGuns = GlbGuns.create(THREE, { query: location.search + location.hash }); glbGuns.setRenderer(renderer);   // setRenderer: the steel's small reflection map
   let glbScale = 0, glbVr = false, glbOn = false;                 // the mesh gun in your hands is true size in a headset, the voxel gun's size on a flat screen
   const CHARGE_REST = new THREE.Vector3(), GP = { gunBody: null, magBase: null, chargeRest: CHARGE_REST, fore: null };   // the gun's parts for the VR hand reload
   // the red dot floats between the scope rings; ADS lines it up with the eye.
@@ -1258,8 +1258,8 @@
       worldView.load(ref.map, view.fogFar, halls.forMap(ref.map)); loadedFloor = st.floorId;
     }
   }   // a new floor (or a new run) is baked and drawn here
-  // the test map's start room in Crimson Halls (Wrok's mesh wall kit, src/screen/crimson_halls.js); ?voxelwalls keeps the old walls
-  const halls = CrimsonHalls.create(THREE, { query: location.search + location.hash, sandbox: SANDBOX });
+  // every floor in Crimson Halls (Wrok's mesh wall kit, src/screen/crimson_halls.js); ?voxelwalls keeps the old walls
+  const halls = CrimsonHalls.create(THREE, { query: location.search + location.hash });
   halls.start(() => { if (loadedFloor !== undefined && loadedFloor !== null) { loadedFloor = null; ensureFloor(state); } });   // decoded after the floor was drawn: draw it again with the kit
   ensureFloor(state);
   chooseClass(0);
@@ -1298,5 +1298,6 @@
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, halls: () => { const m = worldView.kit(); return Object.assign(halls.status(), { mesh: !!m, visible: !!(m && m.visible && m.parent), tris: m ? m.userData.tris : 0, pieces: m ? m.userData.pieces : null }); }, glb: () => Object.assign(glbGuns.status(), { on: glbOn, gun: curGun, scale: glbScale, vr: glbVr }), rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, viewFloor: (n, seed) => { let a = (seed || 7) >>> 0; const rng = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; const m = FloorGen.generate(n, rng, n); m.WALL_H = ref.map.WALL_H; worldView.load(m, view.fogFar, halls.forMap(m)); loadedFloor = state.floorId; return m; },   // tools only: draw another floor's halls (to measure the biggest floors); the rules stay on yours
+    halls: () => { const m = worldView.kit(); return Object.assign(halls.status(), { mesh: !!m, visible: !!(m && m.visible && m.parent), tris: m ? m.userData.tris : 0, blocks: m ? m.userData.blocks : 0, shown: m ? m.children.filter((b) => b.visible).length : 0, pieces: m ? m.userData.pieces : null }); }, glb: () => Object.assign(glbGuns.status(), { on: glbOn, gun: curGun, scale: glbScale, vr: glbVr }), rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
 })();

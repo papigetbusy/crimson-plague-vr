@@ -48,6 +48,13 @@ async function loaderChecks() {
     let mapped = null; M.groups.body.traverse((o) => { if (o.isMesh && o.material.map) mapped = o.material; });
     t(n + 'the texture is pixel-sharp (nearest filter) and lit like the game (Phong, a little self-light so it is never black)', !!mapped && mapped.map.magFilter === THREE.NearestFilter && mapped.type === 'MeshPhongMaterial' && mapped.emissive.r > 0.1);
   }
+  t('The Service Pistol is Wrok\'s blued 1911 base (pistol_1911_base.glb)', G.file('pistol_service') === 'gun/pistol_1911_base.glb', G.file('pistol_service'));
+  { const M = G.build('pistol_service', 1); let steel = null, ivory = null; M.groups.body.traverse((o) => { if (o.isMesh && o.material.type === 'MeshStandardMaterial') steel = o.material; if (o.isMesh && o.material.type === 'MeshPhongMaterial' && o.name !== 'red_dot') ivory = o.material; });
+    t('Its steel is a metal (metalness 1, roughness about 0.3) and the ivory grips are not', !!steel && steel.metalness === 1 && Math.abs(steel.roughness - 0.3) < 0.01 && !!ivory); }
+  { const files = Object.assign({}, data.files, { [spec.file]: Buffer.from('broken').toString('base64') });
+    const F = GlbGuns.create(THREE, { data: { manifest: data.manifest, files }, query: '' }); const cw3 = console.warn; console.warn = () => {};
+    await new Promise((res) => { F.start(() => res()); setTimeout(res, 4000); }); console.warn = cw3;
+    t('If the base 1911 will not load, the first PS2 1911 is used instead', F.has('pistol_service') && F.file('pistol_service') === 'gun/pistol_1911_ps2.glb', F.file('pistol_service')); }
   const off = GlbGuns.create(THREE, { data, query: '?voxelguns' }); off.start(() => {});
   t('?voxelguns in the link keeps the voxel pistol', !off.has('pistol_service') && off.build('pistol_service', 1) === null);
   const broken = GlbGuns.create(THREE, { data: { manifest: data.manifest, files: { [spec.file]: Buffer.from('not a glb at all').toString('base64') } } });

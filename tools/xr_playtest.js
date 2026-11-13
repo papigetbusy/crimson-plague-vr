@@ -311,11 +311,11 @@ async function controlsGroup() {
 }
 
 const MORE = require('./xr_playtest_more.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, held, shotsDir: shots });
-const MESH = require('./xr_playtest_glb.js')({ open, rest, rec, debug, pointAt, shot });
+const MESH = require('./xr_playtest_glb.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps });
 const COOP = require('./xr_playtest_coop.js')({ rec, rest, debug, pointAt, shot: (S, n) => MORE.shot(S, n), root, page, HELPERS, MORE });
 (async () => {
-  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['reload', MORE.reloadGroup], ['meshes', MESH.meshGroup], ['coop', COOP.coopGroup]];
-  const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ALL.map((g) => g[0]);
+  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['reload', MORE.reloadGroup], ['meshes', MESH.meshGroup], ['boss', () => MESH.bossGroup(MORE.clickTile)], ['coop', COOP.coopGroup]];
+  const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ALL.map((g) => g[0]).filter((n) => n !== 'boss');   // the boss run (~20-30 min) only runs when asked: --only=boss
   for (const [n, f] of ALL) if (want.includes(n)) { try { await f(); } catch (e) { rec(n, 'group ran to the end', false, String(e && e.message || e).slice(0, 200)); } }
   const bad = results.filter((r) => !r.pass);
   console.log('\n' + (results.length - bad.length) + '/' + results.length + ' passed');
