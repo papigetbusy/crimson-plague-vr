@@ -171,6 +171,14 @@ New group **mechanics**: **11/11.** The Scale (grip pays gold onto the pan; a ha
 | Enter restart | RISE AGAIN tile | yes |
 | Tab Tuning panel | SOUND / NEW RUN on the Y pause menu (the dev sliders stay flat-only) | yes |
 
+### Batch 4: co-op over the real internet
+New tool `tools/xr_coop_real.js`: two windows on the real PeerJS server (no fake). On this box the PeerJS library loads and the host gets a real room code, but this machine cannot make any WebRTC link at all (0 ICE candidates even for a bare RTCPeerConnection), so the actual friend-to-host link must be checked on a headset + phone/PC.
+
+| Found | Why | Fix |
+|---|---|---|
+| A friend whose link never connects sat on "Joining room..." forever | the join had no time limit | gives up after 20 s with a clear message (check the code, host still waiting, same Wi-Fi helps); JOIN works again right away. Checked with the real server: 5/5 |
+| The backup relay (openrelay.metered.ca, user "openrelayproject") no longer works | Metered retired the shared public login; it now needs a free account + API key | not fixed (needs an account the owner signs up for). Co-op still works whenever the two devices can link directly (same Wi-Fi, most home internet); it can fail on some phone networks |
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.
@@ -182,3 +190,4 @@ New group **mechanics**: **11/11.** The Scale (grip pays gold onto the pan; a ha
 - Walk 6.2 m/s and sprint 10 m/s are fast for VR (Meta suggests 4-6 m/s); left for the owner to decide.
 - Draw calls (~210-260 per eye in the sim) and frame time on the Quest's own GPU.
 - Co-op over real networks (the sim checks the game logic; real WebRTC links, NAT and lag need two headsets or a headset and a PC).
+- Co-op between two real devices; on mobile data the link can fail until a relay (TURN) account is set up.

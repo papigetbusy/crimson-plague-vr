@@ -25,7 +25,7 @@ async function launch(o) {
   page.on('pageerror', (e) => logs.push('pageerror: ' + e.message));
   page.on('response', (r) => { if (r.status() >= 400) logs.push('http ' + r.status() + ': ' + r.url().slice(0, 120)); });
   await page.setRequestInterception(true);
-  page.on('request', (r) => { const u = r.url(); if (/three\.min\.js/.test(u) && THREE_LOCAL) return r.respond({ status: 200, contentType: 'text/javascript', body: THREE_LOCAL }); if (/peerjs/.test(u)) return r.respond({ status: 200, contentType: 'text/javascript', body: o.fakePeer ? FAKE_PEER : 'window.__peerFailed=true' }); r.continue(); });
+  page.on('request', (r) => { const u = r.url(); if (/three\.min\.js/.test(u) && THREE_LOCAL) return r.respond({ status: 200, contentType: 'text/javascript', body: THREE_LOCAL }); if (/peerjs/.test(u) && !o.realPeer) return r.respond({ status: 200, contentType: 'text/javascript', body: o.fakePeer ? FAKE_PEER : 'window.__peerFailed=true' }); r.continue(); });
   await page.evaluateOnNewDocument(FAKE);
   await page.goto('http://localhost:' + port + '/' + (o.page || 'site/index.html') + (o.query !== undefined ? o.query : '?sandbox'), { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.__game && document.getElementById('vrBtn') && !document.getElementById('vrBtn').hidden, { timeout: 120000 });

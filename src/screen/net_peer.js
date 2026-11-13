@@ -37,17 +37,20 @@ const NetPeer = (function () {
   }
   // friend: handlers = { open(), msg(msg), close(), error(text) }
   function join(code, h) {
-    let conn = null, up = false;
+    let conn = null, up = false, done = false;
     const peer = new Peer(undefined, { config: ICE });
+    const failOnce = (t) => { if (done || up) return; done = true; clearTimeout(timer); try { peer.destroy(); } catch (e) { /* gone */ } h.error(t); };
+    // a link that never opens (a network that blocks the direct link and the relay) must not leave you on "Joining room..." forever
+    const timer = setTimeout(() => failOnce('Could not connect to the host after 20 seconds. Check the code, make sure the host is still waiting, and try again (being on the same Wi-Fi helps).'), (typeof window !== 'undefined' && window.__joinTimeoutMs) || 20000);
     peer.on('open', () => {
       conn = peer.connect(PREFIX + clean(code), { reliable: true, serialization: 'json' });
-      conn.on('open', () => { up = true; h.open(); });
+      conn.on('open', () => { if (done) return; up = true; clearTimeout(timer); h.open(); });
       conn.on('data', (m) => h.msg(m));
       conn.on('close', () => { if (up) { up = false; h.close(); } });
-      conn.on('error', (e) => h.error(friendly(e)));
+      conn.on('error', (e) => { if (up) h.error(friendly(e)); else failOnce(friendly(e)); });
     });
-    peer.on('error', (err) => h.error(friendly(err)));
-    return { send(msg) { if (conn && conn.open) conn.send(msg); }, close() { up = false; try { peer.destroy(); } catch (e) { /* gone */ } } };
+    peer.on('error', (err) => { if (up) h.error(friendly(err)); else failOnce(friendly(err)); });
+    return { send(msg) { if (conn && conn.open) conn.send(msg); }, close() { up = false; done = true; clearTimeout(timer); try { peer.destroy(); } catch (e) { /* gone */ } } };
   }
   return { available, host, join, clean, makeCode };
 })();
