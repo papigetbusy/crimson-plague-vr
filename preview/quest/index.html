@@ -52,6 +52,7 @@ body {
 #downMsg span { display: block; font-family: var(--body); font-weight: 700; font-size: clamp(13px, 3vh, 18px); letter-spacing: 0.08em; color: var(--ink); }
 #coopBtn { margin-top: 6px; font-family: var(--body); font-weight: 700; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #bfe0ff; background: transparent; border: 1px solid #4a7aa8; padding: 8px 16px; cursor: pointer; touch-action: manipulation; }
 #coopPanel { margin: 8px auto 4px; max-width: 520px; padding: 8px 10px; border: 1px solid #4a7aa8; background: rgba(10, 20, 34, 0.55); }
+.vrOnly { display: none !important; } body.xr #vrExtras { display: flex !important; gap: 8px; justify-content: center; order: 6; } body.xr #coopKeys { display: flex !important; flex-wrap: wrap; justify-content: center; gap: 4px; flex-basis: 100%; }
 #coopMenu { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
 #coopPanel button, #coopPanel input { font-family: var(--body); font-weight: 700; font-size: 14px; color: var(--ink); background: #12202e; border: 1px solid #4a7aa8; padding: 7px 12px; }
 #coopPanel input { width: 7em; text-transform: uppercase; letter-spacing: 0.2em; text-align: center; }
@@ -404,7 +405,7 @@ body.pad .card3.sel { border-color: var(--gold); background: linear-gradient(#3c
 <div class="overlay" id="start">
   <div class="card">
     <h1>Crimson Plague</h1>
-    <p>Hold the corridor. Nothing stops coming.</p><p class="buildTag">build a35f399+</p>
+    <p>Hold the corridor. Nothing stops coming.</p><p class="buildTag">build 53256bb</p>
     <div class="keys">
       <p><b>WASD</b> move</p><p><b>Mouse</b> look, <b>Click</b> fire</p>
       <p><b>Shift</b> sprint</p><p><b>Right click</b> aim</p>
@@ -423,12 +424,13 @@ body.pad .card3.sel { border-color: var(--gold); background: linear-gradient(#3c
     <div id="coopPanel" hidden>
       <div id="coopRow"><label for="coopName">Your name</label><input id="coopName" maxlength="12" autocomplete="off"></div>
       <div id="coopSkins" role="group" aria-label="Your look"></div>
-      <div id="coopMenu"><button id="coopHost" type="button">HOST A GAME (up to 5 players)</button><span>or</span><input id="coopCode" maxlength="5" placeholder="CODE" autocapitalize="characters" autocomplete="off" aria-label="Room code"><button id="coopJoin" type="button">JOIN</button></div>
+      <div id="coopMenu"><button id="coopHost" type="button">HOST A GAME (up to 5 players)</button><span>or</span><input id="coopCode" maxlength="5" placeholder="CODE" autocapitalize="characters" autocomplete="off" aria-label="Room code"><button id="coopJoin" type="button">JOIN</button><div id="coopKeys" class="vrOnly" aria-label="Room code keys"></div></div>
       <p id="coopInfo"></p>
       <button id="coopLeave" type="button" hidden>LEAVE THE ROOM</button>
     </div>
     <button id="play" type="button"><span id="playLabel">ENTER THE HALL</span></button>
     <button id="codexBtn" type="button">CODEX: how everything works</button>
+    <div id="vrExtras" class="vrOnly"><button id="vrSound" type="button">SOUND: ON</button><button id="vrNewRun" type="button">NEW RUN (start over)</button></div>
   </div>
 </div>
 <div class="overlay" id="codex" hidden><div class="cxwrap"><header><b>CODEX</b><input type="search" placeholder="Search: a gun, monster, affix, class..." aria-label="Search the Codex"><button type="button" class="cxclose">Close</button></header><div class="cxmain"><nav class="cxtabs"></nav><div class="cxbody"></div></div></div></div>
@@ -7634,6 +7636,18 @@ const Coop = (function () {
     const nameLine = document.createElement('div'); nameLine.id = 'coopSkinName'; skinsEl.appendChild(nameLine);
     chooseSkin(skin, false);
     const say = (t) => { info.textContent = t; };
+    // a headset has no keyboard: on-screen letter keys for the room code (shown only in VR, where the VR menu turns them into tiles)
+    const keysEl = $('coopKeys');
+    if (keysEl) {
+      const shown = document.createElement('div'); shown.id = 'coopKeysShow'; keysEl.appendChild(shown);
+      const upd = () => { shown.textContent = 'Room code: ' + (NetPeer.clean(codeIn.value) + '_____').slice(0, 5).split('').join(' '); };
+      for (const ch of 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'.split('').concat(['DEL'])) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'ck'; b.textContent = ch;
+        b.addEventListener('click', () => { const v = NetPeer.clean(codeIn.value); codeIn.value = ch === 'DEL' ? v.slice(0, -1) : (v + ch).slice(0, 5); upd(); });
+        keysEl.appendChild(b);
+      }
+      codeIn.addEventListener('input', upd); upd();
+    }
     function show() {
       menu.hidden = mode !== 'off'; leaveBtn.hidden = mode === 'off';
       if (mode === 'host') {
@@ -8509,7 +8523,7 @@ const XrMenu = (function () {
   const DISPLAY = "'Pirata One', Georgia, serif", BODY = "'Barlow Condensed', 'Arial Narrow', sans-serif";
   const CLICKABLE = 'button, [data-act], [data-bp], [data-load], [data-del], [data-keep], [role="button"]';
   const EXIT = '.gclose, .cxclose';
-  const SKIP = '.kbd, .touchhelp, .keys, .padk, .padhelp, .buildTag, .cheatTag, input, textarea, select, label, #coopPanel, #coopBtn, .phone, [data-act^="rename"]';   // text boxes need a keyboard: flat screen only
+  const SKIP = '.kbd, .touchhelp, .keys, .padk, .padhelp, .buildTag, .cheatTag, input, textarea, select, label, .phone, [data-act^="rename"]';   // text boxes need a keyboard: flat screen only
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
 
   // ---------- reading the page ----------
@@ -8524,7 +8538,7 @@ const XrMenu = (function () {
     const t = { el, primary: el.id === 'play' || el.id === 'restart', disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true', sel: el.classList.contains('sel') && el.matches('[data-cls]'),   // 'sel' is only a real choice for the class buttons; on cards it is the flat pad's focus, not shown in VR
       act: el.classList.contains('active') || el.getAttribute('aria-selected') === 'true', dim: el.classList.contains('poor') };
     if (b && (sp || em)) { t.style = 'card'; t.title = norm(b.textContent); t.color = b.style.color || ''; t.body = sp ? norm(sp.textContent) : ''; t.foot = em ? norm(em.textContent) : ''; t.ult = el.classList.contains('ult'); }
-    else { const l = lines(el); t.style = 'btn'; t.title = l[0] || norm(el.textContent) || '?'; t.body = l.slice(1).join('  ·  ').slice(0, 160); }
+    else { const l = lines(el); t.style = 'btn'; t.title = l[0] || norm(el.textContent) || norm(el.getAttribute('aria-label') || el.title || '') || '?'; t.body = l.slice(1).join('  ·  ').slice(0, 160); }
     return t;
   }
   // a Gear / stash place: the item's card (name first, then its numbers) with that place's own buttons underneath
@@ -8609,7 +8623,7 @@ const XrMenu = (function () {
         const n = b.tiles.length, card = b.style === 'card';
         let cols, tw, gap = 28;
         if (card) { cols = n <= 4 ? n : (n % 3 === 0 ? 3 : 4); tw = Math.min(340, Math.floor((W - PAD * 2 - gap * (cols - 1)) / cols)); }
-        else { const short = b.tiles.every((t) => t.title.length <= 28 && !t.body); cols = short && n > 1 ? Math.min(3, n) : 1; tw = cols === 1 ? 1040 : Math.floor((1240 - gap * (cols - 1)) / cols); }
+        else { const short = b.tiles.every((t) => t.title.length <= 28 && !t.body), keys = n > 6 && b.tiles.every((t) => t.title.length <= 3 && !t.body); cols = keys ? Math.min(8, n) : short && n > 1 ? Math.min(3, n) : 1; tw = cols === 1 ? 1040 : Math.floor((1240 - gap * (cols - 1)) / cols); }
         for (let r = 0; r * cols < n; r++) {
           const row = b.tiles.slice(r * cols, r * cols + cols);
           // every tile in a row gets the same height (the tallest one's), so rows line up cleanly
@@ -8934,6 +8948,65 @@ const XrInteract = (function () {
 })();
 if (typeof module !== 'undefined') module.exports = XrInteract;
 
+/* VR gun feel, pure numbers (no THREE, no DOM) so tests can check them. Research and choices: docs/vr-design.md, "Feel (research round 5)".
+   Recoil: every shot kicks the gun in your hand (muzzle up and back toward you) and a spring brings it home, like Pavlov / Contractors / Alyx.
+   It is only the look and the buzz: the bullets still go exactly where the controller points (no surprise misses), so it never fights the aim.
+   Heavier guns kick harder and settle slower; a second hand on the fore-end halves the kick (the reason to hold a rifle with two hands);
+   aiming down sights trims it a little more. The trigger hand buzzes harder for heavier guns; the support hand feels it too. */
+const XrFeel = (function () {
+  // rot: peak muzzle climb (radians), back: peak push toward you (metres), w: spring speed (higher = settles faster), hap/ms: trigger-hand buzz
+  const KICK = {
+    pistol: { rot: 0.10, back: 0.022, w: 30, hap: 0.40, ms: 28 },
+    smg: { rot: 0.040, back: 0.012, w: 34, hap: 0.26, ms: 16 },
+    rifle: { rot: 0.060, back: 0.018, w: 30, hap: 0.45, ms: 26 },
+    shotgun: { rot: 0.20, back: 0.050, w: 20, hap: 0.95, ms: 70 },
+    sniper: { rot: 0.17, back: 0.045, w: 18, hap: 0.85, ms: 60 },
+    hmg: { rot: 0.045, back: 0.016, w: 32, hap: 0.50, ms: 22 }
+  };
+  const TWO_HAND = 0.5, ADS = 0.8, CAP_ROT = 0.32, CAP_BACK = 0.07;
+  function kickOf(type, twoHand, ads) {
+    const K = KICK[type] || KICK.rifle, k = (twoHand ? TWO_HAND : 1) * (ads ? ADS : 1);
+    return { rot: K.rot * k, back: K.back * k, w: K.w, hap: K.hap, ms: K.ms, left: twoHand ? +(K.hap * 0.6).toFixed(3) : 0 };
+  }
+  // a critically damped spring: a kick of `peak` reaches about that far after 1/w seconds and is home (under 5%) after about 5/w
+  function createSpring(cap) {
+    let x = 0, v = 0, w = 30;
+    return {
+      kick(peak, wi) { w = wi || w; v += peak * w * Math.E; },
+      step(dt) {
+        const e = Math.exp(-w * dt), c = v + w * x;                 // the exact answer for any frame length: x(t) = (x0 + (v0 + w x0) t) e^-wt
+        const nx = (x + c * dt) * e, nv = (v - w * c * dt) * e; x = nx; v = nv;
+        if (x > cap) { x = cap; if (v > 0) v = 0; }
+        if (Math.abs(x) < 1e-5 && Math.abs(v) < 1e-4) { x = 0; v = 0; }
+        return x;
+      },
+      get x() { return x; }, reset() { x = 0; v = 0; }
+    };
+  }
+  // Where the gun points: the distance along the gun's line to the first monster or wall (or maxD). The game's bullets start at your eye, a hand's
+  // width away from the gun, so the screen aims the eye at THIS point: then the shot lands where the barrel points at any range (close-range
+  // shotgun blasts no longer sail over a monster's head). o = [x, y, z], d = unit [x, y, z], mons = [{ x, z, scale }], wall(x, z) = true in a wall.
+  function converge(o, d, mons, wall, maxD) {
+    maxD = maxD || 40; let best = maxD;
+    for (let i = 0; i < mons.length; i++) {                         // each monster as an upright cylinder about its size
+      const m = mons[i], sc = m.scale || 1, r = 0.45 * sc, top = 2.0 * sc;
+      const ex = m.x - o[0], ez = m.z - o[2], a = d[0] * d[0] + d[2] * d[2]; if (a < 1e-6) continue;
+      const t = (ex * d[0] + ez * d[2]) / a; if (t <= 0.05 || t >= best) continue;
+      const cx = o[0] + d[0] * t - m.x, cz = o[2] + d[2] * t - m.z, miss = cx * cx + cz * cz; if (miss > r * r) continue;
+      const tIn = Math.max(0.05, t - Math.sqrt(r * r - miss) / Math.sqrt(a)), y = o[1] + d[1] * tIn; if (y < -0.1 || y > top) continue;
+      best = tIn;
+    }
+    for (let t = 0.25; t < best; t += 0.25) { if ((wall && wall(o[0] + d[0] * t, o[2] + d[2] * t)) || o[1] + d[1] * t <= 0) { best = t; break; } }   // walls (if a map is given) and the floor
+    return best;
+  }
+  // weight: how fast the aim follows the hand when holding the gun in one hand at the hip (per second; lower = heavier, the gun trails the hand a touch).
+  // The gun model and the laser both ride this same aim, so they never disagree; two hands and aiming down sights use their own steadier rates.
+  const WEIGHT = { pistol: 34, smg: 30, rifle: 26, shotgun: 22, sniper: 22, hmg: 16 }, WEIGHT_TWO = 18;
+  function aimRate(type, twoHand, adsSmooth) { if (adsSmooth) return adsSmooth; if (twoHand) return WEIGHT_TWO; return WEIGHT[type] || WEIGHT.rifle; }
+  return { KICK, kickOf, createSpring, converge, TWO_HAND, ADS, CAP_ROT, CAP_BACK, WEIGHT, aimRate };
+})();
+if (typeof module !== 'undefined') module.exports = XrFeel;
+
 /* Meta Quest / WebXR mode: an "Enter VR" button (only shown when the browser can do immersive VR), the VR camera rig,
    the two Touch controllers (simple hand meshes and an aim laser), and a floating HUD you can read in the headset.
    Presentation and input only: it never touches the referee's rules. The game reads its input through the same
@@ -8954,7 +9027,6 @@ const XrMode = (function () {
     const hands = { left: null, right: null };
     const tmpS = new THREE.Vector3(), v3 = new THREE.Vector3(), q4 = new THREE.Quaternion(), fwd = new THREE.Vector3(), aimQ = new THREE.Quaternion(), aimP = new THREE.Vector3(), headQ = new THREE.Quaternion();
     let aimInit = false, fps = 0, fpsN = 0, fpsT = 0, moveK = 0;
-    const AIM_SMOOTH = 28;                                          // per second: takes the hand jitter out of the ray without feeling laggy
 
     // ---- controllers: rays (aim) and grips (where the hand mesh and the gun sit) ----
     const handMat = new THREE.MeshLambertMaterial({ color: 0x2a1a18, emissive: 0x120806 });
@@ -9000,6 +9072,30 @@ const XrMode = (function () {
     // grabbing and using things in the world (xr_interact.js): what each hand will take, the highlight, the squeeze
     const inter = XrInteract.create({ THREE, dolly, camera, hands, pulse: (h, s, ms) => pulse(h, s, ms), twoHand: () => twoHand, map: o.levelMap, toast: o.toast });
     const STEER = { pistol: 0.3, smg: 0.75, rifle: 0.8, shotgun: 0.8, sniper: 0.85, hmg: 0.85 };
+    // ---- feel (xr_feel.js): recoil kicks the gun in the hand and springs back (look and buzz only: bullets go where you point); a hit marker on what you hit ----
+    const recRot = XrFeel.createSpring(XrFeel.CAP_ROT), recBack = XrFeel.createSpring(XrFeel.CAP_BACK), recQ = new THREE.Quaternion(), AX_X = new THREE.Vector3(1, 0, 0);
+    let shotN = 0, lastKick = null;
+    function shotFx() {
+      const g = o.gunParts && o.gunParts(), K = XrFeel.kickOf((g && g.type) || 'rifle', twoHand, adsK > 0.5);
+      recRot.kick(K.rot, K.w); recBack.kick(K.back, K.w); pulse('right', K.hap, K.ms); if (K.left) pulse('left', K.left, K.ms);
+      shotN++; lastKick = K;
+    }
+    const hmMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthTest: false, depthWrite: false, fog: false });
+    const hitMk = new THREE.Group(); hitMk.visible = false;
+    { const geo = new THREE.PlaneGeometry(0.012, 0.045); for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2, m = new THREE.Mesh(geo, hmMat); m.position.set(Math.sin(a) * 0.04, Math.cos(a) * 0.04, 0); m.rotation.z = -a; m.renderOrder = 999; hitMk.add(m); } }
+    scene.add(hitMk);
+    let hmT = 0, hmDur = 0.12, hmS = 1, hitN = 0; const hmQ = new THREE.Quaternion(), hmC = new THREE.Vector3();
+    function hitMark(x, y, z, kind) {
+      if (!session) return;
+      hitMk.position.set(x, y, z); hmDur = hmT = kind === 'kill' ? 0.26 : 0.13; hmS = kind === 'kill' ? 1.6 : kind === 'crit' ? 1.25 : 1;
+      hmMat.color.setHex(kind === 'kill' ? 0xff3030 : kind === 'crit' ? 0xffd27a : 0xffffff); hitMk.visible = true; hitN++;
+    }
+    function hitFx(x, y, z, crit) { hitMark(x, y, z, crit ? 'crit' : 'hit'); pulse('right', crit ? 0.6 : 0.25, crit ? 40 : 20); }
+    function hitMarkStep(dt) {
+      if (hmT <= 0) return; hmT -= dt; if (hmT <= 0) { hitMk.visible = false; return; }
+      camera.getWorldQuaternion(hmQ); camera.getWorldPosition(hmC); hitMk.quaternion.copy(hmQ);
+      const k = hmT / hmDur; hitMk.scale.setScalar(hmS * Math.max(0.6, hitMk.position.distanceTo(hmC) * 0.35) * (1.3 - 0.3 * k)); hmMat.opacity = Math.min(1, k * 1.6);
+    }
     function supportHand() {
       const L = hands.left, R = hands.right, g = o.gunParts && o.gunParts();
       const held = !!L && btnOn(L.gamepad, 1, 0.35);
@@ -9050,6 +9146,8 @@ const XrMode = (function () {
       if (glove && adsK < 0.01) { gunAnchor.updateMatrixWorld(true); glove.getWorldPosition(gripW); dolly.worldToLocal(gripW); gripErr = gripW.distanceTo(h.grip.position); }   // (checked by the test) the gun's grip is in the hand
       // hands: the game's own gloves at this gun's grip and fore-end spots (no forearms: they crowded the left eye). The right glove is always
       // on the grip; the left one appears on the fore-end while the left grip holds the gun or you aim down sights.
+      const kr = recRot.step(lastDt), kb = recBack.step(lastDt);   // recoil: muzzle up and the gun back toward you, springing home
+      if (kr || kb) { recQ.setFromAxisAngle(AX_X, kr); gunAnchor.quaternion.multiply(recQ); v3.set(0, 0, kb).applyQuaternion(q); gunAnchor.position.add(v3); }
       const gR = o.arms && o.arms[1], gL = o.arms && o.arms[0], showL = twoHand || adsK > 0.35;
       if (gR) gR.visible = true; if (gL) gL.visible = showL;
       for (const m of h.grip.children) m.visible = false;              // the glove replaces the placeholder controller hand
@@ -9239,6 +9337,7 @@ const XrMode = (function () {
     function update(st, running, dt) {
       if (!session) return;
       lastDt = dt || lastDt;
+      lastSt = st;
       const p = st.player;
       const dYaw = turn.step(hands.right && hands.right.gamepad, dt, opts.snap ? 0 : TURN_SPEED); bodyYaw += dYaw;
       fpsN++; fpsT += dt; if (fpsT >= 0.5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; }
@@ -9252,6 +9351,7 @@ const XrMode = (function () {
       dolly.updateMatrixWorld(true);
       fall(dt); mapHand(dt, running);
       placeGun(p);
+      hitMarkStep(dt);
       menuPanel(running, dt);
       inter.update(st, running, dt, menuMesh.visible);
       laser(dt);
@@ -9261,16 +9361,29 @@ const XrMode = (function () {
     const rP = new THREE.Vector3(), magwell = new THREE.Vector3(), tgtQ = new THREE.Quaternion();
     const gl = new THREE.Vector3();
     function toRig(obj, local, out) { gl.copy(local); obj.localToWorld(gl); return dolly.worldToLocal(out.copy(gl)); }
+    const convO = [0, 0, 0], convD = [0, 0, 0], WALK = { '.': 1, c: 1, d: 1, P: 1 }; let convDist = 0, lastSt = null;
+    const wallAt = (x, z) => { const m = o.levelMap && o.levelMap(); if (!m) return false; const r = m.rows[Math.floor(z / m.CELL)]; return !r || !WALK[r[Math.floor(x / m.CELL)]]; };
     function aim() {
       if (!session) return null;
       const h = !opts.gaze && hands.right;
       if (h) { rP.copy(h.grip.position); supportHand(); handsAim(tgtQ); }
       else { camera.matrixWorld.decompose(v3, q4, tmpS); dollyInv.copy(dolly.quaternion).invert(); tgtQ.copy(dollyInv).multiply(q4); rP.copy(camera.position); }
-      if (!aimInit) { aimLocal.copy(tgtQ); aimInit = true; } else aimLocal.slerp(tgtQ, Math.min(1, (adsK > 0.5 ? adsOf().smooth : twoHand ? 18 : AIM_SMOOTH) * lastDt));   // steadier while aiming down sights
+      if (!aimInit) { aimLocal.copy(tgtQ); aimInit = true; } else { const gp = o.gunParts && o.gunParts(); aimLocal.slerp(tgtQ, Math.min(1, XrFeel.aimRate((gp && gp.type) || 'rifle', twoHand, adsK > 0.5 ? adsOf().smooth : 0) * lastDt)); }   // heavier guns trail the hand a touch; steadier while aiming down sights or with two hands
       aimQ.copy(dolly.quaternion).multiply(aimLocal);                // world aim
       fwd.set(0, 0, -1).applyQuaternion(aimQ);
       v3.copy(rP).applyMatrix4(dolly.matrixWorld);
-      reticle.visible = !menuMesh.visible; reticle.position.copy(v3).addScaledVector(fwd, 6); reticle.quaternion.copy(aimQ);
+      // the bullets start at your eye (the rules' player), a hand's width from the gun: aim the eye at the point the barrel points at, so the shot
+      // lands where the gun points at any range (xr_feel.js converge). The dot sits on that point.
+      const pl = lastSt && lastSt.player;
+      if (pl && h) {
+        convO[0] = v3.x; convO[1] = v3.y; convO[2] = v3.z; convD[0] = fwd.x; convD[1] = fwd.y; convD[2] = fwd.z;
+        const d = XrFeel.converge(convO, convD, lastSt.monsters, wallAt, 40); convDist = d;
+        v3.addScaledVector(fwd, d); reticle.visible = !menuMesh.visible; reticle.position.copy(v3); reticle.quaternion.copy(aimQ); reticle.scale.setScalar(Math.max(0.5, d / 6));
+        tmpS.set(v3.x - pl.x, v3.y - pl.eye, v3.z - pl.z); const L = tmpS.length();
+        if (L > 0.4) return XrInput.dirToAngles(tmpS.x / L, tmpS.y / L, tmpS.z / L);
+        return XrInput.dirToAngles(fwd.x, fwd.y, fwd.z);
+      }
+      reticle.visible = !menuMesh.visible; reticle.position.copy(v3).addScaledVector(fwd, 6); reticle.quaternion.copy(aimQ); reticle.scale.setScalar(1);
       return XrInput.dirToAngles(fwd.x, fwd.y, fwd.z);
     }
     // ---- reload: the game's own reload animation plays on the gun (screen.js animateReload); here only the old magazine falling away ----
@@ -9392,7 +9505,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();
@@ -10652,7 +10765,7 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   function setRunning(v) {
     running = v; if (xr) xr.corner(v);
     overlay.hidden = v;
-    classPick.hidden = started; $('coopBtn').hidden = started && coop.mode === 'off';
+    classPick.hidden = started; $('coopBtn').hidden = started && coop.mode === 'off'; $('vrNewRun').hidden = !started;
     if (!v) {
       mouse.fire = mouse.ads = false; tch.fire = false; bFire.classList.remove('on');
       playLabel.textContent = started ? 'RESUME' : 'ENTER THE HALL';
@@ -10850,6 +10963,10 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   });
   $('tuneSound').addEventListener('click', () => { view.sound = view.sound ? 0 : 1; $('tuneSound').textContent = view.sound ? 'Sound on' : 'Sound off'; saveTune(); });
   $('tuneSound').textContent = view.sound ? 'Sound on' : 'Sound off';
+  // VR has no tuning panel (it needs a mouse): its two useful buttons are on the VR pause menu instead
+  const vrSoundLabel = () => { $('vrSound').textContent = 'SOUND: ' + (view.sound ? 'ON' : 'OFF'); };
+  $('vrSound').addEventListener('click', () => { $('tuneSound').click(); vrSoundLabel(); }); vrSoundLabel();
+  $('vrNewRun').addEventListener('click', () => { if (coop.mode !== 'off') { toast('Leave the room to start over'); return; } ref.reset(); state = ref.snapshot(); if (started) begin(true); });
   function togglePanel() {
     panelOpen = !panelOpen; panel.hidden = !panelOpen;
     if (panelOpen) { if (locked()) document.exitPointerLock(); mouse.fire = mouse.ads = false; }
@@ -10919,20 +11036,20 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
     for (const e of events) {
       hud.event(e);
       if (e.type === 'shot') {
-        if (!e.extra && xr && xr.presenting()) xr.pulse('right', 0.45, 35);   // a kick in the gun hand
+        if (!e.extra && xr && xr.presenting()) xr.shotFx();   // VR: the gun kicks in your hand and springs back, with a buzz that fits the gun (xr_feel.js)
         if (!e.extra) { flashT = 0.06; kickG = 1; kickDir = [Math.random() * 2 - 1, Math.random() * 2 - 1]; inspK = 0; sfx('shot'); ejectShell(); if (fxOn()) { muzzle.getWorldPosition(tmpV); if (xr && xr.presenting()) xr.aimDir(tmpV2); else camera.getWorldDirection(tmpV2); fx.play(fxId(), 'muzzle', tmpV.x + tmpV2.x * 0.12, tmpV.y + tmpV2.y * 0.12, tmpV.z + tmpV2.z * 0.12); } }
         addTracer(e.ex, e.ey, e.ez);
         if (e.hit === 'wall') { burst(e.ex, e.ey, e.ez, 5, [0xffb347, 0xff7a1a, 0x888078], 4, 0.35, 12, 0.7); if (fxOn()) fx.play(fxId(), 'wall', e.ex, e.ey, e.ez); }
       } else if (e.type === 'peerShot') {
         if (e.key !== coopKey) friendShot(e);
       } else if (e.type === 'hit') {
-        if (xr && xr.presenting()) xr.pulse('right', e.crit ? 0.6 : 0.25, e.crit ? 40 : 20);   // feel the hit land
+        if (xr && xr.presenting()) xr.hitFx(e.x, e.y, e.z, e.crit);   // feel the hit land, and a hit marker on it (VR has no screen crosshair)
         burst(e.x, e.y, e.z, e.crit ? 9 : 5, [0xb01818, 0x701010, 0xe03030], 3.5, 0.4, 10, 0.8);
         if (fxOn() && !e.splash) fx.play(fxId(), 'flesh', e.x, e.y, e.z, { crit: e.crit });
         if (!e.splash) damageNumber(e.x, e.y + 0.2, e.z, e.dmg, e.crit);
         hitT = 0.14; hitKill = false; sfx(e.crit ? 'crit' : 'hit');
       } else if (e.type === 'kill') {
-        hitT = 0.28; hitKill = true; sfx('kill');
+        hitT = 0.28; hitKill = true; sfx('kill'); if (xr && xr.presenting()) xr.hitMark(e.x, 1.2 * e.scale, e.z, 'kill');
         const en = mons.get(e.id);
         if (en) { mons.delete(e.id); dropBadges(en); dying.push({ en, t: 0 }); }
         burst(e.x, 1.2 * e.scale, e.z, e.boss ? 40 : 24, [0xb01818, 0x701010, 0x3a0a0a, 0xff6a20], 5, 0.8, 11, e.boss ? 2 : 1.3);
@@ -11257,17 +11374,19 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
   ensureFloor(state);
   chooseClass(0);
   GP.gunBody = gunBody; GP.magBase = MAG_BASE; GP.fore = HOLD;
+  const VR_ACCEL = 240;   // in VR you reach full speed and stop in about 0.04 s: Meta's comfort guides say speeding up and slowing down the view is what makes people sick (docs/vr-design.md, round 5)
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
     gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
-  xr.on(() => { renderer.setAnimationLoop(frame); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
-  , () => { renderer.setAnimationLoop(null); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
+  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
+  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
     try { pollPad(dt); padMenus(); if (xr && xr.presenting()) { const ga = xr.grab(); if (ga && running && !panelOpen && !state.choices && !state.classChoices && !state.over) vrGrab(ga); } } catch (e) { /* a controller hiccup must not stop the frame */ }
     // each stage guards itself: one bad frame in the drawing code must never freeze the rules or the controller, and the first error is shown on screen so it can be read off a phone
-    const stage = (name, fn) => { try { fn(); } catch (e) { if (!frameErr) { frameErr = name + ': ' + (e && e.message ? e.message : e); toastEl.textContent = 'Error in ' + frameErr; toastEl.classList.add('show'); toastT = 1e9; if (window.console) console.error(e); } } };
+    perfN++;
+    const stage = (name, fn) => { const t0 = performance.now(); try { fn(); } catch (e) { if (!frameErr) { frameErr = name + ': ' + (e && e.message ? e.message : e); toastEl.textContent = 'Error in ' + frameErr; toastEl.classList.add('show'); toastT = 1e9; if (window.console) console.error(e); } } perfT[name] = (perfT[name] || 0) + performance.now() - t0; };
     if (running && !panelOpen) {
       stage('rules', () => { const out = ref.step(dt, gatherInput()); state = out.state; stage('events', () => handleEvents(out.events)); coop.tick(dt, out.events); });
     } else {
@@ -11286,9 +11405,10 @@ if (typeof module !== 'undefined') module.exports = GunMotion;
     stage('view', () => updateView(state, running && !panelOpen ? dt : 0, now / 1000));
     stage('draw', () => { if (xr && xr.presenting()) xr.renderScope(); renderer.render(scene, camera); });
   }
+  const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer };   // handy for poking at numbers from the console
 })();
 
 </script>
