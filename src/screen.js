@@ -113,12 +113,15 @@
   const MAG_BASE = new THREE.Vector3(), SIGHT = { y: 0, z: 0 };
   let charge, mag, CHARGE_Z = 0, muzzle;
   const CHARGE_REST = new THREE.Vector3(), GP = { gunBody: null, magBase: null, chargeRest: CHARGE_REST, fore: null };   // the gun's parts for the VR hand reload
-  // the red dot floats between the scope rings; ADS lines it up with the eye
+  // the red dot floats between the scope rings; ADS lines it up with the eye.
+  // Small crisp point (~2-4 MOA at typical eye relief, was an 8 mm cube plus a 35 mm glow) with a white-hot core and a faint halo, visible on light or dark walls.
   const EYE_RELIEF = 0.5;
   const dotMat = new THREE.MeshBasicMaterial({ color: 0xff2424, fog: false });
-  const dotMesh = gb(0.008, 0.008, 0.004, dotMat, 0, 0, 0);
-  const dotGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff2a2a, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true }));
-  dotGlow.scale.setScalar(0.035); gunBody.add(dotGlow);
+  const dotCoreMat = new THREE.MeshBasicMaterial({ color: 0xfff0f0, fog: false });
+  const dotMesh = gb(0.001, 0.001, 0.0005, dotMat, 0, 0, 0);
+  const dotCore = gb(0.00045, 0.00045, 0.0006, dotCoreMat, 0, 0, 0);
+  const dotGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff2a2a, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true, opacity: 0.7 }));
+  dotGlow.scale.setScalar(0.004); gunBody.add(dotGlow);
 
   // gloved hands and forearms (forearms stretch between a fixed elbow and the hand)
   const limbGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -167,7 +170,7 @@
     charge = voxelPart(G.parts.bolt, G.vox, gunRig); charge.position.set(A.boltRest[0], A.boltRest[1], A.boltRest[2]); CHARGE_Z = A.boltRest[2]; CHARGE_REST.copy(charge.position);
     mag = voxelPart(G.parts.mag, G.vox, gunRig); mag.rotation.x = 0.1; MAG_BASE.set(A.magPivot[0], A.magPivot[1], A.magPivot[2]); mag.position.copy(MAG_BASE);
     SIGHT.y = A.sightDot[1]; SIGHT.z = A.sightDot[2];
-    dotMesh.position.set(0, SIGHT.y, SIGHT.z); dotGlow.position.set(0, SIGHT.y, SIGHT.z + 0.004);
+    dotMesh.position.set(0, SIGHT.y, SIGHT.z); dotCore.position.set(0, SIGHT.y, SIGHT.z); dotGlow.position.set(0, SIGHT.y, SIGHT.z + 0.001);
     muzzle.position.set(A.muzzle[0], A.muzzle[1], A.muzzle[2]);
     handR.position.set(H.grip[0], H.grip[1], H.grip[2]);
     HOLD.set(H.fore[0], H.fore[1], H.fore[2]); MAGH.set(H.mag[0], H.mag[1], H.mag[2]);
@@ -584,7 +587,7 @@
       if (a) { const lk = XrInput.lookToward(pl, a, c.lookSens, 1 - pl.adsT * (1 - c.adsLookMul)); out.lookX += lk.lookX; out.lookY += lk.lookY; }
       if (XrInput.autoSprint(out.mz, out.mx) && !out.ads) out.sprint = true;   // stick fully forward runs
       if (xr.menuOpen()) out.fire = false;
-      const hy = xr.headYaw();                                        // walk where your head faces, not where the gun points
+      const hy = xr.walkYaw();                                        // walk where your head faces (or the left hand, Onward-style), not where the gun points
       if (hy !== null && (out.mx || out.mz)) { const mv = XrInput.headMove(out.mx, out.mz, hy - (a ? a.yaw : pl.yaw)); out.mx = mv.mx; out.mz = mv.mz; }
     }
     I.lookX = I.lookY = I.touchX = I.touchY = 0; I.slide = false; I.jump = false; I.reload = false; I.swap = false; I.pickup = false; I.pickupId = undefined; I.lockUse = undefined; I.pick = undefined; I.pickClass = undefined; I.shopClose = false; I.restart = false;
@@ -814,17 +817,19 @@
   // VR has no tuning panel (it needs a mouse): its two useful buttons are on the VR pause menu instead
   const vrSoundLabel = () => { $('vrSound').textContent = 'SOUND: ' + (view.sound ? 'ON' : 'OFF'); };
   $('vrSound').addEventListener('click', () => { $('tuneSound').click(); vrSoundLabel(); }); vrSoundLabel();
-  // VR comfort (pause menu): slower walking (4.5 / 7 m/s instead of the game's 6.2 / 10), snap or smooth turn, vignette. Saved by xr_mode.js.
+  // VR comfort (pause menu): slower walking (4.5 / 7 m/s instead of the game's 6.2 / 10), snap or smooth turn, turn speed, vignette, walk from the head or the left hand. Saved by xr_mode.js.
   const COMFY = { walkSpeed: 4.5, sprintSpeed: 7 }; let vrSpeedSaved = null;
   function applyVrSpeed() {
     const want = !!(xr && xr.presenting() && xr.comfort().slow);
     if (want && !vrSpeedSaved) { vrSpeedSaved = { walkSpeed: ref.cfg.walkSpeed, sprintSpeed: ref.cfg.sprintSpeed }; ref.setCfg(COMFY); }
     else if (!want && vrSpeedSaved) { ref.setCfg(vrSpeedSaved); vrSpeedSaved = null; }
   }
-  const comfortLabels = () => { if (!xr) return; const c = xr.comfort(); $('vrSpeed').textContent = c.slow ? 'SPEED: COMFORT (slower)' : 'SPEED: NORMAL'; $('vrTurn').textContent = c.snap ? 'TURN: SNAP' : 'TURN: SMOOTH'; $('vrVig').textContent = 'VIGNETTE: ' + (c.vignette ? 'ON' : 'OFF'); };
+  const comfortLabels = () => { if (!xr) return; const c = xr.comfort(); $('vrSpeed').textContent = c.slow ? 'SPEED: COMFORT (slower)' : 'SPEED: NORMAL'; $('vrTurn').textContent = c.snap ? 'TURN: SNAP' : 'TURN: SMOOTH'; $('vrTurnSpeed').textContent = 'TURN SPEED: ' + (c.turnRate === 'slow' ? 'SLOW' : c.turnRate === 'fast' ? 'FAST' : 'NORMAL'); $('vrVig').textContent = 'VIGNETTE: ' + (c.vignette ? 'ON' : 'OFF'); $('vrWalk').textContent = c.walkHand ? 'WALK: LEFT HAND' : 'WALK: HEAD'; };
   $('vrSpeed').addEventListener('click', () => { if (!xr) return; xr.setComfort('slow', !xr.comfort().slow); applyVrSpeed(); comfortLabels(); });
   $('vrTurn').addEventListener('click', () => { if (!xr) return; xr.setComfort('snap', !xr.comfort().snap); comfortLabels(); });
+  $('vrTurnSpeed').addEventListener('click', () => { if (!xr) return; xr.setComfort('turnRate', XrInput.nextTurnRate(xr.comfort().turnRate)); comfortLabels(); });
   $('vrVig').addEventListener('click', () => { if (!xr) return; xr.setComfort('vignette', !xr.comfort().vignette); comfortLabels(); });
+  $('vrWalk').addEventListener('click', () => { if (!xr) return; xr.setComfort('walkHand', !xr.comfort().walkHand); comfortLabels(); });
   $('vrNewRun').addEventListener('click', () => { if (coop.mode !== 'off') { toast('Leave the room to start over'); return; } ref.reset(); state = ref.snapshot(); if (started) begin(true); });
   function togglePanel() {
     panelOpen = !panelOpen; panel.hidden = !panelOpen;
@@ -878,7 +883,7 @@
   /* ============ per-frame presentation ============ */
   const clock = { last: performance.now() };
   const reloadHold = { t: 0, done: false };
-  let equipK = 0, inspK = 0, inspKind = 'sides', kickDir = [0, 0], emberT = 0, flameT = 0, nextInspect = 'sides';
+  let equipK = 0, inspK = 0, inspKind = 'sides', kickDir = [0, 0], emberT = 0, flameT = 0, nextInspect = 'sides', lastShot = null;
   const startInspect = (kind) => { if (running && inspK === 0 && !state.over && !state.player.reloading) { inspKind = kind || nextInspect; nextInspect = inspKind === 'sides' ? 'mag' : 'sides'; inspK = 0.0001; } };
   let bob = 0, kickG = 0, flashT = 0, sway = 0, roll = 0, lastSlideK = 0;
   const gunHip = new THREE.Vector3(), gunAds = new THREE.Vector3();
@@ -896,7 +901,7 @@
       hud.event(e);
       if (e.type === 'shot') {
         if (!e.extra && xr && xr.presenting()) xr.shotFx();   // VR: the gun kicks in your hand and springs back, with a buzz that fits the gun (xr_feel.js)
-        if (!e.extra) { flashT = 0.06; kickG = 1; kickDir = [Math.random() * 2 - 1, Math.random() * 2 - 1]; inspK = 0; sfx('shot'); ejectShell(); if (fxOn()) { muzzle.getWorldPosition(tmpV); if (xr && xr.presenting()) xr.aimDir(tmpV2); else camera.getWorldDirection(tmpV2); fx.play(fxId(), 'muzzle', tmpV.x + tmpV2.x * 0.12, tmpV.y + tmpV2.y * 0.12, tmpV.z + tmpV2.z * 0.12); } }
+        if (!e.extra) { lastShot = { ox: e.ox, oy: e.oy, oz: e.oz, ex: e.ex, ey: e.ey, ez: e.ez, t: e.t, hit: e.hit }; flashT = 0.06; kickG = 1; kickDir = [Math.random() * 2 - 1, Math.random() * 2 - 1]; inspK = 0; sfx('shot'); ejectShell(); if (fxOn()) { muzzle.getWorldPosition(tmpV); if (xr && xr.presenting()) xr.aimDir(tmpV2); else camera.getWorldDirection(tmpV2); fx.play(fxId(), 'muzzle', tmpV.x + tmpV2.x * 0.12, tmpV.y + tmpV2.y * 0.12, tmpV.z + tmpV2.z * 0.12); } }
         addTracer(e.ex, e.ey, e.ez);
         if (e.hit === 'wall') { burst(e.ex, e.ey, e.ez, 5, [0xffb347, 0xff7a1a, 0x888078], 4, 0.35, 12, 0.7); if (fxOn()) fx.play(fxId(), 'wall', e.ex, e.ey, e.ez); }
       } else if (e.type === 'peerShot') {
@@ -1111,6 +1116,7 @@
     const p = st.player;
     const inVr = !!(xr && xr.presenting());
     if (inVr) xr.headPose(); else camera.position.set(p.x, p.eye, p.z);   // in VR the headset places the camera
+    dotMesh.visible = dotCore.visible = dotGlow.visible = !inVr;          // VR: a collimated point on the fire ray (xr_mode) is the red dot, so it sits on the impact from any eye
     const planar = clamp(p.speed / 6, 0, 1.6);
     bob += dt * (p.sprinting ? 13 : 9) * (p.speed > 0.5 ? 1 : 0) * (p.sliding ? 0 : 1);
     const bobAmt = (p.sliding ? 0 : planar) * (1 - p.adsT * 0.7);
@@ -1237,9 +1243,9 @@
   const VR_ACCEL = 240;   // in VR you reach full speed and stop in about 0.04 s: Meta's comfort guides say speeding up and slowing down the view is what makes people sick (docs/vr-design.md, round 5)
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
-    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
-  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); applyVrSpeed(); comfortLabels(); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
-  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); applyVrSpeed(); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
+    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.muzzle = muzzle; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
+  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL, recoilKick: 0 }); applyVrSpeed(); comfortLabels(); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
+  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel, recoilKick: ref.defaults.recoilKick }); applyVrSpeed(); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
@@ -1268,5 +1274,5 @@
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
 })();

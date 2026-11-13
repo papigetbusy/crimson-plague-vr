@@ -188,6 +188,11 @@ New tool `tools/xr_coop_real.js`: two windows on the real PeerJS server (no fake
 ### Batch 6: Comfort settings on the VR pause menu
 Three new tiles on the Y pause menu, saved on the headset between visits (a link flag like `?snap` or `?vignette` still wins): **SPEED: NORMAL / COMFORT (slower)** (4.5 m/s walk, 7 m/s sprint instead of 6.2 / 10; only in VR, put back on leaving VR), **TURN: SMOOTH / SNAP** (45 degree steps), **VIGNETTE: OFF / ON**. Defaults unchanged. Mechanics group: 16/16 (toggles, saved, walk tops out at 7 m/s, one snap push = 46 degrees, all back off).
 
+### Batch 8: turn speed, walk-from-the-left-hand, and a small collimated red dot
+Two new tiles on the Y pause menu, saved with the other comfort settings (a `?turn=` or `?snap=30` link still wins for that visit): **TURN SPEED: SLOW / NORMAL / FAST** (smooth: 2.5 / 4.5 / 7 rad/s; snap: 30 / 45 / 60 degrees), and **WALK: HEAD / LEFT HAND** (Onward-style: the left stick moves you the way the left controller points, or the way your head faces; falls back to the head if the left controller is missing). Default is still Normal and Head. Light pushes on the right stick are closer to linear (a half push is about a third of full speed, not a fifth), with a 0.12 deadzone so a resting stick does not drift. Mechanics group: turn-speed and walk tiles toggle and save, half-push ~1.6 vs full ~4.7 rad/s, Fast vs Slow about 8 vs 2.6 rad/s, walk-from-left-hand ~90 degrees off the head.
+
+The pistol's red-dot sight is no longer an 8 mm cube with a 35 mm glow. In the flat game it is a small crisp point (about 1 mm, white-hot core, faint halo). In VR the on-gun blob is hidden and a collimated point sits on the actual fire ray (from the eye, toward the point the muzzle aims at, including walls in the way), about 1.5–2 MOA, so it overlays the impact from any eye position. Referee kick is off in VR so shots do not climb off the dot. Feel group: pistol ADS at 3, 10 and 30 m, plus the rifle and sniper at 10 m, all land within about 0.10 m of the dot. Full simulated Quest check: **161/161**.
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.

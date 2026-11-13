@@ -33,12 +33,17 @@ t('Gear menu has a Close the VR panel turns into its Y exit', /class="gclose" da
   t('Co-op: letter keys for the room code exist and show only in VR', /coopKeys/.test(coop) && /body\.xr #coopKeys/.test(tplS) && /id="coopKeys" class="vrOnly"/.test(tplS));
   t('Co-op: the keys cover every letter a room code can use, plus delete', /ABCDEFGHJKMNPQRSTUVWXYZ23456789/.test(coop) && /'DEL'/.test(coop));
   t('VR menu: a key board lays out 8 keys a row (not 3)', /Math\.min\(8, n\)/.test(xm));
-  t('VR: instant start and stop while in the headset, normal again after', /ref\.setCfg\(\{ accel: VR_ACCEL \}\)/.test(screen) && /ref\.setCfg\(\{ accel: ref\.defaults\.accel \}\)/.test(screen));
+  t('VR: instant start and stop while in the headset, normal again after', /ref.setCfg\(\{ accel: VR_ACCEL/.test(screen) && /ref.setCfg\(\{ accel: ref.defaults.accel/.test(screen));
   t('VR: the eye aims at the point the barrel points at (converge), so shots land where the gun points', /XrFeel\.converge\(/.test(xrm));
   t('VR: every shot uses the per-gun kick and buzz (shotFx), every hit the hit marker (hitFx)', /xr\.shotFx\(\)/.test(screen) && /xr\.hitFx\(/.test(screen));
 }
 // batch 3
 t('VR pause menu has SOUND and NEW RUN (the flat Tuning panel needs a mouse)', /id="vrSound"/.test(tpl) && /id="vrNewRun"/.test(tpl) && /\$\('vrNewRun'\)\.addEventListener/.test(screen));
 t('NEW RUN is refused in a co-op room (the host owns the run)', /vrNewRun'\)\.addEventListener\('click', \(\) => \{ if \(coop\.mode !== 'off'\)/.test(screen));
-t('Gun weight: the aim follows the hand at a per-class rate (XrFeel.aimRate)', /XrFeel\.aimRate\(/.test(xrm));
+t('Gun weight: the aim follows the hand at a per-class rate (XrFeel.aimRate)', /XrFeel.aimRate\(/.test(xrm));
+t('VR pause menu has TURN SPEED (Slow/Normal/Fast) and WALK (Head / Left hand), saved with the other comfort tiles', /id="vrTurnSpeed"/.test(tpl) && /id="vrWalk"/.test(tpl) && /setComfort\('turnRate'/.test(screen) && /setComfort\('walkHand'/.test(screen) && /turnRate: XrInput.parseTurnRate/.test(xrm) && /walkHand: !!c.walkHand/.test(xrm));
+t('A ?turn= link flag still wins over the saved turn speed', /turnFlag/.test(xrm) && /smoothTurn\(comfort.turnRate, opts.turnFlag\)/.test(xrm));
+t('Walking can follow the left hand, and falls back to the head if that hand is missing', /walkYaw\(\)/.test(screen) && /handYaw\('left'\)/.test(xrm) && /if \(y !== null\) return y/.test(xrm));
+t('VR red dot is a small collimated point on the fire ray (the old 8 mm on-gun cube is gone)', /placeFireDot\(/.test(xrm) && /DOT_MOA = 1\.8/.test(xrm) && /gb\(0\.001, 0\.001, 0\.0005/.test(screen) && !/gb\(0\.008, 0\.008, 0\.004/.test(screen));
+t('VR shots start from the eye aimed where the barrel points, with no referee kick fighting the sight', /gp\.muzzle.getWorldPosition/.test(xrm) && /recoilKick: 0/.test(screen));
 process.exit(bad ? 1 : 0);

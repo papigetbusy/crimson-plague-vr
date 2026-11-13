@@ -250,6 +250,34 @@ module.exports = function (X) {
       const hdbg = await S.ev(() => { const s = window.__game.ref.snapshot(); return { kills: s.kills, mons: s.monsters.map((m) => m.hp + '@' + m.x.toFixed(1) + ',' + m.z.toFixed(1)), me: s.player.x.toFixed(1) + ',' + s.player.z.toFixed(1), ammo: s.player.ammo, f: window.__game.xr.feel() }; });
       rec(G, 'Close range (about 2 m): the shot lands where the gun points, and a hit marker flashes on it (VR has no screen crosshair)', seen, seen ? '' : JSON.stringify(hdbg).slice(0, 200));
       await rest(S);
+      // red dot: a small collimated point on the fire ray; the shot lands on it at 3, 10 and 30 m (pistol ADS), and other sighted guns do not regress
+      const aimDotShot = async (id, dist) => {
+        const O = await toOpen(S);
+        await S.ev((o) => { const r = window.__game.ref; r.equipGun(o.id, 1); r.clearWave(); r.setCfg({ spread: 0, spreadAds: 0 }); r.place(o.O[0], o.O[1], Math.PI / 2); }, { id, O });
+        await rest(S);
+        const tgt = await S.ev((d) => { const p = window.__game.ref.snapshot().player; return [p.x + d, p.eye, p.z]; }, dist);
+        await pointAt(S, 'right', tgt); await S.hold('left', 'trigger', true); await S.frames(45);
+        await S.hold('right', 'trigger', true); await S.frames(3); await S.hold('right', 'trigger', false); await S.frames(2);
+        await S.hold('left', 'trigger', false);
+        const r = await S.ev(() => {
+          const sh = window.__game.lastShot && window.__game.lastShot(), f = window.__game.xr.feel(), p = window.__game.ref.snapshot().player;
+          if (!sh || !f.dot) return { ok: false, why: 'missing ' + JSON.stringify({ sh: !!sh, dot: f.dot, ads: p.adsT, ammo: p.ammo }) };
+          const err = Math.hypot(sh.ex - f.dot[0], sh.ey - f.dot[1], sh.ez - f.dot[2]);
+          const tol = 0.06 + 0.01 * (sh.t || dist);
+          return { ok: err <= tol, err, tol, sh, dot: f.dot, ads: p.adsT, conv: f.conv };
+        });
+        return r;
+      };
+      for (const dist of [3, 10, 30]) {
+        const r = await aimDotShot('pistol_service', dist);
+        rec(G, 'Pistol red dot at ' + dist + ' m: the shot lands on the dot (within ' + (r.tol ? r.tol.toFixed(2) : '?') + ' m)', !!r.ok, r.ok ? 'err ' + r.err.toFixed(3) + ' m, conv ' + (r.conv && r.conv.toFixed(2)) : JSON.stringify(r).slice(0, 240));
+      }
+      const rr = await aimDotShot('rifle', 10);
+      rec(G, 'Rifle red dot at 10 m: the shot still lands on the dot', !!rr.ok, rr.ok ? 'err ' + rr.err.toFixed(3) + ' m' : JSON.stringify(rr).slice(0, 240));
+      const rs = await aimDotShot('sniper_bolt', 10);
+      rec(G, 'Sniper at 10 m: the shot still lands on the aim point (scope does not regress)', !!rs.ok, rs.ok ? 'err ' + rs.err.toFixed(3) + ' m' : JSON.stringify(rs).slice(0, 240));
+      await S.ev(() => { const r = window.__game.ref; r.setCfg({ spread: r.defaults.spread, spreadAds: r.defaults.spreadAds }); });
+      await rest(S);
       // movement: gets going and stops quickly (no slow glide: gliding is what makes people sick)
       await toOpen(S); await S.frames(5);
       const sp = []; await S.hand('left', { ax: [0, 0, 0, -1] }); for (let i = 0; i < 12; i++) { await S.frames(1); sp.push(await S.ev(() => { const s = window.__game.ref.snapshot(); return [s.t, s.player.speed]; })); }
@@ -333,7 +361,7 @@ module.exports = function (X) {
       await clickTile(S, '^SOUND');
       // comfort: slower walking, snap turn, vignette, from the pause menu; saved for next time
       const c0 = await S.ev(() => window.__game.xr.comfort());
-      const cs = await clickTile(S, '^SPEED'), ct = await clickTile(S, '^TURN'), cv = await clickTile(S, '^VIGNETTE');
+      const cs = await clickTile(S, '^SPEED'), ct = await clickTile(S, '^TURN:'), cv = await clickTile(S, '^VIGNETTE');
       const c1 = await S.ev(() => ({ c: window.__game.xr.comfort(), walk: window.__game.ref.cfg.walkSpeed, sprint: window.__game.ref.cfg.sprintSpeed, saved: localStorage.getItem('cp.vrComfort'), labels: ['vrSpeed', 'vrTurn', 'vrVig'].map((i) => document.getElementById(i).textContent) }));
       await shot(S, 'comfort_menu');
       rec(G, 'Pause menu in VR: COMFORT speed, TURN and VIGNETTE toggle with the laser, and are saved', !!cs && !!ct && !!cv && !c0.slow && c1.c.slow && c1.c.snap !== c0.snap && c1.c.vignette !== c0.vignette && /"slow":true/.test(c1.saved || ''), JSON.stringify(c1).slice(0, 220));
@@ -346,9 +374,61 @@ module.exports = function (X) {
       let top = 0; await S.hand('left', { ax: [0, 0, 0, -1] }); for (let i = 0; i < 10; i++) { await S.frames(1); top = Math.max(top, (await S.state()).player.speed); } await S.hand('left', { ax: [0, 0, 0, 0] }); await S.frames(5);
       rec(G, 'Comfort speed: full forward tops out at the slower sprint (7 m/s, not 10)', top > 3 && top <= 7.05, 'top ' + top.toFixed(2) + ' m/s');
       const vg = await S.ev(() => window.__game.xr.vigOn());
-      await yTap(S); await clickTile(S, '^SPEED'); await clickTile(S, '^TURN'); await clickTile(S, '^VIGNETTE');
+      await yTap(S); await clickTile(S, '^SPEED'); await clickTile(S, '^TURN:'); await clickTile(S, '^VIGNETTE');
       const c2 = await S.ev(() => ({ c: window.__game.xr.comfort(), walk: window.__game.ref.cfg.walkSpeed, sprint: window.__game.ref.cfg.sprintSpeed }));
       rec(G, 'Comfort off again: back to the game speeds (6.2 / 10) and the old turn', !c2.c.slow && c2.walk === 6.2 && c2.sprint === 10 && c2.c.snap === c0.snap && c2.c.vignette === c0.vignette, JSON.stringify(c2) + ' vignette seen while walking=' + vg);
+      // turn speed tile and walk-from-the-left-hand (batch 8). Menu is still open. Defaults: Normal, Head, smooth turn.
+      const wrapD = (a, b) => { let d = Math.abs(a - b); if (d > Math.PI) d = 2 * Math.PI - d; return d; };
+      const posOf = async () => { const s = await S.state(); return { x: s.player.x, z: s.player.z, yaw: s.player.yaw }; };
+      // accumulate turn frame by frame so a slow sim cannot wrap past 180 degrees and look slower than it is
+      const pushTurn = async (ax, n) => {
+        let acc = 0, yPrev = (await S.state()).player.yaw, t0 = null, t1 = null;
+        await S.hand('right', { ax: [0, 0, ax, 0] });
+        for (let i = 0; i < n; i++) {
+          await S.frames(1);
+          const s = await S.ev(() => { const p = window.__game.ref.snapshot(); return { y: p.player.yaw, t: p.t }; });
+          if (t0 == null) t0 = s.t; t1 = s.t;
+          let d = s.y - yPrev; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+          acc += d; yPrev = s.y;
+        }
+        await S.hand('right', { ax: [0, 0, 0, 0] }); await S.frames(4);
+        const dt = Math.max(1e-3, (t1 || 0) - (t0 || 0));
+        return { d: Math.abs(acc), dt, rate: Math.abs(acc) / dt };
+      };
+      await yTap(S);
+      const O3 = await S.ev(() => window.__pt.openSpot(4, null) || window.__pt.openSpot(3, null)); await S.ev((O) => window.__game.ref.place(O[0], O[1], Math.PI / 2), O3); await rest(S); await S.frames(4);
+      const h0 = await posOf(); await S.hand('left', { ax: [0, 0, 0, -1] }); await S.frames(20); await S.hand('left', { ax: [0, 0, 0, 0] }); await S.frames(6);
+      const h1 = await posOf(); const headDx = h1.x - h0.x, headDz = h1.z - h0.z;
+      const halfN = await pushTurn(0.5, 12), fullN = await pushTurn(1, 12);
+      rec(G, 'A half push on the right stick turns at about half of full speed (not a gentle crawl)', fullN.rate > 1 && halfN.rate > 0.28 * fullN.rate && halfN.rate < 0.75 * fullN.rate, 'half ' + halfN.rate.toFixed(2) + ' / full ' + fullN.rate.toFixed(2) + ' rad/s in ' + fullN.dt.toFixed(2) + ' s');
+      await yTap(S);
+      const tf = await clickTile(S, '^TURN SPEED');
+      const tFast = await S.ev(() => ({ c: window.__game.xr.comfort(), lab: document.getElementById('vrTurnSpeed').textContent, saved: localStorage.getItem('cp.vrComfort'), spd: window.__game.xr.turnSpeed(), snap: window.__game.xr.snapDeg() }));
+      rec(G, 'Pause menu in VR: TURN SPEED cycles to Fast, is saved, and sets 7 rad/s (60 degree snaps)', !!tf && tFast.c.turnRate === 'fast' && /FAST/.test(tFast.lab) && /"turnRate":"fast"/.test(tFast.saved || '') && tFast.spd === 7 && tFast.snap === 60, JSON.stringify(tFast));
+      await yTap(S); const dFast = await pushTurn(1, 12);
+      await yTap(S); const ts = await clickTile(S, '^TURN SPEED');
+      const tSlow = await S.ev(() => ({ c: window.__game.xr.comfort(), lab: document.getElementById('vrTurnSpeed').textContent, saved: localStorage.getItem('cp.vrComfort'), spd: window.__game.xr.turnSpeed(), snap: window.__game.xr.snapDeg() }));
+      rec(G, 'TURN SPEED Slow is saved and sets 2.5 rad/s (30 degree snaps)', !!ts && tSlow.c.turnRate === 'slow' && /SLOW/.test(tSlow.lab) && /"turnRate":"slow"/.test(tSlow.saved || '') && tSlow.spd === 2.5 && tSlow.snap === 30, JSON.stringify(tSlow));
+      await yTap(S); const dSlow = await pushTurn(1, 12);
+      rec(G, 'Fast turn covers more ground than Slow in the same time (about 7 vs 2.5 rad/s)', dFast.rate > dSlow.rate * 1.8 && dSlow.rate > 1, 'fast ' + dFast.rate.toFixed(2) + ' / slow ' + dSlow.rate.toFixed(2) + ' rad/s');
+      await yTap(S); await clickTile(S, '^TURN SPEED');   // Slow -> Normal
+      const tw = await clickTile(S, '^WALK');
+      const w1 = await S.ev(() => ({ c: window.__game.xr.comfort(), lab: document.getElementById('vrWalk').textContent, saved: localStorage.getItem('cp.vrComfort') }));
+      rec(G, 'Pause menu in VR: WALK cycles to Left hand and is saved', !!tw && w1.c.walkHand && /LEFT HAND/.test(w1.lab) && /"walkHand":true/.test(w1.saved || ''), JSON.stringify(w1));
+      await yTap(S);
+      await S.ev((O) => window.__game.ref.place(O[0], O[1], Math.PI / 2), O3); await S.head({ p: [0, 0, 0], q: [0, 0, 0, 1] });
+      const q90 = [0, Math.SQRT1_2, 0, Math.SQRT1_2];
+      await S.hand('left', { p: [-0.18, -0.42, -0.32], q: q90, ax: [0, 0, 0, 0] }); await S.frames(4);
+      const ys = await S.ev(() => ({ head: window.__game.xr.headYaw(), hand: window.__game.xr.handYaw('left'), walk: window.__game.xr.walkYaw() }));
+      const l0 = await posOf(); await S.hand('left', { q: q90, ax: [0, 0, 0, -1] }); await S.frames(20); await S.hand('left', { q: q90, ax: [0, 0, 0, 0] }); await S.frames(6);
+      const l1 = await posOf(); const handDx = l1.x - l0.x, handDz = l1.z - l0.z;
+      const hMag = Math.hypot(headDx, headDz), lMag = Math.hypot(handDx, handDz);
+      const ang = (hMag > 0.15 && lMag > 0.15) ? Math.acos(Math.max(-1, Math.min(1, (headDx * handDx + headDz * handDz) / (hMag * lMag)))) : 0;
+      rec(G, 'Walk from the left hand: pushing forward walks along the left controller, not the head (about 90 degrees off)', Math.abs(wrapD(ys.hand, ys.head) - Math.PI / 2) < 0.2 && Math.abs(ys.walk - ys.hand) < 0.05 && ang > 0.9 && ang < 2.2 && lMag > 0.15, 'yaw head=' + (ys.head && ys.head.toFixed(2)) + ' hand=' + (ys.hand && ys.hand.toFixed(2)) + ' walk=' + (ys.walk && ys.walk.toFixed(2)) + ' move ang=' + (ang * 180 / Math.PI).toFixed(0) + ' deg, head ' + hMag.toFixed(2) + ' m, hand ' + lMag.toFixed(2) + ' m');
+      await rest(S);
+      await yTap(S); await clickTile(S, '^WALK');   // back to Head
+      const tN = await S.ev(() => ({ c: window.__game.xr.comfort(), spd: window.__game.xr.turnSpeed() }));
+      rec(G, 'Turn speed and walk direction restored to Normal and Head', tN.c.turnRate === 'normal' && !tN.c.walkHand && tN.spd === 4.5, JSON.stringify(tN));
       await S.ev(() => window.__game.ref.giveXp(50)); 
       const nr = await clickTile(S, '^NEW RUN', { wait: 30 });
       if ((await S.ev(() => window.__game.xr.debug().menuId)) === 'stashMenu') await yTap(S);   // the stash still holds things, so the new run opens it at the door first (right); Y enters the hall

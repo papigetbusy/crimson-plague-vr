@@ -22,7 +22,15 @@
 const XrInput = (function () {
   const XR = { TRIGGER: 0, GRIP: 1, STICK: 3, LOW: 4, HIGH: 5 };   // xr-standard button order; LOW = A/X, HIGH = B/Y
   const STICK_X = 2, STICK_Y = 3;                                   // xr-standard axes for the thumbstick
-  const TURN_DEAD = 0.15, SNAP_ON = 0.7, SNAP_OFF = 0.35, SNAP_ANGLE = Math.PI / 4, MOVE_DEAD = 0.15, DOMINANCE = 1.3, GATE_PUSH = 0.85, Y_HOLD = 0.5;
+  const TURN_DEAD = 0.12, TURN_EXP = 1.3, SNAP_ON = 0.7, SNAP_OFF = 0.35, SNAP_ANGLE = Math.PI / 4, MOVE_DEAD = 0.15, DOMINANCE = 1.3, GATE_PUSH = 0.85, Y_HOLD = 0.5;
+  // pause-menu turn speed (Slow / Normal / Fast). A ?turn= or ?snap=N link flag, when present, still wins.
+  const TURN_RATE = { slow: 2.5, normal: 4.5, fast: 7 };
+  const SNAP_DEG = { slow: 30, normal: 45, fast: 60 };
+  const TURN_RATES = ['slow', 'normal', 'fast'];
+  const parseTurnRate = (v) => (TURN_RATES.indexOf(v) >= 0 ? v : 'normal');
+  const nextTurnRate = (v) => TURN_RATES[(TURN_RATES.indexOf(parseTurnRate(v)) + 1) % 3];
+  const smoothTurn = (rate, flag) => (flag != null ? flag : (TURN_RATE[parseTurnRate(rate)]));
+  const snapTurnDeg = (rate, flag) => (flag != null ? flag : (SNAP_DEG[parseTurnRate(rate)]));
 
   const pressed = (gp, i) => { const b = gp && gp.buttons && gp.buttons[i]; return !!b && (b.pressed || b.value > 0.35); };
   const value = (gp, i) => { const b = gp && gp.buttons && gp.buttons[i]; return b ? (b.value || (b.pressed ? 1 : 0)) : 0; };
@@ -93,7 +101,7 @@ const XrInput = (function () {
     // returns radians to add to the body yaw this frame
     function step(gpRight, dt, speed) {
       const x = rightStick(gpRight).x;
-      if (!snap) { const m = Math.abs(x); return m <= TURN_DEAD ? 0 : Math.sign(x) * Math.pow((m - TURN_DEAD) / (1 - TURN_DEAD), 1.8) * speed * dt; }   // a curve: gentle near the centre, full speed at full tilt
+      if (!snap) { const m = Math.abs(x); return m <= TURN_DEAD ? 0 : Math.sign(x) * Math.pow((m - TURN_DEAD) / (1 - TURN_DEAD), TURN_EXP) * speed * dt; }   // almost linear: a half push is close to half speed; 0.12 deadzone hides a resting stick
       if (armed && Math.abs(x) >= SNAP_ON) { armed = false; return Math.sign(x) * SNAP; }
       if (Math.abs(x) <= SNAP_OFF) armed = true;
       return 0;
@@ -119,6 +127,6 @@ const XrInput = (function () {
   }
   // auto-sprint: the left stick pushed almost all the way forward runs, like most VR shooters
   const autoSprint = (mz, mx) => mz > 0.85 && Math.abs(mx) < 0.5;
-  return { createY, rightStick, moveStick, autoSprint, headMove, toPad, createTurn, dirToAngles, lookToward, wrap, SNAP_ANGLE };
+  return { createY, rightStick, moveStick, autoSprint, headMove, toPad, createTurn, dirToAngles, lookToward, wrap, SNAP_ANGLE, TURN_DEAD, TURN_RATE, SNAP_DEG, parseTurnRate, nextTurnRate, smoothTurn, snapTurnDeg };
 })();
 if (typeof module !== 'undefined') module.exports = XrInput;
