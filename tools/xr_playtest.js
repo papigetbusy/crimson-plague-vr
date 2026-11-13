@@ -134,9 +134,11 @@ async function pickupGroup() {
     await S.ev((O) => { const r = window.__game.ref; r.giveGun('shotgun_pump', 1, 1, O[0] + 5, O[1] + 1.5); }, L.O); await S.frames(3);
     const far9 = await S.ev((O) => window.__game.ref.snapshot().pickups.find((p) => p.gun && p.gun.id === 'shotgun_pump' && Math.abs(p.x - O[0] - 5) < 0.1), L.O);
     await pointAt(S, 'right', [far9.x, 0.35, far9.z]); await S.hold('right', 'trigger', true); await S.frames(6);
-    const d9 = await debug(S); await S.hold('right', 'trigger', false); await S.frames(6);
+    const d9 = await debug(S); await S.hold('right', 'trigger', false); await S.frames(3);
+    const d9a = await debug(S); await S.frames(45);
     const d9b = await debug(S);
     rec(G, 'While firing, the gun hand does not light up far items; let go and it does', !(d9.grab.right && d9.grab.right.mode === 'ray') && d9b.grab.right && d9b.grab.right.mode === 'ray', 'firing: ' + JSON.stringify(d9.grab.right) + ' / after: ' + (d9b.grab.right && d9b.grab.right.mode));
+    rec(G, 'Just after a burst (under 0.35 s) a grip squeeze still cannot pull far loot (no accidental grabs mid-fight)', !(d9a.grab.right && (d9a.grab.right.mode === 'ray' || d9a.grab.right.mode === 'body')), 'just after: ' + JSON.stringify(d9a.grab.right));
     await rest(S);
     // coins: walk over them (no button)
     const g10 = (await S.state()).gold;
@@ -311,7 +313,7 @@ async function controlsGroup() {
 const MORE = require('./xr_playtest_more.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, held, shotsDir: shots });
 const COOP = require('./xr_playtest_coop.js')({ rec, rest, debug, pointAt, shot: (S, n) => MORE.shot(S, n), root, page, HELPERS, MORE });
 (async () => {
-  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['coop', COOP.coopGroup]];
+  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['reload', MORE.reloadGroup], ['coop', COOP.coopGroup]];
   const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ALL.map((g) => g[0]);
   for (const [n, f] of ALL) if (want.includes(n)) { try { await f(); } catch (e) { rec(n, 'group ran to the end', false, String(e && e.message || e).slice(0, 200)); } }
   const bad = results.filter((r) => !r.pass);

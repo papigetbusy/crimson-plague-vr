@@ -74,16 +74,18 @@ const XrInteract = (function () {
         const s = side[hand], c = hands[hand];
         if (!c || !c.gamepad) { hide(s); s.tgt = null; continue; }
         const gv = c.gamepad.buttons && c.gamepad.buttons[1] ? (c.gamepad.buttons[1].value || (c.gamepad.buttons[1].pressed ? 1 : 0)) : 0;
-        // while firing, the gun hand only grabs what it touches (no pull from afar in a fight)
+        // while firing, the gun hand only grabs what it touches (no pull from afar, no nearest-item fallback in a fight)
         const trig = c.gamepad.buttons && c.gamepad.buttons[0] && (c.gamepad.buttons[0].pressed || c.gamepad.buttons[0].value > 0.35);
+        s.fireT = trig ? 0.35 : Math.max(0, (s.fireT || 0) - dt);          // and for 0.35 s after letting go: a re-squeeze mid-fight must not pull loot from across the room
+        const fighting = hand === 'right' && (trig || s.fireT > 0);
         const support = hand === 'left' && (o.twoHand() || trig);         // left grip on the fore-end, or aiming down sights (left trigger): that hand is on the gun
         let tgt = null;
         if (!support) {
           c.grip.getWorldPosition(hp); c.ray.getWorldQuaternion(q); hd.set(0, 0, -1).applyQuaternion(q);
           if (hand === 'right' && st.player.gun && st.player.gun.other && XrGrab.overShoulder(c.grip.position.toArray(), headL.toArray(), headYaw)) tgt = { mode: 'shoulder', key: 'shoulder', text: 'Swap to ' + (st.player.gun.other.card ? st.player.gun.other.card.name : 'your other gun'), ok: true };
-          if (!tgt) { const pk = XrGrab.pick({ p: hp.toArray(), d: hd.toArray() }, items, losF, hand === 'right' && trig); if (pk) { const it = items.find((i) => i.id === pk.id); tgt = { mode: pk.mode, id: pk.id, key: pk.mode + pk.id, item: it, text: itemName(it.p), col: itemColor(it.p), ok: true }; } }
+          if (!tgt) { const pk = XrGrab.pick({ p: hp.toArray(), d: hd.toArray() }, items, losF, fighting); if (pk) { const it = items.find((i) => i.id === pk.id); tgt = { mode: pk.mode, id: pk.id, key: pk.mode + pk.id, item: it, text: itemName(it.p), col: itemColor(it.p), ok: true }; } }
           if (!tgt && use) { const at = usePos(st, use); tgt = { mode: 'use', key: 'u' + use.what + use.text, use, at, text: use.text, ok: use.ok }; }
-          if (!tgt && hand === 'right') { const bp = XrGrab.bodyPick(items, { x: st.player.x, z: st.player.z, yaw: st.player.yaw }); if (bp) { const it = items.find((i) => i.id === bp.id); tgt = { mode: 'body', id: bp.id, key: 'body' + bp.id, item: it, text: itemName(it.p), col: itemColor(it.p), ok: true }; } }
+          if (!tgt && hand === 'right' && !fighting) { const bp = XrGrab.bodyPick(items, { x: st.player.x, z: st.player.z, yaw: st.player.yaw }); if (bp) { const it = items.find((i) => i.id === bp.id); tgt = { mode: 'body', id: bp.id, key: 'body' + bp.id, item: it, text: itemName(it.p), col: itemColor(it.p), ok: true }; } }
         }
         const key = tgt ? tgt.key : '';
         if (key !== s.key) { if (tgt && tgt.mode !== 'body') pulse(hand, 0.14, 12); s.key = key; }

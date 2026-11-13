@@ -1131,7 +1131,7 @@
     gunAds.set(0, -SIGHT.y * gs, -EYE_RELIEF - SIGHT.z * gs);   // puts the sight window dead centre
     const still = clamp(1 - planar, 0, 1) * (1 - sp) * (1 - sl);
     // hold Reload for 2 seconds with a full magazine: gun inspect (keyboard R, the touch Reload button, or the controller X button)
-    const pr = currentPad(), rHeld = !!keys.KeyR || tch.reload || !!(pr && pr.reloadHeld);
+    const pr = pad.now, rHeld = !!keys.KeyR || tch.reload || !!(pr && pr.reloadHeld);
     if (GunMotion.holdStep(reloadHold, dt, rHeld, running && p.ammo >= p.magSize && !p.reloading && !state.over && inspK === 0)) startInspect();
     if (equipK < 1) equipK = Math.min(1, equipK + dt / 0.7);
     if (inspK > 0) { inspK += dt / GunMotion.LENGTH[inspKind]; if (inspK >= 1 || p.reloading || p.sprintK > 0.2 || p.adsT > 0.15 || flashT > 0.04) inspK = 0; }
