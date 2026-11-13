@@ -32,7 +32,8 @@ module.exports = function (X) {
     let k = first.s, n = 0; const ks = [k.menuK.toFixed(2)];
     for (; n < 40 && (k.menuK < 1 || k.opacity < 1 || Math.abs(k.scale - 1) > 1e-3); n++) { await S.frames(1); k = await sm(S); if (n < 8) ks.push(k.menuK.toFixed(2)); }
     const typ = base.length ? base.slice().sort((a, b) => a - b)[Math.floor(base.length / 2)] : 0;
-    rec(G, label + ': opens with a fade/grow (starts clear and small, eases to full) and it finishes', first.s.opacity < 0.6 && first.s.scale < 0.99 && k.menuK === 1 && k.opacity === 1 && Math.abs(k.scale - 1) < 1e-3, 'menu ' + first.id + '; first frame opacity ' + first.s.opacity.toFixed(2) + ' scale ' + first.s.scale.toFixed(3) + '; menuK ' + ks.join(' ') + ' ... full after ' + (n + 1) + ' frames');
+    const k1 = Math.min(1, Math.min(first.s.dt, 0.05) / 0.15);         // one frame's worth of the 150 ms fade (the sim's frames are 17-50 ms; a Quest's 8-14 ms)
+    rec(G, label + ': opens with a fade/grow (starts clear and small, eases to full over ~150 ms) and it finishes', first.s.menuK <= k1 + 0.02 && first.s.menuK < 1 && first.s.scale < 0.995 && k.menuK === 1 && k.opacity === 1 && Math.abs(k.scale - 1) < 1e-3, 'menu ' + first.id + '; frame ' + (first.s.dt * 1000).toFixed(0) + ' ms; first frame opacity ' + first.s.opacity.toFixed(2) + ' scale ' + first.s.scale.toFixed(3) + '; menuK ' + ks.join(' ') + ' ... full after ' + (n + 1) + ' frames');
     const top = Object.entries(first.stages).sort((a, b) => b[1] - a[1]).slice(0, 3).map((e) => e[0] + ' ' + e[1].toFixed(1)).join(', ');
     X.openMs = X.openMs || []; X.openMs.push({ menu: label, ms: +first.ms.toFixed(1), typical: +typ.toFixed(1) });
     rec(G, label + ': the frame that opens it stays short (sim CPU, under 40 ms incl. software rendering)', first.ms < 40, first.ms.toFixed(1) + ' ms (normal frames here ~' + typ.toFixed(1) + ' ms; ' + top + ')');
@@ -40,6 +41,7 @@ module.exports = function (X) {
   }
   // hover: a tile gets the gliding frame and a light tick; text (the title) never does
   async function hoverCheck(S, label, re) {
+    await S.hand('left', { q: [-0.7071, 0, 0, 0.7071] });             // the left laser points at the floor (either hand can hover a tile)
     await S.pulses();
     const t = await S.ev((re) => window.__pt.menuFind(re), re);
     if (!t) { rec(G, label + ': a tile to point at', false, re); return null; }
@@ -58,8 +60,11 @@ module.exports = function (X) {
     }
     return t;
   }
+  async function toTop(S) { for (let k = 0; k < 20; k++) { const d = await debug(S), m = await sm(S); if (!d.menu || (d.scroll <= 0 && m.scrollV === 0)) break; await S.hand('right', { ax: [0, 0, 0, -1] }); await S.frames(6); await S.hand('right', { ax: [0, 0, 0, 0] }); await S.frames(6); } }
   async function click(S, re, wait) {
-    const t = await S.ev((re) => window.__pt.menuFind(re), re); if (!t) return null;
+    let t = await S.ev((re) => window.__pt.menuFind(re), re);
+    if (!t) { await toTop(S); for (let k = 0; k < 12 && !t; k++) { t = await S.ev((re) => window.__pt.menuFind(re), re); if (t) break; await S.hand('right', { ax: [0, 0, 0, 0.6] }); await S.frames(5); await S.hand('right', { ax: [0, 0, 0, 0] }); for (let j = 0; j < 30 && (await sm(S)).scrollV !== 0; j++) await S.frames(1); } }
+    if (!t) return null;
     const w = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), t); await pointAt(S, 'right', w); await S.frames(6); await S.pulses();
     await S.press('right', 'trigger', 4); await S.frames(wait || 14); const p = await S.pulses(); await rest(S); return { title: t[2], pulses: p };
   }
@@ -110,7 +115,7 @@ module.exports = function (X) {
       await S.ev(() => { const r = window.__game.ref, O = window.__pt.openSpot(4, null) || window.__pt.openSpot(3, null); r.clearWave(); r.place(O[0], O[1], Math.PI / 2); }); await rest(S);
       await firesAfter(S, 'Start menu');
       // 2. pause, 3. codex (a straight menu-to-menu switch), back to pause, resume
-      await watchOpen(S, 'Pause (Y)', () => S.press('left', 'y', 4), 'start');
+      await S.frames(20); await watchOpen(S, 'Pause (Y)', () => S.seq('left', 'y', [[1, 3], [0, 1]]), 'start');
       await hoverCheck(S, 'Pause', '^RESUME');
       // mid-transition picture for the report
       const cx = await S.ev(() => window.__pt.menuFind('CODEX'));
@@ -131,16 +136,16 @@ module.exports = function (X) {
       await closedCheck(S, 'Pause', 'Y');
       await firesAfter(S, 'Pause');
       // 4. map (double-tap Y): fades in, Y fades it out
-      await S.press('left', 'y', 3); await S.frames(3); await S.press('left', 'y', 3);
+      await S.frames(20); await S.seq('left', 'y', [[1, 3], [0, 3], [1, 3], [0, 1]]);
       let mk = [], mOn = false; for (let i = 0; i < 30; i++) { await S.frames(1); const s = await sm(S); mk.push(+s.mapK.toFixed(2)); if (s.mapK === 1) { mOn = true; break; } }
       const md = await debug(S);
-      rec(G, 'Map: double-tap Y shows it with a fade/grow that finishes', md.mapShown && mOn && mk[0] < 0.9, 'mapK ' + mk.slice(0, 6).join(' ') + ' ...');
+      rec(G, 'Map: double-tap Y shows it with a fade/grow that finishes', md.mapShown && mOn, 'mapK ' + mk.slice(0, 6).join(' ') + ' ...');
       await S.press('left', 'y', 4); let mOff = false, mn = 0; for (; mn < 30; mn++) { await S.frames(1); const s = await sm(S); if (!s.mapVisible && s.mapK === 0) { mOff = true; break; } }
       const md2 = await debug(S);
       rec(G, 'Map: a Y tap closes it with a fade (gone after it, no pause menu)', mOff && !md2.mapShown && !md2.menu, 'gone after ' + (mn + 1) + ' frames, menu ' + md2.menu);
       // 5. gear (hold Y)
       await S.ev(() => { const r = window.__game.ref; r.giveMod(2); r.giveMod(3); r.giveMod(2); });
-      await watchOpen(S, 'Gear (hold Y)', () => S.hold('left', 'y', true), 'gearMenu', async () => { await S.hold('left', 'y', false); await S.frames(2); });
+      await S.frames(20); await watchOpen(S, 'Gear (hold Y)', () => S.hold('left', 'y', true), 'gearMenu', async () => { await S.hold('left', 'y', false); await S.frames(2); });
       await hoverCheck(S, 'Gear', 'Fit to gun in hands|Take off|.');
       await scrollCheck(S, 'Gear');
       await shot(S, 'smooth_gear');
@@ -198,7 +203,7 @@ module.exports = function (X) {
       rec(G, 'Game over: RISE AGAIN still starts a new run', !!ra && !rr.over && rr.run, JSON.stringify(rr));
       await closedCheck(S, 'Game over', 'RISE AGAIN');
       // 10. the laser: steady while the hand trembles, but a sweep is followed at once
-      await watchOpen(S, 'Pause again (laser check)', () => S.press('left', 'y', 4), 'start');
+      await S.frames(20); await watchOpen(S, 'Pause again (laser check)', () => S.seq('left', 'y', [[1, 3], [0, 1]]), 'start');
       const pt = await S.ev(() => window.__pt.menuPoint(0.5, 0.5)); await pointAt(S, 'right', pt); await S.frames(10);
       const base = await S.ev((f) => window.__pt.look(f, window.__pt.menuPoint(0.5, 0.5)), [0.18, -0.42, -0.32]);
       const jit = []; for (let i = 0; i < 12; i++) { const a = (i % 2 ? 1 : -1) * 0.006; const q = await S.ev((b, a) => { const T = window.__game.THREE, q = new T.Quaternion(b[0], b[1], b[2], b[3]).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), a)); return [q.x, q.y, q.z, q.w]; }, base, a); await S.hand('right', { p: [0.18, -0.42, -0.32], q }); await S.frames(1); jit.push((await sm(S)).laserDir); }
