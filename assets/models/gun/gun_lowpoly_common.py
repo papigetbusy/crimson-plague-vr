@@ -83,7 +83,7 @@ def _vn(x, y, sc, s=0):
     return (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty
 
 
-def paint_atlas(path, furn='wood', seed=1):
+def paint_atlas(path, furn='wood', seed=1, furn_grime=0.76):
     pal = dict(STEEL); pal.update(WOOD if furn == 'wood' else POLYMER)
     buf = [pal['recess']] * (S * S)
 
@@ -144,7 +144,7 @@ def paint_atlas(path, furn='wood', seed=1):
                     c = 'f_dark'
                 if checker and ((x + y) % 6 == 0 or (x - y) % 6 == 0):
                     c = 'f_shadow'
-                if _vn(x, y, 8, seed + 5) > 0.76:
+                if _vn(x, y, 8, seed + 5) > furn_grime:
                     c = 'f_grime'
                 if vents and x0 + 8 < x < x1 - 8 and (y - y0) % vents in range(3, 9) \
                         and (x - x0) % 16 < 10:
