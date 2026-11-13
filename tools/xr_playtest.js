@@ -1,5 +1,5 @@
 // Full simulated Quest 3 playtest: every pickup, door and button in the VR build, driven through the fake headset.
-// Run: NODE_PATH=/workspace/xrsim/node_modules node tools/xr_playtest.js [page=site/index.html] [--md out.md] [--shots dir] [--only=pickup,doors,controls]
+// Run: NODE_PATH=/workspace/xrsim/node_modules node tools/xr_playtest.js [page=site/index.html] [--md out.md] [--shots dir] [--only=pickup,doors,controls,smooth]
 // Each check prints PASS/FAIL with what was seen. Exit code 1 when anything fails.
 const { launch } = require('./xr_sim.js');
 const args = process.argv.slice(2), page = args.find((a) => /\.html$/.test(a)) || 'site/index.html';
@@ -312,9 +312,10 @@ async function controlsGroup() {
 
 const MORE = require('./xr_playtest_more.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, held, shotsDir: shots });
 const MESH = require('./xr_playtest_glb.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps });
+const SMOOTH = require('./xr_playtest_smooth.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, shotsDir: shots });
 const COOP = require('./xr_playtest_coop.js')({ rec, rest, debug, pointAt, shot: (S, n) => MORE.shot(S, n), root, page, HELPERS, MORE });
 (async () => {
-  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['reload', MORE.reloadGroup], ['meshes', MESH.meshGroup], ['boss', () => MESH.bossGroup(MORE.clickTile)], ['coop', COOP.coopGroup]];
+  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['reload', MORE.reloadGroup], ['meshes', MESH.meshGroup], ['smooth', SMOOTH.smoothGroup], ['boss', () => MESH.bossGroup(MORE.clickTile)], ['coop', COOP.coopGroup]];
   const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ALL.map((g) => g[0]).filter((n) => n !== 'boss');   // the boss run (~20-30 min) only runs when asked: --only=boss
   for (const [n, f] of ALL) if (want.includes(n)) { try { await f(); } catch (e) { rec(n, 'group ran to the end', false, String(e && e.message || e).slice(0, 200)); } }
   const bad = results.filter((r) => !r.pass);
