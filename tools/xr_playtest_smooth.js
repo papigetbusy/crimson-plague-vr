@@ -17,17 +17,18 @@ module.exports = function (X) {
     if (url) require('fs').writeFileSync(X.shotsDir + '/' + name + '_vrpanel.png', Buffer.from(url.split(',')[1], 'base64'));
   }
   // open: run `act`, then step one frame at a time until the panel shows; then follow its fade until it is fully in
-  async function watchOpen(S, label, act, want) {
+  async function watchOpen(S, label, act, want, after, maxF) {
     await S.ev(() => window.__game.perfReset());
     await act();
     let first = null, f = 0, base = [];
-    for (; f < 60; f++) {
+    for (; f < (maxF || 120); f++) {
       const d = await S.ev(() => ({ m: window.__game.xr.menuShown(), id: window.__game.xr.debug().menuId }));
       const fm = await frameMs(S);
       if (d.m && (!want || d.id === want)) { first = { f, id: d.id, ms: fm.ms, stages: fm.stages, s: await sm(S) }; break; }
       base.push(fm.ms); await S.frames(1);
     }
-    if (!first) { rec(G, label + ': opens', false, 'no panel after 60 frames'); return null; }
+    if (after) await after();
+    if (!first) { rec(G, label + ': opens', false, 'no panel after ' + (maxF || 120) + ' frames'); return null; }
     let k = first.s, n = 0; const ks = [k.menuK.toFixed(2)];
     for (; n < 40 && (k.menuK < 1 || k.opacity < 1 || Math.abs(k.scale - 1) > 1e-3); n++) { await S.frames(1); k = await sm(S); if (n < 8) ks.push(k.menuK.toFixed(2)); }
     const typ = base.length ? base.slice().sort((a, b) => a - b)[Math.floor(base.length / 2)] : 0;
@@ -49,9 +50,12 @@ module.exports = function (X) {
     rec(G, label + ': pointing at "' + t[2].slice(0, 30) + '" lights the whole tile (gliding frame) with a light tick', d.hover === t[2] && h.hi && h.hiA > 0.8 && tile && Math.abs(cx - tile.u) < 0.02 && Math.abs(cy - tile.v) < 0.03 && p.some((q) => q.hand === 'right' && q.s <= 0.15),
       'hover ' + d.hover + ' a ' + h.hiA.toFixed(2) + ' frame centre ' + cx.toFixed(3) + ',' + cy.toFixed(3) + ' tile ' + (tile ? tile.u.toFixed(3) + ',' + tile.v.toFixed(3) : '-') + ' pulses ' + JSON.stringify(p.map((q) => q.s)));
     // the title area: text only, no highlight
-    const wt = await S.ev(() => window.__pt.menuPoint(0.5, 0.95)); await pointAt(S, 'right', wt); await S.frames(14);
-    const h2 = await sm(S), d2 = await debug(S);
-    rec(G, label + ': pointing at the title text lights nothing (text and labels never highlight)', !d2.hover && h2.hiA < 0.08, 'hover ' + d2.hover + ' a ' + h2.hiA.toFixed(2));
+    const ts = (await sm(S)).textSpot;
+    if (ts) {
+      const wt = await S.ev((ts) => window.__pt.menuPoint(ts[0], ts[1]), ts); await pointAt(S, 'right', wt); await S.frames(14);
+      const h2 = await sm(S), d2 = await debug(S);
+      rec(G, label + ': pointing at its ' + ts[2] + ' text lights nothing (text and labels never highlight)', !d2.hover && h2.hiA < 0.08, 'at uv ' + ts.slice(0, 2).map((v) => v.toFixed(2)) + ': hover ' + d2.hover + ' a ' + h2.hiA.toFixed(2));
+    }
     return t;
   }
   async function click(S, re, wait) {
@@ -67,7 +71,7 @@ module.exports = function (X) {
     const c = (await debug(S)).scroll; await S.frames(5); const e = (await debug(S)).scroll;
     rec(G, label + ': the right stick scrolls, then the list glides on a little and comes to rest', a > d0.scroll && (b > a || a >= d0.maxScroll) && c === e && s.scrollV === 0, 'scroll ' + d0.scroll.toFixed(0) + ' -> ' + a.toFixed(0) + ' (speed ' + v.toFixed(0) + ' px/s at release) -> glide ' + b.toFixed(0) + ' -> rest ' + c.toFixed(0) + ' after ' + n + ' frames, of ' + d0.maxScroll.toFixed(0));
     // trigger-drag: the list follows the laser 1:1 and a pull stops a glide
-    const p0 = await S.ev(() => window.__pt.menuPoint(0.5, 0.35)), p1 = await S.ev(() => window.__pt.menuPoint(0.5, 0.6));
+    const p0 = await S.ev(() => window.__pt.menuPoint(0.5, 0.6)), p1 = await S.ev(() => window.__pt.menuPoint(0.5, 0.35));
     await pointAt(S, 'right', p0); await S.frames(6); const s0 = (await debug(S)).scroll; await S.hold('right', 'trigger', true); await S.frames(3);
     for (let i = 1; i <= 6; i++) { await pointAt(S, 'right', p0.map((q, j) => q + (p1[j] - q) * i / 6)); }
     const s1 = (await debug(S)).scroll; await S.hold('right', 'trigger', false); await S.frames(30); const s2 = (await debug(S)).scroll, st = await sm(S), id = (await debug(S)).menuId;
@@ -112,9 +116,9 @@ module.exports = function (X) {
       const cx = await S.ev(() => window.__pt.menuFind('CODEX'));
       if (cx) {
         const w = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), cx); await pointAt(S, 'right', w); await S.frames(6);
-        await S.press('right', 'trigger', 4);
+        const dn0 = (await sm(S)).dipN; await S.press('right', 'trigger', 4);
         let dip = false, ids = []; for (let i = 0; i < 40; i++) { await S.frames(1); const s = await sm(S), d = await debug(S); if (s.dip) dip = true; ids.push(d.menuId); if (d.menuId === 'codex' && s.menuK === 1) break; }
-        const s = await sm(S), d = await debug(S);
+        const s = await sm(S), d = await debug(S); dip = dip || s.dipN > dn0;
         rec(G, 'Pause -> Codex: the old menu dips out, then the Codex fades in fully (no stuck half-way state)', dip && d.menuId === 'codex' && s.menuK === 1 && s.opacity === 1, 'dip ' + dip + ' ids ' + [...new Set(ids)].join('>') + ' k ' + s.menuK);
         await rest(S);
         await hoverCheck(S, 'Codex', '.');
@@ -136,7 +140,7 @@ module.exports = function (X) {
       rec(G, 'Map: a Y tap closes it with a fade (gone after it, no pause menu)', mOff && !md2.mapShown && !md2.menu, 'gone after ' + (mn + 1) + ' frames, menu ' + md2.menu);
       // 5. gear (hold Y)
       await S.ev(() => { const r = window.__game.ref; r.giveMod(2); r.giveMod(3); r.giveMod(2); });
-      await watchOpen(S, 'Gear (hold Y)', async () => { await S.hold('left', 'y', true); await S.frames(60); await S.hold('left', 'y', false); }, 'gearMenu');
+      await watchOpen(S, 'Gear (hold Y)', () => S.hold('left', 'y', true), 'gearMenu', async () => { await S.hold('left', 'y', false); await S.frames(2); });
       await hoverCheck(S, 'Gear', 'Fit to gun in hands|Take off|.');
       await scrollCheck(S, 'Gear');
       await shot(S, 'smooth_gear');
@@ -170,7 +174,8 @@ module.exports = function (X) {
         await S.ev((c) => window.__game.ref.place(c.x - 4, c.z, -Math.PI / 2), sf.m); await S.frames(20);
       } else rec(G, 'Merchant: safe room reached', false, JSON.stringify(sf));
       if (sf.safe && sf.ch) {
-        await watchOpen(S, 'Stash', async () => { await S.ev((c) => window.__game.ref.place(c.x - 1.5, c.z, Math.PI / 2), sf.ch); await S.frames(8); await pointAt(S, 'right', [sf.ch.x, 0.6, sf.ch.z]); await S.press('right', 'grip', 6); }, 'stashMenu');
+        await S.ev((c) => window.__game.ref.place(c.x - 1.5, c.z, Math.PI / 2), sf.ch); await S.frames(8); await pointAt(S, 'right', [sf.ch.x, 0.6, sf.ch.z]);
+        await watchOpen(S, 'Stash', () => S.hold('right', 'grip', true), 'stashMenu', async () => { await S.hold('right', 'grip', false); await S.frames(2); });
         await rest(S);
         await hoverCheck(S, 'Stash', 'Put in stash|Save game here|.');
         await scrollCheck(S, 'Stash');
@@ -184,7 +189,7 @@ module.exports = function (X) {
       await S.ev(() => window.__game.ref.reset()); await S.frames(10);
       if ((await S.ev(() => window.__game.xr.debug().menuId)) === 'stashMenu') { await S.press('left', 'y', 4); await S.frames(30); }
       await S.ev(() => { const r = window.__game.ref, O = window.__pt.openSpot(4, null) || window.__pt.openSpot(3, null); r.place(O[0], O[1], Math.PI / 2); const k = r.kinds; const kd = Object.keys(k).find((id) => !k[id].boss && !k[id].mini && !k[id].ranged) || 'goblin'; r.setHp(1); for (let i = 0; i < 4; i++) r.spawnAt(kd, O[0] + 0.9 * Math.cos(i * 1.6), O[1] + 0.9 * Math.sin(i * 1.6)); });
-      await watchOpen(S, 'Game over', async () => { for (let i = 0; i < 60; i++) { await S.frames(5); if (await S.ev(() => !!window.__game.ref.snapshot().over)) break; } }, 'gameover');
+      await watchOpen(S, 'Game over', async () => {}, 'gameover', null, 700);
       await hoverCheck(S, 'Game over', 'RISE AGAIN');
       await shot(S, 'smooth_gameover_hover');
       const ra = await click(S, 'RISE AGAIN', 40);
@@ -198,7 +203,8 @@ module.exports = function (X) {
       const base = await S.ev((f) => window.__pt.look(f, window.__pt.menuPoint(0.5, 0.5)), [0.18, -0.42, -0.32]);
       const jit = []; for (let i = 0; i < 12; i++) { const a = (i % 2 ? 1 : -1) * 0.006; const q = await S.ev((b, a) => { const T = window.__game.THREE, q = new T.Quaternion(b[0], b[1], b[2], b[3]).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), a)); return [q.x, q.y, q.z, q.w]; }, base, a); await S.hand('right', { p: [0.18, -0.42, -0.32], q }); await S.frames(1); jit.push((await sm(S)).laserDir); }
       const spread = (() => { let mx = 0; for (const a of jit) for (const b of jit) if (a && b) mx = Math.max(mx, Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))); return mx; })();
-      rec(G, 'Laser: a 0.7 degree hand tremor moves the beam much less (steady)', spread < 0.012 * 0.7, 'beam wobble ' + (spread * 57.3).toFixed(2) + ' deg for a ' + (0.012 * 57.3).toFixed(2) + ' deg hand wobble');
+      const fdt = (await sm(S)).dt;
+      rec(G, 'Laser: a 0.7 degree hand tremor moves the beam less (steady; at 72-120 Hz see tests/menusmooth.test.js: 10-16%)', spread < 0.012 * 0.75, 'beam wobble ' + (spread * 57.3).toFixed(2) + ' deg for a ' + (0.012 * 57.3).toFixed(2) + ' deg hand wobble at the sim\'s ' + (1 / fdt).toFixed(0) + ' fps');
       const tR = await S.ev(() => window.__pt.menuFind('^RESUME')); const wR = await S.ev((t) => window.__pt.menuPoint(t[0], t[1]), tR); await pointAt(S, 'right', wR);
       const hv1 = (await debug(S)).hover;
       rec(G, 'Laser: a quick point at RESUME is followed at once (hover within 3 frames, no lag on the click)', hv1 === tR[2], 'hover ' + hv1);

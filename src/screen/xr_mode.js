@@ -3,6 +3,10 @@
    Presentation and input only: it never touches the referee's rules. The game reads its input through the same
    controller path as a normal gamepad (XrInput.toPad -> PadInput), and aim is sent as a mouse-style look input. */
 const XrMode = (function () {
+  // the menu laser's steadying filter (a small "one euro" style filter): the slower the BEAM is moving, the more it is smoothed, so a
+  // still hand's tremor is damped (~55 ms) while a real sweep is followed closely (~10 ms); a jump of 20 degrees or more is taken at once
+  const LASER_SNAP = 0.35;
+  const laserRate = (spd) => 18 + 80 * Math.min(1, Math.max(0, spd) / 2);      // per second; spd = the beam's own speed (rad/s)
   function create(o) {
     const { THREE, renderer, scene, camera, gun, $, gunHome } = o;
     const q = location.search + location.hash;
@@ -43,7 +47,7 @@ const XrMode = (function () {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.007, 6, 16), handMat); ring.position.set(0, 0.02, -0.05); ring.rotation.x = Math.PI / 3; grip.add(ring);
       const lp = new THREE.Group(); ray.add(lp);                       // the menu laser hangs off a pivot that follows the hand smoothed (a steady beam, no tremor)
       const laser = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 1), laserMat); laser.position.z = -0.5; laser.scale.z = 1; laser.visible = false; lp.add(laser);
-      const c = { ray, grip, laser, lp, sq: new THREE.Quaternion(), sqOn: false, hand: null };
+      const c = { ray, grip, laser, lp, sq: new THREE.Quaternion(), pq: new THREE.Quaternion(), spd: 0, sqOn: false, hand: null };
       ray.addEventListener('connected', (e) => { c.hand = e.data && e.data.handedness; if (c.hand === 'left' || c.hand === 'right') hands[c.hand] = c; });
       ray.addEventListener('disconnected', () => { if (c.hand && hands[c.hand] === c) hands[c.hand] = null; c.hand = null; laser.visible = false; });
       return c;
@@ -232,7 +236,7 @@ const XrMode = (function () {
     //  - one menu straight to another (pause -> codex): the old one dips out in 75 ms, then the new one fades in (no flash of half-drawn content)
     //  - hover: a soft gold frame floats over the whole card or button under the laser and glides between them; only clickable tiles
     //    (the page's own buttons) ever get it, never titles or text. The canvas is not redrawn for hover (no texture upload, no hitch).
-    const MENU_FADE = 0.15, MENU_DIP = 0.075; let menuK = 1, ghostK = 0, dipT = 0;
+    const MENU_FADE = 0.15, MENU_DIP = 0.075; let menuK = 1, ghostK = 0, dipT = 0, dipN = 0, openN = 0;
     const ghostMat = menuMat.clone(); const menuGhost = new THREE.Mesh(menuMesh.geometry, ghostMat); menuGhost.renderOrder = 1000; menuGhost.visible = false; dolly.add(menuGhost);
     const ease = (k) => 1 - (1 - k) * (1 - k) * (1 - k);
     const hiTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
@@ -308,11 +312,11 @@ const XrMode = (function () {
       if (!el) { if (menuPlacedFor) { menuGone(); vm.reset(); } menuMesh.visible = false; cursor.visible = false; menuPlacedFor = ''; menuEl = null; dipT = 0; return false; }
       if (!dt) return menuMesh.visible;
       if (menuPlacedFor !== el.id) {
-        if (menuPlacedFor && menuMesh.visible && dipT <= 0 && menuK > 0.05) dipT = MENU_DIP;   // straight from one menu to another: dip the old one out first
+        if (menuPlacedFor && menuMesh.visible && dipT <= 0 && menuK > 0.05) { dipT = MENU_DIP; dipN++; }   // straight from one menu to another: dip the old one out first
         if (dipT > 0) { dipT -= dt; if (dipT > 0) return true; }      // (still showing the old picture; it takes no clicks meanwhile, see laser())
         dipT = 0; menuPlacedFor = el.id; vm.reset(); placeMenu(); modelT = 0; awayT = 0; scrollV = 0;
         ghostK = 0; menuGhost.visible = false;                         // the canvas is about to hold the new menu: no old copy may show it
-        menuK = 0; menuMat.opacity = 0; panelScale(menuMesh, 0.94); hiCur.on = false; hiCur.a = 0;
+        menuK = 0; menuMat.opacity = 0; panelScale(menuMesh, 0.94); hiCur.on = false; hiCur.a = 0; openN++;
       }
       menuEl = el;
       modelT -= dt; if (modelT <= 0) { modelT = 0.25; const m = menuModel(el); if (!vm.setModel(m)) vm.refreshEls(m); }
@@ -359,7 +363,9 @@ const XrMode = (function () {
         // a steady beam: the hand's tremor is filtered out. Light filtering when the hand is still (~55 ms), almost none on a quick sweep,
         // and a jump of 20 degrees or more in one frame is taken at once. What the beam and cursor show is exactly what a pull presses.
         c.ray.updateMatrixWorld(); rO.setFromMatrixPosition(c.ray.matrixWorld); c.ray.getWorldQuaternion(rq);
-        if (!c.sqOn) { c.sq.copy(rq); c.sqOn = true; } else { const ang = c.sq.angleTo(rq), spd = ang / Math.max(lastDt, 1e-3); if (ang > 0.35) c.sq.copy(rq); else c.sq.slerp(rq, 1 - Math.exp(-lastDt * (18 + 40 * Math.min(1, spd / 3)))); }
+        if (!c.sqOn) { c.sq.copy(rq); c.sqOn = true; c.spd = 0; }
+        else if (c.sq.angleTo(rq) > LASER_SNAP) { c.sq.copy(rq); c.spd = 0; }
+        else { const dt = Math.max(lastDt, 1e-3); c.pq.copy(c.sq); c.sq.slerp(rq, 1 - Math.exp(-dt * laserRate(c.spd))); c.spd += (c.pq.angleTo(c.sq) / dt - c.spd) * (1 - Math.exp(-dt * 20)); }
         c.lp.quaternion.copy(rq).invert().multiply(c.sq); rD.set(0, 0, -1).applyQuaternion(c.sq);
         rc.set(rO, rD); const hit = dipT > 0 ? null : rc.intersectObject(menuMesh, false)[0];
         c.laser.visible = true; const len = hit ? hit.distance : 1.2; c.laser.scale.z = len; c.laser.position.z = -len / 2;
@@ -624,8 +630,8 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { comfort: () => Object.assign({}, comfort), setComfort, poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, handYaw, walkYaw, turnSpeed: turnSpeedOf, snapDeg: snapDegOf, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible, dot: fireDot.visible ? fireDotPos.toArray() : null }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapHeld, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, smooth: () => ({ menuK, opacity: menuMat.opacity, scale: menuMesh.scale.x / PANEL_W, ghostK, ghost: menuGhost.visible, dip: dipT > 0, hiA: hiCur.a, hi: hiMesh.visible, hiRect: hiMesh.visible ? { x: hiCur.x, y: hiCur.y, w: hiCur.w, h: hiCur.h } : null, scrollV, dragging, mapK, mapVisible: mapMesh.visible, laserDir: (hands.right && hands.right.sqOn) ? new THREE.Vector3(0, 0, -1).applyQuaternion(hands.right.sq).toArray() : null }), vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { comfort: () => Object.assign({}, comfort), setComfort, poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, handYaw, walkYaw, turnSpeed: turnSpeedOf, snapDeg: snapDegOf, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible, dot: fireDot.visible ? fireDotPos.toArray() : null }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapHeld, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, smooth: () => ({ dipN, openN, dt: lastDt, textSpot: (() => { const L = vm.layout; if (!L) return null; for (const it of L.items) { if (it.k !== 'title' && it.k !== 'text' && it.k !== 'head') continue; const y = it.y + 24 - vm.scroll; if (y > 10 && y < XrMenu.VIEW - 10) return [0.5, 1 - y / XrMenu.H, it.k]; } return null; })(), menuK, opacity: menuMat.opacity, scale: menuMesh.scale.x / PANEL_W, ghostK, ghost: menuGhost.visible, dip: dipT > 0, hiA: hiCur.a, hi: hiMesh.visible, hiRect: hiMesh.visible ? { x: hiCur.x, y: hiCur.y, w: hiCur.w, h: hiCur.h } : null, scrollV, dragging, mapK, mapVisible: mapMesh.visible, laserDir: (hands.right && hands.right.sqOn) ? new THREE.Vector3(0, 0, -1).applyQuaternion(hands.right.sq).toArray() : null }), vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
-  return { create };
+  return { create, laserRate, LASER_SNAP };
 })();
 if (typeof module !== 'undefined') module.exports = XrMode;
