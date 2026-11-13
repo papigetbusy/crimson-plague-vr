@@ -372,6 +372,47 @@ def save_blend(out_dir, name):
     print('saved', blend)
 
 
+
+def preview_fit_distance(look, loc_for_dir, corners, lens_mm, res_x, res_y,
+                         margin=0.09, sensor_width=36.0):
+    """Distance from `look` along (loc_for_dir - look) so Blender-space `corners`
+    fit in frame with `margin` of the frame clear on each side (0.09 = 9%).
+
+    View direction is preserved; only the camera distance changes. Assumes a
+    Blender camera with AUTO/horizontal sensor fit (default 36 mm width).
+    """
+    view_dir = (loc_for_dir - look).normalized()
+    rot_inv = (-view_dir).to_track_quat('-Z', 'Y').to_matrix().inverted()
+    half_w = (sensor_width * 0.5) / lens_mm
+    half_h = half_w * (res_y / float(res_x))
+    ndc_limit = 1.0 - 2.0 * margin
+    lim_x = half_w * ndc_limit
+    lim_y = half_h * ndc_limit
+    d_needed = 0.05
+    for P in corners:
+        rel = rot_inv @ (P - look)
+        d_needed = max(
+            d_needed,
+            rel.z + abs(rel.x) / max(lim_x, 1e-9),
+            rel.z + abs(rel.y) / max(lim_y, 1e-9),
+            rel.z + 0.05,
+        )
+    return d_needed, look + view_dir * d_needed
+
+
+def preview_ndc_extents(look, loc, corners, lens_mm, res_x, res_y, sensor_width=36.0):
+    rot_inv = (look - loc).to_track_quat('-Z', 'Y').to_matrix().inverted()
+    half_w = (sensor_width * 0.5) / lens_mm
+    half_h = half_w * (res_y / float(res_x))
+    xs, ys = [], []
+    for P in corners:
+        pc = rot_inv @ (P - loc)
+        depth = max(-pc.z, 1e-9)
+        xs.append((pc.x / depth) / half_w)
+        ys.append((pc.y / depth) / half_h)
+    return min(xs), max(xs), min(ys), max(ys)
+
+
 def render_glb(glb, render_dir, prefix, small_dir=None):
     M.reset_scene()
     bpy.ops.import_scene.gltf(filepath=os.path.abspath(glb))
@@ -404,16 +445,29 @@ def render_glb(glb, render_dir, prefix, small_dir=None):
     o.location = G(center.x, mx.y + 0.25 * k, center.z)
     look = G(center.x, center.y, center.z)
     dist = L * 1.75
-    views = {
-        'front': G(center.x, center.y + 0.03 * k, mn.z - dist * 0.55),
-        'side': G(mn.x - dist, center.y + 0.02 * k, center.z),
-        'three': G(mx.x + dist * 0.62, center.y + 0.35 * dist, center.z - dist * 0.62),
+    # Keep the original view directions; pull the camera back so the gun's
+    # full AABB fits with a 9% frame margin on each side. Short, tall guns
+    # (the Uzi) were cropped at the top by the rifle-tuned distance.
+    raw_views = {
+        'front': (G(center.x, center.y + 0.03 * k, mn.z - dist * 0.55), 75),
+        'side': (G(mn.x - dist, center.y + 0.02 * k, center.z), 60),
+        'three': (G(mx.x + dist * 0.62, center.y + 0.35 * dist, center.z - dist * 0.62), 60),
     }
+    corners = [G(Vector((x, y, z)))
+               for x in (mn.x, mx.x) for y in (mn.y, mx.y) for z in (mn.z, mx.z)]
     os.makedirs(render_dir, exist_ok=True)
     paths = []
-    for name, loc in views.items():
+    res_x, res_y = sc.render.resolution_x, sc.render.resolution_y
+    for name, (raw_loc, lens) in raw_views.items():
+        cam.data.lens = lens
+        d, loc = preview_fit_distance(look, raw_loc, corners, lens, res_x, res_y, margin=0.09)
+        nx0, nx1, ny0, ny1 = preview_ndc_extents(look, loc, corners, lens, res_x, res_y)
+        print(f'FRAME {name} lens={lens} dist={d:.4f} (raw {(raw_loc - look).length:.4f}) '
+              f'ndc_x[{nx0:+.3f},{nx1:+.3f}] ndc_y[{ny0:+.3f},{ny1:+.3f}]')
+        if max(abs(nx0), abs(nx1), abs(ny0), abs(ny1)) > 0.999:
+            raise RuntimeError(f'{name} still overflows the frame')
         M.aim_camera(cam, look, loc)
-        cam.data.lens = 60 if name != 'front' else 75
+        cam.data.clip_end = max(float(cam.data.clip_end), d * 5.0)
         p = os.path.join(render_dir, f'{prefix}_{name}.png')
         sc.render.filepath = p
         bpy.ops.render.render(write_still=True)
