@@ -112,6 +112,10 @@
   const voxelPart = (part, vox, parent) => { const g = new THREE.Group(); parent.add(g); rigParts.push(g); return gunLook.part(part, vox, g); };
   const MAG_BASE = new THREE.Vector3(), SIGHT = { y: 0, z: 0 };
   let charge, mag, CHARGE_Z = 0, muzzle;
+  let CHARGE_MAX = Infinity, CHARGE_KICK = 0.04, SLIDE_LOCK = 0;   // how far the moving part may slide back, its kick per shot, and (mesh guns) how far it locks back on an empty magazine
+  // mesh guns (assets/models/manifest.json, src/screen/glb_guns.js): shown instead of the voxel gun once decoded; ?voxelguns keeps the voxel ones
+  const glbGuns = GlbGuns.create(THREE, { query: location.search + location.hash });
+  let glbScale = 0, glbVr = false, glbOn = false;                 // the mesh gun in your hands is true size in a headset, the voxel gun's size on a flat screen
   const CHARGE_REST = new THREE.Vector3(), GP = { gunBody: null, magBase: null, chargeRest: CHARGE_REST, fore: null };   // the gun's parts for the VR hand reload
   // the red dot floats between the scope rings; ADS lines it up with the eye.
   // Small crisp point (~2-4 MOA at typical eye relief, was an 8 mm cube plus a 35 mm glow) with a white-hot core and a faint halo, visible on light or dark walls.
@@ -164,11 +168,20 @@
   let gunChanged = () => {};
   function setGun(id, takeSkin) {
     const entry = GunList.find(id); if (!entry) return; curGun = entry.id;
-    const G = entry.build(), A = G.anchors, H = entry.hands || G.hands || { grip: A.handGrip || [0, -0.15, 0.15], fore: A.handFore || [0, -0.12, -0.45], mag: A.handMag || [0, -0.15, -0.13] };
+    glbScale = glbGuns.scaleFor(entry.id, glbVr, view.gunScale);
+    const M = glbGuns.has(entry.id) ? glbGuns.build(entry.id, glbScale) : null; glbOn = !!M;
+    const G = M || entry.build(), A = G.anchors, H = entry.hands || G.hands || { grip: A.handGrip || [0, -0.15, 0.15], fore: A.handFore || [0, -0.12, -0.45], mag: A.handMag || [0, -0.15, -0.13] };
     gunLook.release(); rigParts.forEach((g) => gunRig.remove(g)); rigParts.length = 0;
-    voxelPart(G.parts.body, G.vox, gunRig);
-    charge = voxelPart(G.parts.bolt, G.vox, gunRig); charge.position.set(A.boltRest[0], A.boltRest[1], A.boltRest[2]); CHARGE_Z = A.boltRest[2]; CHARGE_REST.copy(charge.position);
-    mag = voxelPart(G.parts.mag, G.vox, gunRig); mag.rotation.x = 0.1; MAG_BASE.set(A.magPivot[0], A.magPivot[1], A.magPivot[2]); mag.position.copy(MAG_BASE);
+    if (M) {                                                         // the mesh gun: body, slide and magazine come ready-made
+      for (const g of [M.groups.body, M.groups.bolt, M.groups.mag]) { gunRig.add(g); rigParts.push(g); }
+      charge = M.groups.bolt; mag = M.groups.mag; CHARGE_MAX = M.slideTravel; CHARGE_KICK = M.slideTravel; SLIDE_LOCK = M.slideTravel;
+    } else {
+      voxelPart(G.parts.body, G.vox, gunRig);
+      charge = voxelPart(G.parts.bolt, G.vox, gunRig); mag = voxelPart(G.parts.mag, G.vox, gunRig);
+      CHARGE_MAX = Infinity; CHARGE_KICK = 0.04; SLIDE_LOCK = 0;
+    }
+    charge.position.set(A.boltRest[0], A.boltRest[1], A.boltRest[2]); CHARGE_Z = A.boltRest[2]; CHARGE_REST.copy(charge.position);
+    mag.rotation.x = 0.1; MAG_BASE.set(A.magPivot[0], A.magPivot[1], A.magPivot[2]); mag.position.copy(MAG_BASE);
     SIGHT.y = A.sightDot[1]; SIGHT.z = A.sightDot[2];
     dotMesh.position.set(0, SIGHT.y, SIGHT.z); dotCore.position.set(0, SIGHT.y, SIGHT.z); dotGlow.position.set(0, SIGHT.y, SIGHT.z + 0.001);
     muzzle.position.set(A.muzzle[0], A.muzzle[1], A.muzzle[2]);
@@ -180,6 +193,11 @@
     gunLook.setSkin(view.gunSkin || 'crimson'); view.gun = curGun; gunChanged();
   }
   setGun(ref.snapshot().player.gun.id, true);                                   // the gun the referee says you hold; setGun runs again whenever it changes
+  glbGuns.start((id) => { if (id === curGun) setGun(curGun); });                // a mesh gun finished decoding: swap it in if it is the one in your hands
+  function glbFit(inVr) {                                                       // entering or leaving VR (or a new gun size) rescales the mesh gun
+    if (inVr === glbVr && (!glbOn || glbScale === glbGuns.scaleFor(curGun, glbVr, view.gunScale))) return;
+    glbVr = inVr; if (glbOn) setGun(curGun);
+  }
 
   // reload choreography: hand keyframes (k = 0..1 through the reload)
   const RL_NORMAL = { hand: [[0, HOLD], [0.16, MAGH], [0.24, MAGH], [0.38, BELT], [0.46, BELT], [0.64, MAGH], [0.72, MAGH], [0.9, HOLD], [1, HOLD]], grab: 0.24, pullEnd: 0.38, newStart: 0.46, seat: 0.64, tilt: [0.14, 0.8, 1.0], snd: { magout: 0.3, magin: 0.66 }, bolt: null };
@@ -226,7 +244,9 @@
     let sh = false;
     if (vr && shells && p.reloading) for (let i = 0; i < 4; i++) { const a = 0.08 + i * 0.16; if (k > a && k < a + 0.08) sh = true; }
     vrShell.visible = sh; if (sh) vrShell.position.copy(handPos);
-    charge.position.z = CHARGE_Z + ((p.reloading && R.bolt && k >= R.bolt[0] && k <= R.bolt[1]) ? (handPos.z - CH_F.z) : 0);
+    const racking = p.reloading && R.bolt && k >= R.bolt[0] && k <= R.bolt[1];
+    charge.position.z = CHARGE_Z + (racking ? Math.min(CHARGE_MAX, handPos.z - CH_F.z) : 0);
+    if (SLIDE_LOCK && p.ammo <= 0 && !racking && !(p.reloading && R.bolt && k > R.bolt[1])) charge.position.z = CHARGE_Z + SLIDE_LOCK;   // a mesh pistol's slide stays back on an empty magazine until it is racked
     tB.copy(handPos); tB.y -= 0.02; tB.z += 0.1;
     placeLimb(limbL, ELBOW_L, tB, 0.12);
     tB.copy(handR.position); tB.z += 0.08;
@@ -1115,6 +1135,7 @@
   function updateView(st, dt, time) {
     const p = st.player;
     const inVr = !!(xr && xr.presenting());
+    glbFit(inVr);
     if (inVr) xr.headPose(); else camera.position.set(p.x, p.eye, p.z);   // in VR the headset places the camera
     dotMesh.visible = dotCore.visible = dotGlow.visible = !inVr;          // VR: a collimated point on the fire ray (xr_mode) is the red dot, so it sits on the impact from any eye
     const planar = clamp(p.speed / 6, 0, 1.6);
@@ -1153,7 +1174,7 @@
     }
     if (gunLook.skin().embers && running) { emberT -= dt; if (emberT <= 0) { emberT = 0.07; muzzle.getWorldPosition(tmpV); burst(tmpV.x + (Math.random() - 0.5) * 0.5, tmpV.y + (Math.random() - 0.3) * 0.1, tmpV.z + (Math.random() - 0.5) * 0.5, 1, [0xff6a1a, 0xff3a10, 0xffb040], 0.5, 0.7, -1.5, 0.35); } }
     const mo = GunMotion.add(GunMotion.add(GunMotion.kick(kickG, ad, kickDir), GunMotion.idle(time, still, ad)), GunMotion.add(GunMotion.equip(equipK), GunMotion.inspect(inspKind, inspK)));
-    charge.position.z += GunMotion.bolt(kickG, 0.04);
+    charge.position.z = Math.min(CHARGE_Z + Math.max(CHARGE_MAX, SLIDE_LOCK), charge.position.z + GunMotion.bolt(kickG, CHARGE_KICK));
     const gx = lerp(gunHip.x, gunAds.x, ad) - sp * 0.1 - sl * 0.05 + Math.sin(bob) * 0.012 * bobAmt + rl.px + mo.px;
     const gy = lerp(gunHip.y, gunAds.y, ad) - sp * 0.07 + Math.abs(Math.cos(bob)) * 0.012 * bobAmt - sl * 0.06 + rl.py + mo.py;
     const gz = lerp(gunHip.z, gunAds.z, ad) + sp * 0.05 + rl.pz + mo.pz;
@@ -1234,16 +1255,19 @@
     if (st.floorId !== loadedFloor) {
       const set = WallSets.forFloor(st.floor);                                    // every floor wears the next wall set (6 looks, then round again)
       wallSets.apply(set.id); scene.background.setRGB(set.fog[0] / 255, set.fog[1] / 255, set.fog[2] / 255); scene.fog.color.copy(scene.background); worldView.setFlame(set.flame[0], set.flame[1]);
-      worldView.load(ref.map, view.fogFar); loadedFloor = st.floorId;
+      worldView.load(ref.map, view.fogFar, halls.forMap(ref.map)); loadedFloor = st.floorId;
     }
   }   // a new floor (or a new run) is baked and drawn here
+  // the test map's start room in Crimson Halls (Wrok's mesh wall kit, src/screen/crimson_halls.js); ?voxelwalls keeps the old walls
+  const halls = CrimsonHalls.create(THREE, { query: location.search + location.hash, sandbox: SANDBOX });
+  halls.start(() => { if (loadedFloor !== undefined && loadedFloor !== null) { loadedFloor = null; ensureFloor(state); } });   // decoded after the floor was drawn: draw it again with the kit
   ensureFloor(state);
   chooseClass(0);
   GP.gunBody = gunBody; GP.magBase = MAG_BASE; GP.fore = HOLD;
   const VR_ACCEL = 240;   // in VR you reach full speed and stop in about 0.04 s: Meta's comfort guides say speeding up and slowing down the view is what makes people sick (docs/vr-design.md, round 5)
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
-    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.muzzle = muzzle; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
+    gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.muzzle = muzzle; GP.gunScale = view.gunScale; GP.glb = glbOn; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
   xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL, recoilKick: 0 }); applyVrSpeed(); comfortLabels(); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
   , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel, recoilKick: ref.defaults.recoilKick }); applyVrSpeed(); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
@@ -1274,5 +1298,5 @@
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, halls: () => { const m = worldView.kit(); return Object.assign(halls.status(), { mesh: !!m, visible: !!(m && m.visible && m.parent), tris: m ? m.userData.tris : 0, pieces: m ? m.userData.pieces : null }); }, glb: () => Object.assign(glbGuns.status(), { on: glbOn, gun: curGun, scale: glbScale, vr: glbVr }), rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
 })();

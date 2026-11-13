@@ -72,12 +72,13 @@ const WorldView = (function () {
       I.glow.count = n; I.glow.instanceMatrix.needsUpdate = true; if (I.glow.instanceColor) I.glow.instanceColor.needsUpdate = true;
     }
 
-    let chunkMeshes = [], bigMeshes = [], bigExtra = 0, torches = [], baked = null, door = null, doorT = 0, doorTarget = 0, doorOpenNow = false, fogFar = 34;
+    let kitMesh = null, chunkMeshes = [], bigMeshes = [], bigExtra = 0, torches = [], baked = null, door = null, doorT = 0, doorTarget = 0, doorOpenNow = false, fogFar = 34;
     function dropWorld() {
       for (const c of chunkMeshes) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
       chunkMeshes = [];
       for (const c of bigMeshes) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
       bigMeshes = [];
+      if (kitMesh) { scene.remove(kitMesh); kitMesh.geometry.dispose(); kitMesh = null; }
       if (door) { scene.remove(door.grp); door = null; }
     }
 
@@ -98,11 +99,13 @@ const WorldView = (function () {
       return { grp, inner, lamp, h };
     }
 
-    // build a new floor: bake it, make the chunk meshes, file the torches, stand the door in place
-    function load(map, far) {
+    // build a new floor: bake it, make the chunk meshes, file the torches, stand the door in place.
+    // kit (optional, crimson_halls.js forMap): a mesh wall kit drawn over part of the floor; its quads and pooled torches are left out of the bake
+    function load(map, far, kit) {
       dropWorld();
       fogFar = far || fogFar;
-      baked = WorldBake.bake(map);
+      baked = WorldBake.bake(map, kit ? kit.skip : null);
+      if (kit) { try { kitMesh = kit.build(baked.light); scene.add(kitMesh); } catch (e) { console.warn('Crimson Halls mesh failed, old walls: ' + e.message); kitMesh = null; baked = WorldBake.bake(map); kit = null; } }
       for (const c of baked.chunks) {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(c.pos, 3));
@@ -121,7 +124,7 @@ const WorldView = (function () {
         bigMeshes.push({ mesh, x: (b.bx * 24 + 12) * map.CELL, z: (b.bz * 24 + 12) * map.CELL });
       }
       bigExtra = 6 * map.CELL * Math.SQRT2;
-      torches = map.torches;
+      torches = kit ? map.torches.filter((t) => !kit.skip.torch.has(t)) : map.torches;
       door = buildDoor(map); doorT = 0; doorTarget = 0; doorOpenNow = false;
     }
 
@@ -133,6 +136,7 @@ const WorldView = (function () {
       for (const c of chunkMeshes) c.mesh.visible = !instOn && Math.hypot(c.x - cam.x, c.z - cam.z) < reach;
       for (const c of bigMeshes) c.mesh.visible = instOn && Math.hypot(c.x - cam.x, c.z - cam.z) < reach + bigExtra;
       for (const m of worldMats) m.color.setRGB(br * (1 + 0.5 * fb), br * (1 + 0.28 * fb), br * (1 + 0.1 * fb));
+      if (kitMesh) kitMesh.material.color.setRGB(br * (1 + 0.5 * fb), br * (1 + 0.28 * fb), br * (1 + 0.1 * fb));
       // the nearest torches of each kind get the pooled props
       for (const kind of ['sconce', 'brazier']) {
         const pool = kind === 'brazier' ? brazierPool : sconcePool; near.length = 0;
@@ -156,7 +160,7 @@ const WorldView = (function () {
         door.lamp.intensity = doorOpen ? 0 : 1.1 + 0.25 * Math.sin(time * 3);
       }
     }
-    return { load, update, light: (x, y, z, nx, ny, nz) => baked.light(x, y, z, nx, ny, nz), setFogFar: (v) => { fogFar = v; }, instanced: () => instOn, setFlame: (outer, inner) => { flameOuter.color.setHex(outer); flameInner.color.setHex(inner); }, mats: worldMats };
+    return { load, update, light: (x, y, z, nx, ny, nz) => baked.light(x, y, z, nx, ny, nz), setFogFar: (v) => { fogFar = v; }, instanced: () => instOn, kit: () => kitMesh, setFlame: (outer, inner) => { flameOuter.color.setHex(outer); flameInner.color.setHex(inner); }, mats: worldMats };
   }
   return { create };
 })();

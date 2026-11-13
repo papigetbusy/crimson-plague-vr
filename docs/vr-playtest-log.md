@@ -196,7 +196,13 @@ The pistol's red-dot sight is no longer an 8 mm cube with a 35 mm glow. In the f
 ## Red dot visible on Quest, 2026-11-13
 The owner could not see the e410342 red dot on a real Quest 3: the sprite was 10 MOA (about 4 px) with a sub-pixel core, mipmapped and additive, so it faded out. Now the sprite is about 44 MOA with a solid red core and white-hot centre filling the inner 17 % of its radius (about 7-8 MOA, 3-4 px on a Quest 3), never smaller than ~3 px, no mipmaps, normal blending (shows on bright walls), still depth-tested (walls hide it). The old on-gun dot stays hidden in VR. Sim: exactly one dot renders while aiming (44 MOA sprite), shots still land on it at 3, 10 and 30 m; full suite 161/161.
 
+## Mesh 1911 and Crimson Halls on the test map, 2026-11-13
+- The game now loads GLB models (three r128 GLTFLoader, embedded in the page through `assets/models/manifest.json`). The Service Pistol is the PS2-style 1911 (`gun/pistol_1911_ps2.glb`): true size (22 cm) in VR, the voxel pistol's size on a flat screen, the right hand on the same grip spot as every voxel gun (0, -0.1365, 0.104), its own magazine drops on reload, the slide kicks and locks back when empty. `?voxelguns` brings back the voxel guns.
+- The test map's start room (`?sandbox`) is drawn with Wrok's Crimson Halls kit: walls 3 modules high to the 11.5 m roof, inner corners, the room's pillar cells as kit pillars, a doorway arch on openings up to 3 cells wide, floor tiles, banners, and kit sconces whose flame sits on the torch light. All merged into one mesh (one draw call per eye), lit with the same baked torch light; the referee's cells stay the collision. `?voxelwalls` brings back the old walls. The full game's floors are unchanged.
+- Sim (new `meshes` group): the 1911 mesh is in hand, fires, reloads with its magazine dropping, ADS shows exactly one red dot and the shot lands on it, the kit is present, draw calls in the room 126-141 per eye (the kit adds 1), and the flags bring the old look back. Full suite: 161 earlier checks pass, `meshes` 9/9 (one flaky dot-depth check reworked to measure distance from the shot line, then re-run alone).
+
 ## Still needs a real Quest
+- The 1911 mesh and Crimson Halls on the Quest's own GPU: grip feel, size in the hand, brightness of the kit next to the old walls.
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.
 - Haptic strength on real Touch Plus controllers (the browser may ignore very short pulses).

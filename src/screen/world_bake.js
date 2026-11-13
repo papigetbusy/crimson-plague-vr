@@ -1,10 +1,12 @@
 /* World bake: turns the referee's map (rows of cells, torches) into merged quads with torch light baked into the vertex colours.
    Pure: no THREE, no browser, so a tool can draw the same floor offline.
    Returns { chunks: [{ key, cx, cz, pos, uv, col }] (the quads, one list per texture kind per 12 x 12 cell chunk, so the screen can skip what is out of sight),
-             buckets: the same merged by texture kind (for tools and tests), light(x, y, z, nx, ny, nz) -> [r, g, b] the same torch light for things that move }. */
+             buckets: the same merged by texture kind (for tools and tests), light(x, y, z, nx, ny, nz) -> [r, g, b] the same torch light for things that move }.
+   skip (optional, from crimson_halls.js): { face: Set('cx,cz:dx,dz'), floor: Set('cx,cz'), cell: Set('cx,cz') } leaves those quads out where a mesh kit is drawn instead
+   (the light still counts every wall, so the kit is lit the same). */
 const WorldBake = (function () {
   const DIM = 0.82;                                                       // overall light level, a touch darker (owner, 2026-10-19)
-  function bake(map) {
+  function bake(map, skip) {
     const CELL = map.CELL, WALL_H = map.WALL_H, GW = map.W, GH = map.H, rows = map.rows, torches = map.torches;
     const solidC = (cx, cz) => {
       if (cx < 0 || cz < 0 || cx >= GW || cz >= GH) return true;
@@ -90,7 +92,7 @@ const WorldBake = (function () {
       const ch = rows[cz][cx], x0 = cx * CELL, x1 = x0 + CELL, z0 = cz * CELL, z1 = z0 + CELL;
       curCx = Math.floor(cx / CHUNK); curCz = Math.floor(cz / CHUNK); curChunk = curCx + ',' + curCz;
       if (ch === '.' || ch === 'c' || ch === 'D' || ch === 'd') {
-        addFace(ch === 'c' ? 'carpet' : floorKey(cx, cz), [x0, 0, z1], [CELL, 0, 0], [0, 0, -CELL], 2, 2, [0, 1, 0]);
+        if (!(skip && skip.floor.has(cx + ',' + cz))) addFace(ch === 'c' ? 'carpet' : floorKey(cx, cz), [x0, 0, z1], [CELL, 0, 0], [0, 0, -CELL], 2, 2, [0, 1, 0]);
         addFace('ceil', [x0, WALL_H, z0], [CELL, 0, 0], [0, 0, CELL], 2, 2, [0, -1, 0]);
         if (cz % 4 === 0 && cz > 0 && cz < GH - 1) {                    // a stone rib across the ceiling every fourth cell, with a gold edge: depth and rhythm overhead
           addBox('stone', x0, WALL_H - 0.6, z0, x1, WALL_H, z0 + 0.6);
@@ -99,16 +101,18 @@ const WorldBake = (function () {
         continue;
       }
       const key = KIND[ch];
+      if (skip && skip.cell.has(cx + ',' + cz)) continue;
+      const shown = (dx, dz) => !solidC(cx + dx, cz + dz) && !(skip && skip.face.has(cx + ',' + cz + ':' + dx + ',' + dz));
       if (ch === 'B') {
-        if (!solidC(cx + 1, cz)) hangBanner(1, 0, x1, z0 + CELL / 2);
-        if (!solidC(cx - 1, cz)) hangBanner(-1, 0, x0, z0 + CELL / 2);
-        if (!solidC(cx, cz + 1)) hangBanner(0, 1, z1, x0 + CELL / 2);
-        if (!solidC(cx, cz - 1)) hangBanner(0, -1, z0, x0 + CELL / 2);
+        if (shown(1, 0)) hangBanner(1, 0, x1, z0 + CELL / 2);
+        if (shown(-1, 0)) hangBanner(-1, 0, x0, z0 + CELL / 2);
+        if (shown(0, 1)) hangBanner(0, 1, z1, x0 + CELL / 2);
+        if (shown(0, -1)) hangBanner(0, -1, z0, x0 + CELL / 2);
       }
-      if (!solidC(cx + 1, cz)) addFace(key, [x1, 0, z1], [0, 0, -CELL], [0, WALL_H, 0], 2, VREP, [1, 0, 0]);
-      if (!solidC(cx - 1, cz)) addFace(key, [x0, 0, z0], [0, 0, CELL], [0, WALL_H, 0], 2, VREP, [-1, 0, 0]);
-      if (!solidC(cx, cz + 1)) addFace(key, [x0, 0, z1], [CELL, 0, 0], [0, WALL_H, 0], 2, VREP, [0, 0, 1]);
-      if (!solidC(cx, cz - 1)) addFace(key, [x1, 0, z0], [-CELL, 0, 0], [0, WALL_H, 0], 2, VREP, [0, 0, -1]);
+      if (shown(1, 0)) addFace(key, [x1, 0, z1], [0, 0, -CELL], [0, WALL_H, 0], 2, VREP, [1, 0, 0]);
+      if (shown(-1, 0)) addFace(key, [x0, 0, z0], [0, 0, CELL], [0, WALL_H, 0], 2, VREP, [-1, 0, 0]);
+      if (shown(0, 1)) addFace(key, [x0, 0, z1], [CELL, 0, 0], [0, WALL_H, 0], 2, VREP, [0, 0, 1]);
+      if (shown(0, -1)) addFace(key, [x1, 0, z0], [-CELL, 0, 0], [0, WALL_H, 0], 2, VREP, [0, 0, -1]);
       if (ch === 'P') {
         addBox('gold', x0 - 0.14, 0, z0 - 0.14, x1 + 0.14, 0.38, z1 + 0.14);
         addBox('gold', x0 - 0.14, WALL_H - 0.7, z0 - 0.14, x1 + 0.14, WALL_H - 0.3, z1 + 0.14);

@@ -1,1 +1,47 @@
-{ "gun": null, "monsters": [] }
+{
+  "gun": null,
+  "monsters": [],
+  "guns": {
+    "pistol_service": {
+      "file": "gun/pistol_1911_ps2.glb",
+      "note": "PS2-style low-poly M1911 (1,335 tris, 256px atlas). To try Wrok's next model, change only \"file\" (e.g. gun/pistol_1911_base.glb); the numbers below are this model's grip, slide and red-dot fit and may need a nudge.",
+      "root": "pistol_1911",
+      "grip": [
+        0,
+        -0.035,
+        0.015
+      ],
+      "fore": [
+        0,
+        -0.07,
+        0.0
+      ],
+      "slide": "slide",
+      "slideTravel": 0.028,
+      "magazine": "magazine",
+      "muzzle": "muzzle",
+      "redDot": {
+        "base": 0.071,
+        "z": -0.028,
+        "halfW": 0.011,
+        "height": 0.024
+      },
+      "flatScale": 1.18
+    }
+  },
+  "env": {
+    "crimson_halls": {
+      "where": "sandbox start room only (?sandbox; ?voxelwalls turns it off)",
+      "dir": "env/crimson_halls/",
+      "pieces": {
+        "straight": "ch_wall_straight.glb",
+        "corner": "ch_wall_corner.glb",
+        "arch": "ch_doorway_arch.glb",
+        "pillar": "ch_pillar.glb",
+        "floor": "ch_floor_tile.glb",
+        "sconce": "ch_torch_sconce.glb",
+        "banner": "ch_banner.glb"
+      }
+    }
+  }
+}
