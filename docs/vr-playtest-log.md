@@ -193,6 +193,9 @@ Two new tiles on the Y pause menu, saved with the other comfort settings (a `?tu
 
 The pistol's red-dot sight is no longer an 8 mm cube with a 35 mm glow. In the flat game it is a small crisp point (about 1 mm, white-hot core, faint halo). In VR the on-gun blob is hidden and a collimated point sits on the actual fire ray (from the eye, toward the point the muzzle aims at, including walls in the way), about 1.5–2 MOA, so it overlays the impact from any eye position. Referee kick is off in VR so shots do not climb off the dot. Feel group: pistol ADS at 3, 10 and 30 m, plus the rifle and sniper at 10 m, all land within about 0.10 m of the dot. Full simulated Quest check: **161/161**.
 
+## Red dot visible on Quest, 2026-11-13
+The owner could not see the e410342 red dot on a real Quest 3: the sprite was 10 MOA (about 4 px) with a sub-pixel core, mipmapped and additive, so it faded out. Now the sprite is about 44 MOA with a solid red core and white-hot centre filling the inner 17 % of its radius (about 7-8 MOA, 3-4 px on a Quest 3), never smaller than ~3 px, no mipmaps, normal blending (shows on bright walls), still depth-tested (walls hide it). The old on-gun dot stays hidden in VR. Sim: exactly one dot renders while aiming (44 MOA sprite), shots still land on it at 3, 10 and 30 m; full suite 161/161.
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.

@@ -189,16 +189,20 @@ const XrMode = (function () {
     hudMesh.position.set(0, -0.12, -1.1); hudMesh.renderOrder = 999; hudMesh.visible = false; camera.add(hudMesh);
     const reticle = new THREE.Mesh(new THREE.RingGeometry(0.008, 0.013, 16), new THREE.MeshBasicMaterial({ color: 0xffe0c0, depthTest: false, fog: false, transparent: true }));
     reticle.renderOrder = 1000; reticle.visible = false; scene.add(reticle);
-    // Collimated red-dot sight: a sharp point with a faint glow, sitting on the fire ray at the hit (or far along it). From any eye it overlays the impact, the way a real red dot (collimated at infinity) does. About 1.5-2 MOA.
-    const MOA = Math.PI / (180 * 60), DOT_MOA = 1.8, DOT_GLOW_MOA = 5;
+    // Collimated red-dot sight: a solid red point with a white-hot centre and a soft glow, sitting on the fire ray at the hit (or far along it).
+    // From any eye it overlays the impact, the way a real red dot (collimated at infinity) does. Sized in angle, not metres: the sprite is about
+    // 44 MOA across, the solid core about 7-8 MOA (3-4 px on a Quest 3 at ~25 px per degree). Smaller than that (the first try, 10 MOA with a
+    // sub-pixel core, mipmapped and added on) fades to nothing on the headset. Normal blending so it shows on bright walls; depth-tested so walls hide it.
+    const MOA = Math.PI / (180 * 60), DOT_GLOW_MOA = 22, DOT_CORE = 0.17, DOT_MIN_CORE_MOA = 7.2;   // glow radius (MOA), core share of the radius, smallest core (~3 px)
     const fireDotTex = (() => {
-      const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
-      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.1, 'rgba(255,48,40,1)'); g.addColorStop(0.28, 'rgba(255,24,24,0.45)'); g.addColorStop(1, 'rgba(255,0,0,0)');
-      x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-      const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+      const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d'), R = N / 2;
+      const g = x.createRadialGradient(R, R, 0, R, R, R);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.06, 'rgba(255,235,230,1)'); g.addColorStop(0.1, 'rgba(255,40,32,1)'); g.addColorStop(DOT_CORE, 'rgba(255,24,20,1)');
+      g.addColorStop(DOT_CORE + 0.04, 'rgba(255,20,20,0.5)'); g.addColorStop(0.45, 'rgba(255,10,10,0.14)'); g.addColorStop(1, 'rgba(255,0,0,0)');
+      x.fillStyle = g; x.fillRect(0, 0, N, N);
+      const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true; return t;
     })();
-    const fireDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireDotTex, color: 0xffffff, blending: THREE.AdditiveBlending, depthTest: true, depthWrite: false, fog: false, transparent: true }));
+    const fireDot = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireDotTex, color: 0xffffff, blending: THREE.NormalBlending, depthTest: true, depthWrite: false, fog: false, transparent: true }));
     fireDot.renderOrder = 1002; fireDot.visible = false; scene.add(fireDot);
     const fireDotPos = new THREE.Vector3();
     function placeFireDot(hit, dir, dist, show) {
@@ -206,7 +210,8 @@ const XrMode = (function () {
       if (!show) return;
       fireDotPos.copy(hit).addScaledVector(dir, -Math.min(0.03, dist * 0.01));   // a hair toward you, so it does not z-fight the wall or hide inside a monster
       fireDot.position.copy(fireDotPos);
-      const s = Math.max(0.0015, dist * DOT_GLOW_MOA * MOA * 2);                 // sprite is the glow; the bright core in the texture is about DOT_MOA
+      const moa = Math.max(DOT_GLOW_MOA * 2, DOT_MIN_CORE_MOA / DOT_CORE);        // sprite diameter in MOA: never lets the solid core drop under ~3 px
+      const s = Math.max(0.004, dist * moa * MOA);
       fireDot.scale.set(s, s, 1);
     }
     // comfort vignette: a dark ring that closes in a little while you move or turn with the sticks (off with ?novignette)

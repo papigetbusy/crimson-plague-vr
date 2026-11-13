@@ -44,6 +44,7 @@ t('Gun weight: the aim follows the hand at a per-class rate (XrFeel.aimRate)', /
 t('VR pause menu has TURN SPEED (Slow/Normal/Fast) and WALK (Head / Left hand), saved with the other comfort tiles', /id="vrTurnSpeed"/.test(tpl) && /id="vrWalk"/.test(tpl) && /setComfort\('turnRate'/.test(screen) && /setComfort\('walkHand'/.test(screen) && /turnRate: XrInput.parseTurnRate/.test(xrm) && /walkHand: !!c.walkHand/.test(xrm));
 t('A ?turn= link flag still wins over the saved turn speed', /turnFlag/.test(xrm) && /smoothTurn\(comfort.turnRate, opts.turnFlag\)/.test(xrm));
 t('Walking can follow the left hand, and falls back to the head if that hand is missing', /walkYaw\(\)/.test(screen) && /handYaw\('left'\)/.test(xrm) && /if \(y !== null\) return y/.test(xrm));
-t('VR red dot is a small collimated point on the fire ray (the old 8 mm on-gun cube is gone)', /placeFireDot\(/.test(xrm) && /DOT_MOA = 1\.8/.test(xrm) && /gb\(0\.001, 0\.001, 0\.0005/.test(screen) && !/gb\(0\.008, 0\.008, 0\.004/.test(screen));
+t('VR red dot is big enough to see on a Quest: a ~44 MOA sprite with a solid core of at least ~7 MOA (3 px), no mipmaps, normal blending, depth-tested', /DOT_GLOW_MOA = 22/.test(xrm) && /DOT_MIN_CORE_MOA = 7\.2/.test(xrm) && /generateMipmaps = false/.test(xrm) && /blending: THREE\.NormalBlending, depthTest: true/.test(xrm));
+t('VR red dot is a collimated point on the fire ray (the old 8 mm on-gun cube is gone)', /placeFireDot\(/.test(xrm) && /gb\(0\.001, 0\.001, 0\.0005/.test(screen) && !/gb\(0\.008, 0\.008, 0\.004/.test(screen));
 t('VR shots start from the eye aimed where the barrel points, with no referee kick fighting the sight', /gp\.muzzle.getWorldPosition/.test(xrm) && /recoilKick: 0/.test(screen));
 process.exit(bad ? 1 : 0);
