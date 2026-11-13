@@ -179,6 +179,12 @@ New tool `tools/xr_coop_real.js`: two windows on the real PeerJS server (no fake
 | A friend whose link never connects sat on "Joining room..." forever | the join had no time limit | gives up after 20 s with a clear message (check the code, host still waiting, same Wi-Fi helps); JOIN works again right away. Checked with the real server: 5/5 |
 | The backup relay (openrelay.metered.ca, user "openrelayproject") no longer works | Metered retired the shared public login; it now needs a free account + API key | not fixed (needs an account the owner signs up for). Co-op still works whenever the two devices can link directly (same Wi-Fi, most home internet); it can fail on some phone networks |
 
+### Batch 5: Quest draw calls (VR only; the flat game is unchanged)
+| Found | Why | Fix |
+|---|---|---|
+| 263 draw calls per eye mid-fight (Quest 3 wants well under ~200) | every torch was 6 separate meshes (22 sconces + 6 braziers), and the floor was cut into 12 x 12-cell chunks per texture (about 55 in view) | in VR the torches are drawn as 12 instanced meshes in all (glow becomes a camera-facing additive quad, same look: checked side by side at 2 m, `torch_compare.png`), and the floor uses merged 2 x 2-chunk meshes (same quads, fog hides the extra reach). Mid-fight test: **263 -> 133 per eye**; standing in the full game ~110 -> ~75. `window.__noInst = true` switches back to compare |
+| (found while doing it) calling `renderer.xr.getCamera()` mid-frame broke sprinting and laser clicks | in three r128 it moves the camera to the headset pose as a side effect | not used; the glow faces the player's eye point |
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.

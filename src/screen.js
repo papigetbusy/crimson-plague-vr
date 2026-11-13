@@ -1095,7 +1095,7 @@
     cloakVeil.classList.toggle('on', cloakK > 0.3);
   }
   const cloakVeil = $('cloakVeil');
-  const camWorld = new THREE.Vector3();
+  const camWorld = new THREE.Vector3(); const camEye = new THREE.Vector3();
   function updateView(st, dt, time) {
     const p = st.player;
     const inVr = !!(xr && xr.presenting());
@@ -1158,7 +1158,8 @@
     // world brightness: flicker + muzzle flash
     const fl = 1 + 0.035 * Math.sin(time * 17) + 0.025 * Math.sin(time * 31 + 1.3), fb = flashT / 0.06;
     const br = view.brightness * fl;
-    worldView.update(time, camera.getWorldPosition(camWorld), dt, br, fb, st.door.open);
+    const vrNow = !!(xr && xr.presenting()); if (vrNow) camEye.set(st.player.x, st.player.eye, st.player.z);   // the glow quads face your eye (the player's eye point; the head is within a step of it)
+    worldView.update(time, camera.getWorldPosition(camWorld), dt, br, fb, st.door.open, vrNow && !window.__noInst, vrNow ? camEye : null);   // VR: torches drawn instanced (Quest draw calls); window.__noInst = true turns it off (to compare)
     locksView.sync(st.locks, ref.map, time, dt); lockHud(st.locks);
     scene.fog.far = view.fogFar * st.fog.mul; fogGlow.intensity = 1.7 * st.fog.k;   // a fog wave shrinks the view, and your gun lights a small circle around you
 
@@ -1256,5 +1257,5 @@
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera };   // handy for poking at numbers from the console
 })();

@@ -35,10 +35,49 @@ const WorldView = (function () {
     for (let i = 0; i < SCONCES; i++) sconcePool.push(makeTorch(false));
     for (let i = 0; i < BRAZIERS; i++) brazierPool.push(makeTorch(true));
 
-    let chunkMeshes = [], torches = [], baked = null, door = null, doorT = 0, doorTarget = 0, doorOpenNow = false, fogFar = 34;
+    // VR (Quest) draw-call saver: the same torch props drawn as one instanced mesh per part (12 draws for every torch in view instead of 6 per torch).
+    // The pool above still works out where every part goes; in VR each part's place is copied into its instanced mesh and the pooled meshes are hidden.
+    // The glow sprite becomes a camera-facing quad with the same additive glow (its opacity flicker rides the instance colour: with additive blending that is the same thing).
+    const glowQuad = new THREE.PlaneGeometry(1, 1);
+    function makeInst(pool) {
+      const t = pool[0], list = [];
+      for (const m of [...t.parts, t.outer, t.inner]) { const im = new THREE.InstancedMesh(m.geometry, m.material, pool.length); im.frustumCulled = false; im.count = 0; im.visible = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im); list.push({ im }); }
+      const gm = new THREE.MeshBasicMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true, side: THREE.DoubleSide });
+      const glow = new THREE.InstancedMesh(glowQuad, gm, pool.length); glow.frustumCulled = false; glow.count = 0; glow.visible = false; glow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      glow.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(pool.length * 3).fill(1), 3); glow.instanceColor.setUsage(THREE.DynamicDrawUsage); scene.add(glow);   // made by hand: setColorAt would size it by count (0 here)
+      return { parts: list.map((e) => e.im), glow };
+    }
+    const instS = makeInst(sconcePool), instB = makeInst(brazierPool);
+    let instOn = false;
+    const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpP = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color(), lookM = new THREE.Matrix4(), UP = new THREE.Vector3(0, 1, 0);
+    function setInstanced(on) {
+      if (on === instOn) return; instOn = on;
+      for (const I of [instS, instB]) { for (const im of I.parts) im.visible = on; I.glow.visible = on; }
+      for (const pool of [sconcePool, brazierPool]) for (const o of pool) for (const m of [...o.parts, o.outer, o.inner, o.sp]) m.visible = !on;
+    }
+    function fillInst(pool, I, eye) {
+      let n = 0;
+      for (const o of pool) {
+        if (!o.grp.visible) continue;
+        o.grp.updateMatrixWorld(true);
+        const meshes = [...o.parts, o.outer, o.inner];
+        for (let j = 0; j < meshes.length; j++) I.parts[j].setMatrixAt(n, meshes[j].matrixWorld);
+        o.sp.getWorldPosition(tmpP);                                   // the glow quad faces your eye
+        lookM.lookAt(eye, tmpP, UP); tmpQ.setFromRotationMatrix(lookM); tmpS.set(o.sp.scale.x, o.sp.scale.y, 1);
+        tmpM.compose(tmpP, tmpQ, tmpS); I.glow.setMatrixAt(n, tmpM);
+        const a = o.sp.material.opacity; I.glow.setColorAt(n, tmpC.setRGB(a, a, a));
+        n++;
+      }
+      for (const im of I.parts) { im.count = n; im.instanceMatrix.needsUpdate = true; }
+      I.glow.count = n; I.glow.instanceMatrix.needsUpdate = true; if (I.glow.instanceColor) I.glow.instanceColor.needsUpdate = true;
+    }
+
+    let chunkMeshes = [], bigMeshes = [], bigExtra = 0, torches = [], baked = null, door = null, doorT = 0, doorTarget = 0, doorOpenNow = false, fogFar = 34;
     function dropWorld() {
       for (const c of chunkMeshes) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
       chunkMeshes = [];
+      for (const c of bigMeshes) { scene.remove(c.mesh); c.mesh.geometry.dispose(); }
+      bigMeshes = [];
       if (door) { scene.remove(door.grp); door = null; }
     }
 
@@ -72,15 +111,27 @@ const WorldView = (function () {
         const mesh = new THREE.Mesh(geo, mats[c.key]); scene.add(mesh);
         chunkMeshes.push({ mesh, x: (c.cx * 12 + 6) * map.CELL, z: (c.cz * 12 + 6) * map.CELL });
       }
+      // VR: the same quads merged 2 x 2 chunks at a time (a quarter of the draws; the fog hides the extra reach). Built now, shown only in the headset.
+      const big = {};
+      for (const c of baked.chunks) { const id = c.key + '@' + (c.cx >> 1) + ',' + (c.cz >> 1); const b = big[id] || (big[id] = { key: c.key, bx: c.cx >> 1, bz: c.cz >> 1, pos: [], uv: [], col: [] }); for (const a of ['pos', 'uv', 'col']) { const src = c[a], dst = b[a]; for (let i = 0; i < src.length; i++) dst.push(src[i]); } }
+      for (const id in big) {
+        const b = big[id], geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+        const mesh = new THREE.Mesh(geo, mats[b.key]); mesh.visible = false; scene.add(mesh);
+        bigMeshes.push({ mesh, x: (b.bx * 24 + 12) * map.CELL, z: (b.bz * 24 + 12) * map.CELL });
+      }
+      bigExtra = 6 * map.CELL * Math.SQRT2;
       torches = map.torches;
       door = buildDoor(map); doorT = 0; doorTarget = 0; doorOpenNow = false;
     }
 
     // every frame: chunks and torches near the camera, flame flicker, the door's lift
     const near = [];
-    function update(time, cam, dt, br, fb, doorOpen) {
+    function update(time, cam, dt, br, fb, doorOpen, inst, eye) {
+      setInstanced(!!inst);
       const reach = fogFar + 18;
-      for (const c of chunkMeshes) c.mesh.visible = Math.hypot(c.x - cam.x, c.z - cam.z) < reach;
+      for (const c of chunkMeshes) c.mesh.visible = !instOn && Math.hypot(c.x - cam.x, c.z - cam.z) < reach;
+      for (const c of bigMeshes) c.mesh.visible = instOn && Math.hypot(c.x - cam.x, c.z - cam.z) < reach + bigExtra;
       for (const m of worldMats) m.color.setRGB(br * (1 + 0.5 * fb), br * (1 + 0.28 * fb), br * (1 + 0.1 * fb));
       // the nearest torches of each kind get the pooled props
       for (const kind of ['sconce', 'brazier']) {
@@ -97,6 +148,7 @@ const WorldView = (function () {
           o.sp.scale.setScalar(o.base * (0.92 + 0.1 * q)); o.sp.material.opacity = 0.75 + 0.2 * Math.sin(time * 11 + o.ph);
         }
       }
+      if (instOn) { fillInst(sconcePool, instS, eye || cam); fillInst(brazierPool, instB, eye || cam); }
       // the door: shut, or lifting out of the way
       if (door) {
         doorTarget = doorOpen ? 1 : 0; doorT += Math.sign(doorTarget - doorT) * Math.min(Math.abs(doorTarget - doorT), dt * 0.8);
@@ -104,7 +156,7 @@ const WorldView = (function () {
         door.lamp.intensity = doorOpen ? 0 : 1.1 + 0.25 * Math.sin(time * 3);
       }
     }
-    return { load, update, light: (x, y, z, nx, ny, nz) => baked.light(x, y, z, nx, ny, nz), setFogFar: (v) => { fogFar = v; }, setFlame: (outer, inner) => { flameOuter.color.setHex(outer); flameInner.color.setHex(inner); }, mats: worldMats };
+    return { load, update, light: (x, y, z, nx, ny, nz) => baked.light(x, y, z, nx, ny, nz), setFogFar: (v) => { fogFar = v; }, instanced: () => instOn, setFlame: (outer, inner) => { flameOuter.color.setHex(outer); flameInner.color.setHex(inner); }, mats: worldMats };
   }
   return { create };
 })();

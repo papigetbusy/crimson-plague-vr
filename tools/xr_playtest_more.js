@@ -267,7 +267,9 @@ module.exports = function (X) {
       console.log('  frame time per stage (ms): ' + parts + '; draw calls ' + pf.calls + ', triangles ' + pf.tris + ', geometries ' + pf.geos + ', textures ' + pf.tex);
       X.perfOut = { logic, draw, parts, calls: pf.calls, tris: pf.tris };
       rec(G, 'Game logic (rules + screen, not the drawing) fits a Quest frame: under 4 ms of the 11-14 ms budget', logic < 4, logic.toFixed(2) + ' ms/frame (sim CPU)');
-      rec(G, 'Draw calls stay in Quest 3 range (under 300 per eye)', pf.calls / 2 < 300, (pf.calls / 2) + ' per eye (' + pf.calls + ' both eyes), ' + Math.round(pf.tris / 2) + ' triangles per eye');
+      const inst = await S.ev(() => { let n = 0, g = 0; window.__game.scene.children.forEach((o) => { if (o.isInstancedMesh && o.visible) { n++; if (o.geometry.type === 'PlaneGeometry') g += o.count; } }); return { n, g }; });
+      rec(G, 'In VR the torches are drawn instanced (12 draws for all of them), glow included', inst.n >= 12 && inst.g > 0, JSON.stringify(inst));
+      rec(G, 'Draw calls stay in Quest 3 range (under 200 per eye, mid-fight)', pf.calls / 2 < 200, (pf.calls / 2) + ' per eye (' + pf.calls + ' both eyes), ' + Math.round(pf.tris / 2) + ' triangles per eye');
       const errs = await errsOf(S); rec(G, 'No script errors in the feel run', errs.length === 0, errs.join(' | ').slice(0, 200));
     } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
   }
