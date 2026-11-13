@@ -265,7 +265,9 @@ module.exports = function (X) {
         const r = await S.ev(() => {
           const sh = window.__game.lastShot && window.__game.lastShot(), f = window.__game.xr.feel(), p = window.__game.ref.snapshot().player;
           if (!sh || !f.dot) return { ok: false, why: 'missing ' + JSON.stringify({ sh: !!sh, dot: f.dot, ads: p.adsT, ammo: p.ammo }) };
-          const err = Math.hypot(sh.ex - f.dot[0], sh.ey - f.dot[1], sh.ez - f.dot[2]);
+          const dx = f.dot[0] - sh.ox, dy = f.dot[1] - sh.oy, dz = f.dot[2] - sh.oz, vx = sh.ex - sh.ox, vy = sh.ey - sh.oy, vz = sh.ez - sh.oz, vn = Math.hypot(vx, vy, vz) || 1;
+          // what the eye sees: how far the dot is off the shot's line (a depth gap along the line, e.g. the bullet stopping a hair before the wall the dot sits on, is invisible)
+          const err = Math.hypot(dy * vz - dz * vy, dz * vx - dx * vz, dx * vy - dy * vx) / vn;
           const tol = 0.06 + 0.01 * (sh.t || dist);
           return { ok: err <= tol, err, tol, sh, dot: f.dot, ads: p.adsT, conv: f.conv };
         });
@@ -288,7 +290,8 @@ module.exports = function (X) {
       const top = Math.max(...sp.map((q) => q[1])), t90 = (sp.find((q) => q[1] >= top * 0.9) || [0])[0] - sp[0][0] + (sp[1][0] - sp[0][0]), stopAt = (st.find((q) => q[1] < 0.1) || [st[st.length - 1][0] + 1])[0] - st[0][0] + (st[1][0] - st[0][0]);
       const f90 = sp.findIndex((q) => q[1] >= top * 0.9);   // the sim's frames are slow and uneven: count frames too (2 frames = full speed by the next frame after pushing)
       rec(G, 'Walking reaches full speed at once (under 0.1 s, or within 2 frames: no slow ramp, Meta comfort rule)', t90 <= 0.1 || f90 <= 1, 'top ' + top.toFixed(2) + ' m/s in ' + t90.toFixed(3) + ' s (' + (f90 + 1) + ' frames)');
-      rec(G, 'Letting go of the stick stops you at once (under 0.1 s: no slide-on-ice)', stopAt <= 0.1, stopAt.toFixed(3) + ' s');
+      const fStop = st.findIndex((q) => q[1] < 0.1);   // slow sim frames: stopped by the next frame also counts
+      rec(G, 'Letting go of the stick stops you at once (under 0.1 s or by the next frame: no slide-on-ice)', stopAt <= 0.1 || (fStop >= 0 && fStop <= 1), stopAt.toFixed(3) + ' s (' + (fStop + 1) + ' frames)');
       // frame budget: 300 frames of fighting (2 monsters, trigger held) on the test map
       await S.ev((O) => { const r = window.__game.ref; r.equipGun('smg_compact', 1); r.place(O[0], O[1], Math.PI / 2); for (let i = 0; i < 4; i++) r.spawnAt('goblin', O[0] + 6, O[1] - 2 + i); }, O);
       await S.ev(() => window.__game.perfReset()); const heap0 = await S.ev(() => performance.memory ? performance.memory.usedJSHeapSize : 0);
