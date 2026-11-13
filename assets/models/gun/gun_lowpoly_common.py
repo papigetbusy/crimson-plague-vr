@@ -382,7 +382,7 @@ def render_glb(glb, render_dir, prefix, small_dir=None):
                 if n.type == 'TEX_IMAGE':
                     n.interpolation = 'Closest'
     mn, mx, center, size = M.mesh_bounds_game(meshes)
-    L = max(size.z, 0.2)
+    L = max(size.z, size.y * 1.6, 0.2)
     k = L / 0.22
     cam, ground = M.setup_preview_scene()
     sc = bpy.context.scene
