@@ -176,7 +176,7 @@ const XrMenu = (function () {
     const dctx = disp.getContext('2d');
     const content = document.createElement('canvas'); content.width = W; content.height = VIEW;
     const cctx = content.getContext('2d');
-    const tex = new THREE.CanvasTexture(disp); tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.generateMipmaps = false;   // no mipmap rebuild on each upload: a scroll or a new menu does not stall the frame
+    const tex = new THREE.CanvasTexture(disp); tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.anisotropy = 4;
     let L = null, sig = '', scroll = 0, hover = null, dirty = true, model = null;
     const maxScroll = () => (L ? Math.max(0, L.height - VIEW) : 0);
     function setModel(m) {
@@ -186,7 +186,6 @@ const XrMenu = (function () {
       // tile elements change identity when the page redraws; keep them fresh even if the look is unchanged
       L = layout(m); content.height = Math.min(8000, L.height);
       drawContent(cctx, L);
-      for (const t of L.tiles) drawTile(cctx, t, false, 0);           // the cards and buttons are drawn once here, not on every redraw (hover is a separate glowing frame in xr_mode.js)
       if (first) scroll = 0; scroll = Math.min(scroll, maxScroll());
       hover = null; dirty = true; return true;
     }
@@ -200,13 +199,14 @@ const XrMenu = (function () {
       const cy = y + scroll; for (const t of L.tiles) if (!t.disabled && x >= t.x && x <= t.x + t.w && cy >= t.y && cy <= t.y + t.h && t.y - scroll < VIEW && t.y + t.h - scroll > 0) return t;
       return null;
     }
-    function setHover(t) { if (t !== hover) { hover = t; return true; } return false; }   // no redraw: the highlight floats over the panel
+    function setHover(t) { if (t !== hover) { hover = t; dirty = true; return true; } return false; }
     function draw(hints) {
       if (!dirty || !L) return false; dirty = false;
       const g = dctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, C.bg0); g.addColorStop(1, C.bg1);
       dctx.clearRect(0, 0, W, H); rr(dctx, 4, 4, W - 8, H - 8, 26); dctx.fillStyle = g; dctx.globalAlpha = 0.97; dctx.fill(); dctx.globalAlpha = 1; dctx.lineWidth = 4; dctx.strokeStyle = C.edge; dctx.stroke();
       dctx.save(); dctx.beginPath(); dctx.rect(0, 0, W, VIEW); dctx.clip();
       dctx.drawImage(content, 0, scroll, W, Math.min(VIEW, content.height - scroll), 0, 0, W, Math.min(VIEW, content.height - scroll));
+      for (const t of L.tiles) if (t.y + t.h - scroll > 0 && t.y - scroll < VIEW) drawTile(dctx, t, t === hover, scroll);
       // more above / below: a soft fade and an arrow, so the cut-off edge reads as "scroll"
       const fade = (y0, up) => { const f = dctx.createLinearGradient(0, y0, 0, y0 + (up ? 60 : -60)); f.addColorStop(0, 'rgba(7,3,4,0.95)'); f.addColorStop(1, 'rgba(7,3,4,0)'); dctx.fillStyle = f; dctx.fillRect(0, up ? y0 : y0 - 60, W, 60); };
       if (scroll > 2) fade(0, true); if (scroll < maxScroll() - 2) fade(VIEW, false);
@@ -216,7 +216,7 @@ const XrMenu = (function () {
       }
       dctx.restore();
       dctx.fillStyle = C.line; dctx.fillRect(PAD, VIEW, W - PAD * 2, 2);
-      for (const t of L.exits) drawTile(dctx, Object.assign({ tl: [t.title], bl: [] }, t), false, 0);
+      for (const t of L.exits) drawTile(dctx, Object.assign({ tl: [t.title], bl: [] }, t), t === hover, 0);
       dctx.font = F.hint; dctx.fillStyle = C.dim; dctx.textBaseline = 'middle';
       const more = maxScroll() > 2 ? (scroll < maxScroll() - 2 ? '▼ More below: right stick or drag' : '▲ Top: right stick up') : '';
       dctx.textAlign = 'left'; dctx.fillStyle = more ? C.goldHi : C.dim; dctx.font = more ? '700 26px ' + BODY : F.hint; dctx.fillText(more || hints.left || '', PAD, VIEW + 56); dctx.fillStyle = C.dim; dctx.font = F.hint; dctx.textAlign = 'right'; dctx.fillText(hints.right || '', W - PAD, VIEW + 56);
