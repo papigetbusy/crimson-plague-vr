@@ -169,12 +169,23 @@ const WallSets = (function () {
   const paintOn = (tex, seed, fn) => { const c = tex.image, g = c.getContext('2d'); fn(g, c.width, c.height, mulberry(seed)); tex.needsUpdate = true; };
   function create(T) {
     const names = ['texStone', 'texPanel', 'texPillar', 'texFloor', 'texFloor2', 'texFloor3', 'texFloorEdge', 'texCeil'];
-    const orig = {};
-    for (const n of names) { const c = T[n].image; orig[n] = c.getContext('2d').getImageData(0, 0, c.width, c.height); }      // the Crypt is the original paint, kept to put back
+    const extras = ['texBanner', 'texCarpet', 'texCloth', 'texGold'];
+    const orig = {}, origCanvas = {};
+    for (const n of names.concat(extras)) { if (!T[n]) continue; const c = T[n].image; origCanvas[n] = c; orig[n] = c.getContext && c.getContext('2d') ? c.getContext('2d').getImageData(0, 0, c.width, c.height) : null; }      // the Crypt is the original paint, kept to put back
     let cur = 'crypt';
+    function restore(n) {
+      if (!T[n] || !origCanvas[n]) return;
+      if (T[n].image !== origCanvas[n]) T[n].image = origCanvas[n];
+      else if (orig[n]) T[n].image.getContext('2d').putImageData(orig[n], 0, 0);
+      T[n].needsUpdate = true;
+    }
     function apply(id) {
+      // Wrok's v2 textures, when they have decoded: same names, bigger canvases. If they are not ready, the paint below stays.
+      if (typeof WallTexV2 !== 'undefined' && WallTexV2.ready() && WallTexV2.apply(T, SETS[id] ? id : 'crypt', origCanvas)) { cur = SETS[id] ? id : 'crypt'; return; }
       const set = SETS[id];
-      if (!set) { for (const n of names) { T[n].image.getContext('2d').putImageData(orig[n], 0, 0); T[n].needsUpdate = true; } cur = 'crypt'; return; }
+      if (!set) { for (const n of names) restore(n); for (const n of extras) restore(n); cur = 'crypt'; return; }
+      for (const n of names) if (T[n] && T[n].image !== origCanvas[n]) T[n].image = origCanvas[n];   // a previous v2 apply may have swapped in a bigger canvas
+      for (const n of extras) restore(n);
       paintOn(T.texStone, 101, (g, w, h, r) => set.stone(g, w, h, r));
       paintOn(T.texPanel, 102, (g, w, h, r) => panel(set, g, w, h, r));
       paintOn(T.texPillar, 103, (g, w, h, r) => pillar(set, g, w, h, r));

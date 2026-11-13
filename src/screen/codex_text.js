@@ -25,6 +25,7 @@ const CodexText = (function () {
     light: ['Light magic', 'white', 'Smites: each hit stuns the monster for a moment.']
   };
   const GUN_TYPE = {
+    rifle: 'Rifles: a balanced automatic, the hall\'s baseline. The M4 Carbine is a lighter, faster-firing rifle with a quicker reload and a touch more spread.',
     pistol: 'Light and steady. Good damage per shot, small magazine, quick reload, very accurate. Your first gun is a plain silver pistol.',
     smg: 'Fast and spraying. Lower damage per bullet but a high fire rate and a big magazine.',
     shotgun: 'Seven pellets per shot, strong up close and weak at range. Reloads one shell at a time.',

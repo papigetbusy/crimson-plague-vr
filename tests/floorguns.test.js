@@ -6,7 +6,7 @@ const t = (name, ok) => { console.log((ok ? 'ok   ' : 'FAIL ') + name); if (!ok)
 const types = Object.keys(W.TYPES), e = (ty) => S.extent(ty);
 
 t('Every gun type in the game has its own floor model', types.every((ty) => S.SHAPES[ty] && S.SHAPES[ty].length >= 3));
-t('Every one of the 20 catalog guns lands on a model through its type', Object.values(W.GUNS).every((g) => S.SHAPES[g.type]));
+t('Every gun in the weapon table lands on a floor model through its type', Object.values(W.GUNS).every((g) => S.SHAPES[g.type]));
 t('Every part is a real box with sizes and a position', types.every((ty) => S.SHAPES[ty].every((p) => p.length >= 6 && p.slice(0, 6).every((n) => typeof n === 'number' && isFinite(n)) && p[0] > 0 && p[1] > 0 && p[2] > 0)));
 t('No two types have the same silhouette (length, height and part count)', (() => { const sig = types.map((ty) => [e(ty).len.toFixed(2), e(ty).height.toFixed(2), e(ty).parts].join()); return new Set(sig).size === types.length; })());
 t('The pistol is the smallest and the sniper is the longest, so size alone tells them apart', types.every((ty) => ty === 'pistol' || e('pistol').len < e(ty).len) && types.every((ty) => ty === 'sniper' || e('sniper').len > e(ty).len));

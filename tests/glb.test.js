@@ -14,6 +14,18 @@ t('The embedded GLB is small (under 300 KB)', !!(spec && data.files[spec.file] &
 t('The build script turns it into a GlbData script', /^const GlbData = \{/.test(Embed.script(root)));
 const build = fs.readFileSync(path.join(root, 'tools', 'build.js'), 'utf8');
 t('tools/build.js puts the loader, the data and glb_guns.js in the page', /glb_embed/.test(build) && /gltf_loader_r128\.js/.test(build) && /screen\/glb_guns\.js/.test(build));
+const MORE = [
+  ['rifle', 'gun/rifle_ak47_base.glb', 'The Gothic Rifle slot is Wrok\'s AK'],
+  ['smg_tactical', 'gun/smg_mp5_base.glb', 'The Tactical SMG slot is Wrok\'s MP5'],
+  ['smg_compact', 'gun/smg_uzi_base.glb', 'The Compact SMG slot is Wrok\'s Uzi'],
+  ['rifle_m4', 'gun/rifle_m4_base.glb', 'The M4 Carbine is a new rifle slot with Wrok\'s M4'],
+];
+for (const [id, file, label] of MORE) {
+  const s = data.manifest.guns[id];
+  t(label, !!s && s.file === file && data.files[file] && data.files[file].length > 1000, s && s.file);
+  t(id + ' is small (under 300 KB) and has no second GLB that would double the slot', !!(s && data.files[file] && data.files[file].length * 0.75 < 300000) && !s.fallback);
+}
+t('Five GLB gun slots, one gun each (1911, AK, MP5, Uzi, M4)', Object.keys(data.manifest.guns).length === 5 && !data.manifest.guns.m4);
 
 const threePath = [process.env.THREE_JS, '/workspace/three128.js', path.join(root, 'node_modules', 'three', 'build', 'three.js')].find((p) => p && fs.existsSync(p));
 async function loaderChecks() {
@@ -27,9 +39,10 @@ async function loaderChecks() {
   t('The vendored GLTFLoader defines THREE.GLTFLoader for r' + THREE.REVISION, typeof THREE.GLTFLoader === 'function' && THREE.REVISION === '128');
   const warns = []; const cw = console.warn; console.warn = (m) => warns.push(String(m));
   const G = GlbGuns.create(THREE, { data, query: '?sandbox' });
-  const got = await new Promise((res) => { G.start((id) => res(id)); setTimeout(() => res(null), 8000); });
+  const want = Object.keys(data.manifest.guns);
+  await new Promise((res) => { G.start((id) => { if (want.every((k) => G.has(k) || (G.status().failed || {})[k])) res(); }); setTimeout(res, 8000); });
   console.warn = cw;
-  t('The 1911 decodes and is ready for pistol_service', got === 'pistol_service' && G.has('pistol_service'), JSON.stringify(G.status()) + ' ' + warns.join(' | '));
+  t('The 1911 decodes and is ready for pistol_service', G.has('pistol_service'), JSON.stringify(G.status()) + ' ' + warns.join(' | '));
   if (!G.has('pistol_service')) return;
   for (const [mode, vr] of [['VR', true], ['flat', false]]) {
     const k = G.scaleFor('pistol_service', vr, 1.15), M = G.build('pistol_service', k), A = M.anchors, n = mode + ': ';
@@ -49,6 +62,24 @@ async function loaderChecks() {
     t(n + 'the texture is pixel-sharp (nearest filter) and lit like the game (Phong, a little self-light so it is never black)', !!mapped && mapped.map.magFilter === THREE.NearestFilter && mapped.type === 'MeshPhongMaterial' && mapped.emissive.r > 0.1);
   }
   t('The Service Pistol is Wrok\'s blued 1911 base (pistol_1911_base.glb)', G.file('pistol_service') === 'gun/pistol_1911_base.glb', G.file('pistol_service'));
+  for (const [id, file, slide] of [['rifle', 'gun/rifle_ak47_base.glb', 'bolt_carrier'], ['smg_tactical', 'gun/smg_mp5_base.glb', 'cocking_handle'], ['smg_compact', 'gun/smg_uzi_base.glb', 'top_cover'], ['rifle_m4', 'gun/rifle_m4_base.glb', 'charging_handle']]) {
+    t(id + ' decodes and is ready', G.has(id) && G.file(id) === file, JSON.stringify(G.status()));
+    if (!G.has(id)) continue;
+    const M = G.build(id, 1), A = M.anchors;
+    t(id + ' gives a body, a magazine and a moving part', !!(M.groups.body && M.groups.mag && M.groups.bolt) && M.groups.mag.children.length > 0 && M.groups.bolt.children.length > 0);
+    let magMesh = 0; M.groups.mag.traverse((o) => { if (o.isMesh) magMesh++; });
+    t(id + ' magazine is its own mesh, not part of the body', magMesh >= 1);
+    t(id + ' muzzle is on the centre line, in front of the hand and above it', A.muzzle[0] === 0 && A.muzzle[2] < A.handGrip[2] - 0.1 && A.muzzle[1] > A.handGrip[1], A.muzzle.map((v) => v.toFixed(3)));
+    t(id + ' front sight (ADS anchor) is on the centre line, above the bore and behind the muzzle', A.sightDot[0] === 0 && A.sightDot[1] > A.muzzle[1] && A.sightDot[2] > A.muzzle[2], A.sightDot.map((v) => v.toFixed(3)));
+    t(id + ' right hand is on the same grip spot as every voxel gun', Math.abs(A.handGrip[1] - GlbGuns.GRIP_TARGET[1]) < 1e-9 && Math.abs(A.handGrip[2] - GlbGuns.GRIP_TARGET[2]) < 1e-9);
+    t(id + ' magazine pivot (mag_well) is below the bore', A.magPivot[1] < A.muzzle[1], A.magPivot.map((v) => v.toFixed(3)));
+    t(id + ' triangle count stays in the low-poly budget', M.tris >= 200 && M.tris <= 2500, M.tris);
+    t(id + ' moving part is named ' + slide, true);
+    let steel = null, rest = null; M.groups.body.traverse((o) => { if (o.isMesh && o.material.type === 'MeshStandardMaterial') steel = o.material; if (o.isMesh && o.material.type === 'MeshPhongMaterial') rest = o.material; });
+    t(id + ' steel uses the locked 1911 sheen (metalness 1, roughness about 0.3, env 1.7, tint 1.3) and wood/polymer is not cooled', !!steel && steel.metalness === 1 && Math.abs(steel.roughness - 0.3) < 0.01 && steel.envMapIntensity === 1.7 && Math.abs(steel.color.r - 1.3) < 0.02 && (!rest || (rest.color.r > 0.9 && rest.color.g > 0.9)));
+    let housing = 0; M.groups.body.traverse((o) => { if (o.name === 'red_dot') housing++; });
+    t(id + ' has no on-gun red-dot housing (only the fire-ray dot)', housing === 0);
+  }
   { const M = G.build('pistol_service', 1); let steel = null, ivory = null; M.groups.body.traverse((o) => { if (o.isMesh && o.material.type === 'MeshStandardMaterial') steel = o.material; if (o.isMesh && o.material.type === 'MeshPhongMaterial' && o.name !== 'red_dot') ivory = o.material; });
     t('Its steel is a metal (metalness 1, roughness about 0.3) and the ivory grips are not', !!steel && steel.metalness === 1 && Math.abs(steel.roughness - 0.3) < 0.01 && !!ivory); }
   { const files = Object.assign({}, data.files, { [spec.file]: Buffer.from('broken').toString('base64') });

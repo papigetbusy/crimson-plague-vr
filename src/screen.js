@@ -40,6 +40,7 @@
 
   /* ============ texture painting (small canvases, nearest filter = chunky pixels) ============ */
   const T = WorldTex.create(THREE);
+  if (typeof WallTexV2 !== 'undefined') WallTexV2.create(THREE);   // Wrok's v2 wall textures; until they decode, the old paint and the kit atlas stay
   const { texStone, texBanner, texPanel, texPillar, texGold, texFloor, texFloor2, texFloor3, texFloorEdge, texCarpet, texCeil, texCloth, texSkin, texBone, texDark } = T;
 
   /* ============ renderer, scene, camera ============ */
@@ -1255,12 +1256,14 @@
     if (st.floorId !== loadedFloor) {
       const set = WallSets.forFloor(st.floor);                                    // every floor wears the next wall set (6 looks, then round again)
       wallSets.apply(set.id); scene.background.setRGB(set.fog[0] / 255, set.fog[1] / 255, set.fog[2] / 255); scene.fog.color.copy(scene.background); worldView.setFlame(set.flame[0], set.flame[1]);
-      worldView.load(ref.map, view.fogFar, halls.forMap(ref.map)); loadedFloor = st.floorId;
+      worldView.load(ref.map, view.fogFar, halls.forMap(ref.map, set.id)); loadedFloor = st.floorId;
     }
   }   // a new floor (or a new run) is baked and drawn here
   // every floor in Crimson Halls (Wrok's mesh wall kit, src/screen/crimson_halls.js); ?voxelwalls keeps the old walls
   const halls = CrimsonHalls.create(THREE, { query: location.search + location.hash });
-  halls.start(() => { if (loadedFloor !== undefined && loadedFloor !== null) { loadedFloor = null; ensureFloor(state); } });   // decoded after the floor was drawn: draw it again with the kit
+  const reloadFloor = () => { if (loadedFloor !== undefined && loadedFloor !== null) { loadedFloor = null; ensureFloor(state); } };
+  halls.start(reloadFloor);   // decoded after the floor was drawn: draw it again with the kit
+  if (typeof WallTexV2 !== 'undefined') WallTexV2.start((ok) => { if (ok) { wallSets.apply(WallSets.forFloor(state.floor).id); reloadFloor(); } });
   ensureFloor(state);
   chooseClass(0);
   GP.gunBody = gunBody; GP.magBase = MAG_BASE; GP.fore = HOLD;
@@ -1298,6 +1301,6 @@
   const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, viewFloor: (n, seed) => { let a = (seed || 7) >>> 0; const rng = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; const m = FloorGen.generate(n, rng, n); m.WALL_H = ref.map.WALL_H; worldView.load(m, view.fogFar, halls.forMap(m)); loadedFloor = state.floorId; return m; },   // tools only: draw another floor's halls (to measure the biggest floors); the rules stay on yours
-    halls: () => { const m = worldView.kit(); return Object.assign(halls.status(), { mesh: !!m, visible: !!(m && m.visible && m.parent), tris: m ? m.userData.tris : 0, blocks: m ? m.userData.blocks : 0, shown: m ? m.children.filter((b) => b.visible).length : 0, pieces: m ? m.userData.pieces : null }); }, glb: () => Object.assign(glbGuns.status(), { on: glbOn, gun: curGun, scale: glbScale, vr: glbVr }), rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, lastShot: () => lastShot, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer, scene, camera, viewFloor: (n, seed) => { let a = (seed || 7) >>> 0; const rng = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; const m = FloorGen.generate(n, rng, n); m.WALL_H = ref.map.WALL_H; const set = WallSets.forFloor(n); wallSets.apply(set.id); worldView.load(m, view.fogFar, halls.forMap(m, set.id)); loadedFloor = state.floorId; return m; },   // tools only: draw another floor's halls (to measure the biggest floors); the rules stay on yours
+    halls: () => { const m = worldView.kit(); return Object.assign(halls.status(), { mesh: !!m, visible: !!(m && m.visible && m.parent), tris: m ? m.userData.tris : 0, blocks: m ? m.userData.blocks : 0, shown: m ? m.children.filter((b) => b.visible).length : 0, pieces: m ? m.userData.pieces : null }); }, walltex: () => (typeof WallTexV2 !== 'undefined' ? WallTexV2.status() : null), glb: () => Object.assign(glbGuns.status(), { on: glbOn, gun: curGun, scale: glbScale, vr: glbVr }), rl: () => ({ mag: !!(mag && mag.visible), shell: !!(vrShell && vrShell.visible), charge: charge ? +(charge.position.z - CHARGE_Z).toFixed(3) : 0, insp: inspK, inspKind }) };   // handy for poking at numbers from the console
 })();

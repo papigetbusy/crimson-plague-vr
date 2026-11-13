@@ -73,7 +73,8 @@ const GlbGuns = (function () {
     // magazine: its own group pivoting at the magazine well (screen.js tilts every magazine 0.1 rad; the inner group takes that back out)
     const magN = root.getObjectByName(spec.magazine || 'magazine');
     if (!magN) throw new Error('GLB gun has no ' + (spec.magazine || 'magazine') + ' node');
-    const well = new THREE.Vector3().setFromMatrixPosition(magN.parent.matrixWorld);
+    const wellN = root.getObjectByName('mag_well');
+    const well = wellN ? new THREE.Vector3().setFromMatrixPosition(wellN.matrixWorld) : new THREE.Vector3().setFromMatrixPosition(magN.parent.matrixWorld);
     const magBox = new THREE.Box3().setFromObject(magN);
     const mag = new THREE.Group(), magIn = new THREE.Group(); magIn.rotation.x = -0.1; magIn.scale.setScalar(k); mag.add(magIn);
     magIn.add(detach(THREE, magN, well)); mag.position.fromArray(P(well)); mag.name = 'glb_mag';
@@ -83,9 +84,15 @@ const GlbGuns = (function () {
     let rest = new THREE.Vector3(0, well.y, well.z);
     if (slideN) { const sb = new THREE.Box3().setFromObject(slideN); rest = new THREE.Vector3(0, (sb.min.y + sb.max.y) / 2, sb.max.z); boltIn.add(detach(THREE, slideN, rest)); }
     bolt.position.fromArray(P(rest));
-    // red dot on top of the slide
-    if (!mat.userData.dotMat) mat.userData.dotMat = new THREE.MeshLambertMaterial({ color: 0x1c1c20, emissive: 0x0c0c0e });
-    const r = redDot(THREE, root, Object.assign({ base: box3.max.y, z: (box3.min.z + box3.max.z) / 2, halfW: 0.011, height: 0.024 }, spec.redDot || {}, { mat: mat.userData.dotMat }));
+    // red-dot housing: the 1911 keeps its open sight window (anchors ADS). Other mesh guns have iron-sight empties and only the sharp fire-ray dot, so no on-gun housing.
+    let r;
+    if (spec.redDot === false) {
+      const s = at(spec.sight || 'front_sight') || new THREE.Vector3(0, box3.max.y, box3.min.z * 0.2);
+      r = { dot: s, y0: s.y - 0.006, y1: s.y + 0.006, halfW: 0.004 };
+    } else {
+      if (!mat.userData.dotMat) mat.userData.dotMat = new THREE.MeshLambertMaterial({ color: 0x1c1c20, emissive: 0x0c0c0e });
+      r = redDot(THREE, root, Object.assign({ base: box3.max.y, z: (box3.min.z + box3.max.z) / 2, halfW: 0.011, height: 0.024 }, spec.redDot || {}, { mat: mat.userData.dotMat }));
+    }
     const body = new THREE.Group(); body.name = 'glb_body'; body.position.copy(off); body.scale.setScalar(k); body.add(root);
     const muzzle = at(spec.muzzle || 'muzzle') || new THREE.Vector3(0, r.dot.y - 0.02, box3.min.z);
     const fore = V(spec.fore || [grip.x, grip.y - 0.035, grip.z - 0.018]);
@@ -129,8 +136,8 @@ const GlbGuns = (function () {
               const map = firstMap(gltf.scene), r = { scene: gltf.scene, spec, mat: lookMat(THREE, map) };
               let metal = null; gltf.scene.traverse((m) => { if (!metal && m.isMesh && m.material && m.material.metalness >= 0.5) metal = m.material; });
               if (metal) { r.mat.userData.steel = steelMat(THREE, metal, map); if (env) r.mat.userData.steel.envMap = env; steels.push(r.mat.userData.steel);
-                // next to the steel, the rest (the ivory grips) is toned down and cooled: near-white ivory under an orange torch blew out to a skin-coloured block that read as a hand
-                r.mat.color.setRGB(0.5, 0.5, 0.58); r.mat.emissive.setHex(0x1c1c1e); r.mat.specular.setHex(0x151412); }
+                // 1911 only: next to the steel, the ivory grips are toned down and cooled (near-white ivory under an orange torch blew out to a skin-coloured block that read as a hand). Wood and polymer keep their own colour.
+                if (spec.coolNonMetal) { r.mat.color.setRGB(0.5, 0.5, 0.58); r.mat.emissive.setHex(0x1c1c1e); r.mat.specular.setHex(0x151412); } }
               parts(THREE, r.scene, spec, 1, r.mat);              // a dry run: a GLB missing its magazine fails here, not mid-game
               ready[id] = r; if (onReady) onReady(id);
             } catch (e) { fail(id, e); }

@@ -1,4 +1,4 @@
-/* Weapons: the 20 guns' numbers, the five rarities, and what drops when. Pure data and pure functions (no browser, no clock, no random of their own:
+/* Weapons: the guns' numbers, the five rarities, and what drops when. Pure data and pure functions (no browser, no clock, no random of their own:
    the referee hands in its seeded rng). Every number is a multiplier on the referee's cfg gun (damage, fireRate, magSize, reloadTime, spread),
    so the starting rifle ('rifle', all ones) is the baseline that older tests and tuning use. A gun item is { id, rarity, wave, status[], affixes[] }. */
 const RefereeWeapons = (function () {
@@ -20,9 +20,11 @@ const RefereeWeapons = (function () {
     sniper:  { dmg: 7,    rate: 0.1,  mag: 0.17, reload: 1.25, spread: 0.1, pellets: 1 },
     hmg:     { dmg: 1.1,  rate: 1.2,  mag: 3.4,  reload: 1.9,  spread: 1.8, pellets: 1 }
   };
-  // the 20 guns: its type, how this version differs from the type's plain numbers, and its status effect (what Phase 6 will make each shot do; legendaries get a second one)
+  // the guns: its type, how this version differs from the type's plain numbers, and its status effect (what Phase 6 will make each shot do; legendaries get a second one).
+  // The starting rifle stays the all-ones baseline. The M4 Carbine is a second rifle: a bit faster and lighter, obtainable like the other droppable guns.
   const GUNS = {
     rifle:               { name: 'Gothic Rifle',   type: 'rifle', status: [] },
+    rifle_m4:            { name: 'M4 Carbine',     type: 'rifle', v: { dmg: 0.9, rate: 1.2, reload: 0.85, spread: 1.05 }, status: [] },
     pistol_service:      { name: 'Service Pistol', type: 'pistol', status: [] },
     pistol_cannon:       { name: 'Hand Cannon',    type: 'pistol', v: { dmg: 1.6, rate: 0.7, mag: 0.6 }, status: ['fire'] },
     pistol_machine:      { name: 'Machine Pistol', type: 'pistol', v: { dmg: 0.55, rate: 2.3, mag: 1.7, reload: 1.1 }, status: ['electric'] },

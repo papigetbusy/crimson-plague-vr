@@ -27,12 +27,106 @@
         "halfW": 0.011,
         "height": 0.024
       },
-      "flatScale": 1.18
+      "flatScale": 1.18,
+      "coolNonMetal": true,
+      "kind": "pistol"
+    },
+    "rifle": {
+      "file": "gun/rifle_ak47_base.glb",
+      "note": "Wrok's low-poly AK (blued steel, weathered wood; steel uses the locked 1911 sheen: tint 1.3, env 1.7). Replaces the Gothic Rifle. If it does not load, the voxel rifle stays. mag_well is the reload pivot; the moving part is bolt_carrier.",
+      "root": "rifle_ak47",
+      "grip": [
+        0,
+        0,
+        0
+      ],
+      "fore": [
+        0,
+        0.07,
+        -0.33
+      ],
+      "slide": "bolt_carrier",
+      "slideTravel": 0.08,
+      "magazine": "magazine",
+      "muzzle": "muzzle",
+      "sight": "front_sight",
+      "redDot": false,
+      "kind": "rifle",
+      "flatScale": 1
+    },
+    "smg_tactical": {
+      "file": "gun/smg_mp5_base.glb",
+      "note": "Wrok's low-poly MP5 (blued steel, worn black polymer; same locked 1911 steel sheen). Replaces the Tactical SMG. If it does not load, the voxel SMG stays. mag_well is the reload pivot; the moving part is cocking_handle.",
+      "root": "smg_mp5",
+      "grip": [
+        0,
+        0,
+        0
+      ],
+      "fore": [
+        0,
+        0.05,
+        -0.25
+      ],
+      "slide": "cocking_handle",
+      "slideTravel": 0.06,
+      "magazine": "magazine",
+      "muzzle": "muzzle",
+      "sight": "front_sight",
+      "redDot": false,
+      "kind": "smg",
+      "flatScale": 1
+    },
+    "smg_compact": {
+      "file": "gun/smg_uzi_base.glb",
+      "note": "Wrok's low-poly Uzi (blued steel, worn black polymer; same locked 1911 steel sheen). Replaces the Compact SMG. If it does not load, the voxel SMG stays. mag_well is the reload pivot; the moving part is top_cover.",
+      "root": "smg_uzi",
+      "grip": [
+        0,
+        0,
+        0
+      ],
+      "fore": [
+        0,
+        0.03,
+        -0.13
+      ],
+      "slide": "top_cover",
+      "slideTravel": 0.06,
+      "magazine": "magazine",
+      "muzzle": "muzzle",
+      "sight": "front_sight",
+      "redDot": false,
+      "kind": "smg",
+      "flatScale": 1
+    },
+    "rifle_m4": {
+      "file": "gun/rifle_m4_base.glb",
+      "note": "Wrok's low-poly M4 Carbine (blued steel, worn black polymer; same locked 1911 steel sheen: tint 1.3, env 1.7). New rifle slot, not a replacement. If the GLB does not load, the Gothic Rifle voxel is used. mag_well is the reload pivot; the moving part is charging_handle; optic_mount is the ADS anchor.",
+      "root": "rifle_m4",
+      "grip": [
+        0,
+        0,
+        0
+      ],
+      "fore": [
+        0,
+        0.07,
+        -0.2
+      ],
+      "slide": "charging_handle",
+      "slideTravel": 0.045,
+      "magazine": "magazine",
+      "muzzle": "muzzle",
+      "sight": "optic_mount",
+      "redDot": false,
+      "kind": "rifle",
+      "flatScale": 1
     }
   },
   "env": {
     "crimson_halls": {
-      "where": "sandbox start room only (?sandbox; ?voxelwalls turns it off)",
+      "where": "every floor (Wrok's v2 textures on the kit when they load; ?voxelwalls keeps the old painted walls)",
       "dir": "env/crimson_halls/",
       "pieces": {
         "straight": "ch_wall_straight.glb",

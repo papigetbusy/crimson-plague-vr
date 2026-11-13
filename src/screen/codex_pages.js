@@ -39,10 +39,10 @@ const CodexPages = (function () {
 
     // a gun at common, wave 1, against the base numbers
     const gunStats = (id) => WP.stats({ id, rarity: 0, wave: 1, status: [], affixes: [] }, cfg);
-    const types = ['pistol', 'smg', 'shotgun', 'sniper', 'hmg'];
+    const types = ['rifle', 'pistol', 'smg', 'shotgun', 'sniper', 'hmg'];
     out.push({ id: 'guns', title: 'Guns', sections: types.map((ty) => {
       const ids = Object.keys(WP.GUNS).filter((g) => WP.GUNS[g].type === ty);
-      return sec({ pistol: 'Pistols', smg: 'SMGs', shotgun: 'Shotguns', sniper: 'Sniper rifles', hmg: 'Heavy machine guns' }[ty], p(esc(T.GUN_TYPE[ty])) + table(['Gun', 'Status', 'Damage', 'Fire rate', 'Magazine', 'Reload'], ids.map((g) => { const s = gunStats(g), gg = WP.GUNS[g]; return [esc(gg.name), gg.status.length ? esc(gg.status.join(', ')) : 'none', num(s.dmg) + (s.pellets > 1 ? ' x ' + s.pellets : ''), num(s.rate, 1) + '/s', s.mag, num(s.reload, 1) + 's']; })) + p('Numbers shown are for a Common copy dropped on wave 1. Rarity, wave and affixes raise them.'));
+      return sec({ rifle: 'Rifles', pistol: 'Pistols', smg: 'SMGs', shotgun: 'Shotguns', sniper: 'Sniper rifles', hmg: 'Heavy machine guns' }[ty], p(esc(T.GUN_TYPE[ty])) + table(['Gun', 'Status', 'Damage', 'Fire rate', 'Magazine', 'Reload'], ids.map((g) => { const s = gunStats(g), gg = WP.GUNS[g]; return [esc(gg.name), gg.status.length ? esc(gg.status.join(', ')) : 'none', num(s.dmg) + (s.pellets > 1 ? ' x ' + s.pellets : ''), num(s.rate, 1) + '/s', s.mag, num(s.reload, 1) + 's']; })) + p('Numbers shown are for a Common copy dropped on wave 1. Rarity, wave and affixes raise them.'));
     }).concat([
       sec('Gun and gear rules', p('You carry two guns and swap with Q, the Swap button or Triangle. Pick a gun up with E, A or by tapping its card (gear works the same way); with both hands full it replaces the gun in your hands and that one drops at your feet. Every wave a gun drops it gets +' + pct(WP.DROP.waveGrowth) + ' damage until the damage cap (chosen later). Guns lie on the floor for ' + WP.DROP.life + ' seconds.'))
     ]) });

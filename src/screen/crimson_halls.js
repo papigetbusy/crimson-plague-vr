@@ -15,7 +15,8 @@ const CrimsonHalls = (function () {
   // plan(map): every hall of the floor. Walls go on every edge between an open cell and a solid one; nothing is drawn across an opening
   // (the referee treats a doorway as open all the way to the 11.5 m roof, so a wall or arch above it would hide shots that really pass).
   const TRIM_Z = 0.35;                                                    // the kit's brick trim stands 0.16 m proud of the wall; squashed to ~5 cm so a gun held at a wall does not sink into it
-  function plan(map) {
+  function plan(map, opts) {
+    opts = opts || {};
     const C = map.CELL, H = map.WALL_H, rows = map.rows;
     const at = (cx, cz) => (cz < 0 || cz >= map.H || cx < 0 || cx >= map.W) ? '#' : rows[cz][cx];
     const rowsY = []; for (let y = 0; y < H - 1e-6; y += ROW_H) rowsY.push([y, Math.min(1, (H - y) / ROW_H)]);   // [bottom, y scale]: 0, 4, 8 (x0.875)
@@ -58,7 +59,7 @@ const CrimsonHalls = (function () {
       const yaw = yawOf(e.nx, e.nz);
       if (corners.has(k)) { for (const [y, s] of rowsY) put('corner', e.x, y, e.z, yaw, 1, s, 1); continue; }
       for (const [y, s] of rowsY) put('straight', e.x, y, e.z, yaw, 1, s, TRIM_Z);
-      if (e.banner && !lit.has(k)) put('banner', e.x, Math.min(H - 1.5, 7.2), e.z, yaw);   // banner walls ('B') keep their banner
+      if (e.banner && !lit.has(k) && opts.banners !== false) put('banner', e.x, Math.min(H - 1.5, 7.2), e.z, yaw);   // banner walls ('B') keep their banner (Crypt / v2 crypt only)
     }
     return { place, skip, count: place.reduce((a, p) => { a[p.piece] = (a[p.piece] || 0) + 1; return a; }, {}) };
   }
@@ -101,7 +102,10 @@ const CrimsonHalls = (function () {
         const gp = g.attributes.position, gn = g.attributes.normal, gu = g.attributes.uv, base = pos.length / 3;
         for (let i = 0; i < gp.count; i++) {
           v.fromBufferAttribute(gp, i).applyMatrix4(M); n.fromBufferAttribute(gn, i).applyMatrix3(N3).normalize();
-          pos.push(v.x, v.y, v.z); uv.push(gu.getX(i), gu.getY(i));
+          pos.push(v.x, v.y, v.z);
+          let uu = gu.getX(i), vv = gu.getY(i);
+          if (kit.remap && typeof WallTexV2 !== 'undefined') { const r = WallTexV2.remapUv(p.piece, uu, vv, v.x, v.y, v.z, n.x, n.y, n.z, kit.setId, cell || 2); uu = r[0]; vv = r[1]; }
+          uv.push(uu, vv);
           const l = light(v.x + n.x * 0.05, v.y, v.z + n.z * 0.05, Math.round(n.x * 2) / 2, Math.round(n.y * 2) / 2, Math.round(n.z * 2) / 2); col.push(tone(l[0]), tone(l[1]), tone(l[2]));
         }
         const gi = g.index; for (let i = 0; i < gi.count; i++) idx.push(base + gi.getX(i)); tris += gi.count / 3;
@@ -142,7 +146,8 @@ const CrimsonHalls = (function () {
               got[id] = hidden(THREE, id, g); if (!map && mesh.material.map) map = mesh.material.map;
               if (--left === 0) {
                 if (map) { map.magFilter = THREE.NearestFilter; map.minFilter = THREE.NearestFilter; map.generateMipmaps = false; map.encoding = THREE.LinearEncoding; map.needsUpdate = true; }
-                kit = { pieces: got, mat: new THREE.MeshBasicMaterial({ map: map || null, vertexColors: true, fog: true }) };
+                const kitMap = map || null;
+                kit = { pieces: got, mat: new THREE.MeshBasicMaterial({ map: kitMap, vertexColors: true, fog: true }), kitMap, remap: false, setId: null };
                 if (onReady) onReady();
               }
             } catch (e) { fail(e); }
@@ -151,11 +156,17 @@ const CrimsonHalls = (function () {
       }
     }
     // what world_view.load needs for this map: the plan (what to leave out of the bake) and a builder that takes the baked light
-    function forMap(map) {
+    function forMap(map, setId) {
       if (!kit) return null;
-      try { const P = plan(map); if (!P) return null; return { skip: P.skip, plan: P, build: (light) => build(THREE, kit, P, light, map.CELL), mat: kit.mat }; } catch (e) { fail(e); return null; }
+      try {
+        const v2 = typeof WallTexV2 !== 'undefined' && WallTexV2.atlas(setId);
+        if (v2) { kit.mat.map = v2; kit.remap = true; kit.setId = setId; }
+        else { kit.mat.map = kit.kitMap; kit.remap = false; kit.setId = setId || null; }
+        const P = plan(map, { banners: !(setId && setId !== 'crypt') }); if (!P) return null;
+        return { skip: P.skip, plan: P, build: (light) => build(THREE, kit, P, light, map.CELL), mat: kit.mat };
+      } catch (e) { fail(e); return null; }
     }
-    return { start, forMap, ready: () => !!kit, status: () => ({ ready: !!kit, failed, off, pieces: kit ? Object.keys(kit.pieces) : [] }) };
+    return { start, forMap, ready: () => !!kit, status: () => ({ ready: !!kit, failed, off, pieces: kit ? Object.keys(kit.pieces) : [], v2: !!(kit && kit.remap), set: kit && kit.setId }) };
   }
   return { create, plan, build, tone, ROW_H, TRIM_Z };
 })();
