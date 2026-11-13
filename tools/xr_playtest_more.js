@@ -1,7 +1,14 @@
 // More fake-Quest playtest groups for tools/xr_playtest.js: a full run of the real game (no test map), every menu (gun mods and the stash in depth),
 // and the boss-door puzzles. Each step drives the game the way a player would: laser + trigger on menu tiles, grips, sticks and buttons.
 module.exports = function (X) {
-  const { open, rest, rec, debug, pointAt, shot } = X;
+  const { open, rest, rec, debug, pointAt } = X;
+  // a screenshot of the page AND of the VR menu panel itself (what you see in the headset: the canvas drawn on the panel)
+  async function shot(S, name) {
+    await X.shot(S, name);
+    if (!X.shotsDir) return;
+    const url = await S.ev(() => { const c = window.__game.xr.menuCanvas && window.__game.xr.menuCanvas(); return window.__game.xr.menuShown() && c ? c.toDataURL('image/png') : null; });
+    if (url) require('fs').writeFileSync(X.shotsDir + '/' + name + '_vrpanel.png', Buffer.from(url.split(',')[1], 'base64'));
+  }
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const menuOn = (S) => S.ev(() => window.__game.xr.menuShown());
   const running = (S) => S.ev(() => window.__game.running());
@@ -212,5 +219,121 @@ module.exports = function (X) {
       const errs = await errsOf(S); rec(G, 'No script errors in the menus run', errs.length === 0, errs.join(' | ').slice(0, 200));
     } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
   }
-  return { gameGroup, menusGroup, clickTile, allTiles };
+  // ---------------- feel: recoil, buzz per gun, two hands, hit marker, movement, frame time ----------------
+  async function feelGroup() {
+    const G = 'feel';
+    const S = await open('?sandbox');
+    try {
+      const O = await toOpen(S); await S.ev(() => window.__game.ref.clearWave()); await S.frames(5);
+      const fireOnce = async (id) => { await S.ev((id) => window.__game.ref.equipGun(id, 1), id); await S.frames(25); await S.pulses(); const f0 = await S.ev(() => window.__game.xr.feel()); await S.hold('right', 'trigger', true); await S.frames(2); const f1 = await S.ev(() => window.__game.xr.feel()); await S.hold('right', 'trigger', false); await S.frames(1); const f2 = await S.ev(() => window.__game.xr.feel()); const pz = await S.pulses(); return { f0, f1, f2, pz }; };
+      const sg = await fireOnce('shotgun_pump'), sm = await fireOnce('smg_compact');
+      rec(G, 'Every shot kicks the gun in your hand (muzzle up, then it springs back)', sg.f2.shotN > sg.f0.shotN && Math.max(sg.f1.rot, sg.f2.rot) > 0.02, 'shots ' + sg.f0.shotN + ' -> ' + sg.f2.shotN + ', kick ' + Math.max(sg.f1.rot, sg.f2.rot).toFixed(3) + ' rad');
+      await S.frames(60); const back = await S.ev(() => window.__game.xr.feel());
+      rec(G, 'The gun settles back in the hand after the kick', Math.abs(back.rot) < 0.005 && Math.abs(back.back) < 0.002, 'rot ' + back.rot.toFixed(4));
+      const hs = (r) => Math.max(0, ...r.pz.filter((p) => p.hand === 'right').map((p) => p.s));
+      rec(G, 'A shotgun buzzes the hand much harder than an SMG', hs(sg) > hs(sm) * 2, 'shotgun ' + hs(sg) + ', smg ' + hs(sm));
+      rec(G, 'A shotgun kicks harder than an SMG', sg.f2.kick.rot > sm.f2.kick.rot * 3, sg.f2.kick.rot + ' vs ' + sm.f2.kick.rot);
+      // two hands on a rifle halve the kick, and the support hand feels the shot
+      await S.ev(() => window.__game.ref.equipGun('rifle', 1)); await S.frames(25);
+      const one = await fireOnce('rifle');
+      const fore = (await debug(S)).foreAt; if (fore) { await S.hand('left', { p: fore }); await S.hold('left', 'grip', true); await S.frames(10); }
+      const two = await fireOnce('rifle');
+      const tw = (await debug(S)).twoHand;
+      await S.hold('left', 'grip', false); await rest(S);
+      rec(G, 'Two hands on the rifle halve the kick (the reason to hold it with both)', tw && Math.abs(two.f2.kick.rot - one.f2.kick.rot * 0.5) < 1e-6, 'one hand ' + one.f2.kick.rot + ', two ' + two.f2.kick.rot + ' (twoHand=' + tw + ')');
+      rec(G, 'With two hands the support hand buzzes on every shot too', two.pz.some((p) => p.hand === 'left'), JSON.stringify(two.pz).slice(0, 100));
+      // hit marker
+      await S.ev((O) => { const r = window.__game.ref; r.equipGun('rifle', 1); r.clearWave(); r.place(O[0], O[1], Math.PI / 2); r.spawnAt('goblin', O[0] + 2.2, O[1] + 0.3); }, O); await S.frames(4);
+      const h0 = (await S.ev(() => window.__game.xr.feel())).hitN; let seen = false;
+      for (let i = 0; i < 12 && !seen; i++) { const m = await S.ev(() => window.__game.ref.snapshot().monsters[0]); if (!m) break; await pointAt(S, 'right', [m.x, 1.1, m.z]); await S.hold('right', 'trigger', true); await S.frames(3); const f = await S.ev(() => window.__game.xr.feel()); if (f.marker || f.hitN > h0) { seen = true; await shot(S, 'hit_marker'); } await S.hold('right', 'trigger', false); await S.frames(3); }
+      const hdbg = await S.ev(() => { const s = window.__game.ref.snapshot(); return { kills: s.kills, mons: s.monsters.map((m) => m.hp + '@' + m.x.toFixed(1) + ',' + m.z.toFixed(1)), me: s.player.x.toFixed(1) + ',' + s.player.z.toFixed(1), ammo: s.player.ammo, f: window.__game.xr.feel() }; });
+      rec(G, 'Close range (about 2 m): the shot lands where the gun points, and a hit marker flashes on it (VR has no screen crosshair)', seen, seen ? '' : JSON.stringify(hdbg).slice(0, 200));
+      await rest(S);
+      // movement: gets going and stops quickly (no slow glide: gliding is what makes people sick)
+      await toOpen(S); await S.frames(5);
+      const sp = []; await S.hand('left', { ax: [0, 0, 0, -1] }); for (let i = 0; i < 12; i++) { await S.frames(1); sp.push(await S.ev(() => { const s = window.__game.ref.snapshot(); return [s.t, s.player.speed]; })); }
+      await S.hand('left', { ax: [0, 0, 0, 0] }); const st = []; for (let i = 0; i < 12; i++) { await S.frames(1); st.push(await S.ev(() => { const s = window.__game.ref.snapshot(); return [s.t, s.player.speed]; })); }
+      const top = Math.max(...sp.map((q) => q[1])), t90 = (sp.find((q) => q[1] >= top * 0.9) || [0])[0] - sp[0][0] + (sp[1][0] - sp[0][0]), stopAt = (st.find((q) => q[1] < 0.1) || [st[st.length - 1][0] + 1])[0] - st[0][0] + (st[1][0] - st[0][0]);
+      const f90 = sp.findIndex((q) => q[1] >= top * 0.9);   // the sim's frames are slow and uneven: count frames too (2 frames = full speed by the next frame after pushing)
+      rec(G, 'Walking reaches full speed at once (under 0.1 s, or within 2 frames: no slow ramp, Meta comfort rule)', t90 <= 0.1 || f90 <= 1, 'top ' + top.toFixed(2) + ' m/s in ' + t90.toFixed(3) + ' s (' + (f90 + 1) + ' frames)');
+      rec(G, 'Letting go of the stick stops you at once (under 0.1 s: no slide-on-ice)', stopAt <= 0.1, stopAt.toFixed(3) + ' s');
+      // frame budget: 300 frames of fighting (2 monsters, trigger held) on the test map
+      await S.ev((O) => { const r = window.__game.ref; r.equipGun('smg_compact', 1); r.place(O[0], O[1], Math.PI / 2); for (let i = 0; i < 4; i++) r.spawnAt('goblin', O[0] + 6, O[1] - 2 + i); }, O);
+      await S.ev(() => window.__game.perfReset()); const heap0 = await S.ev(() => performance.memory ? performance.memory.usedJSHeapSize : 0);
+      await S.hold('right', 'trigger', true); await S.frames(300); await S.hold('right', 'trigger', false);
+      const pf = await S.ev(() => { const p = window.__game.perf(), ri = window.__game.renderer.info; return { ms: p.ms, n: p.frames, calls: ri.render.calls, tris: ri.render.triangles, geos: ri.memory.geometries, tex: ri.memory.textures }; });
+      const logic = Object.keys(pf.ms).filter((k) => k !== 'draw' && k !== 'events').reduce((a, k) => a + pf.ms[k], 0) / pf.n, draw = (pf.ms.draw || 0) / pf.n;
+      const parts = Object.keys(pf.ms).map((k) => k + ' ' + (pf.ms[k] / pf.n).toFixed(2)).join(', ');
+      console.log('  frame time per stage (ms): ' + parts + '; draw calls ' + pf.calls + ', triangles ' + pf.tris + ', geometries ' + pf.geos + ', textures ' + pf.tex);
+      X.perfOut = { logic, draw, parts, calls: pf.calls, tris: pf.tris };
+      rec(G, 'Game logic (rules + screen, not the drawing) fits a Quest frame: under 4 ms of the 11-14 ms budget', logic < 4, logic.toFixed(2) + ' ms/frame (sim CPU)');
+      rec(G, 'Draw calls stay in Quest 3 range (under 300 per eye)', pf.calls / 2 < 300, (pf.calls / 2) + ' per eye (' + pf.calls + ' both eyes), ' + Math.round(pf.tris / 2) + ' triangles per eye');
+      const errs = await errsOf(S); rec(G, 'No script errors in the feel run', errs.length === 0, errs.join(' | ').slice(0, 200));
+    } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
+  }
+  // ---------------- the boss door's puzzles, the stash at the door of the hall, the Scale's second action ----------------
+  async function mechanicsGroup() {
+    const G = 'mechanics';
+    const S = await open('');
+    try {
+      await S.ev(() => window.__game.begin(true)); await S.frames(10);
+      // find a floor of each puzzle kind (the map seed decides it)
+      const found = await S.ev(() => { const r = window.__game.ref, out = {}; for (let sd = 1; sd < 400 && Object.keys(out).length < 3; sd++) { r.setSeeds({ map: sd * 7919 }); r.reset(); const b = r.snapshot().locks.boss; if (b && !out[b.kind]) out[b.kind] = sd * 7919; } return out; });
+      rec(G, 'Floors with each boss-door puzzle exist (Scale, Wheels, Coin Sockets)', found.scale && found.wheels && found.sockets, JSON.stringify(found));
+      const atStation = (S) => S.ev(() => { const r = window.__game.ref, b = r.snapshot().locks.boss, st = b.station; r.clearWave(); r.giveGold(2000); for (const [dx, dz] of [[1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5], [2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) { r.place(st.x + dx, st.z + dz, Math.atan2(dx, dz)); if (r.snapshot().locks.near) return true; } return false; });
+      if (found.scale) {
+        await S.ev((sd) => { const r = window.__game.ref; r.setSeeds({ map: sd }); r.reset(); }, found.scale); await S.frames(10);
+        const near = await atStation(S); await S.frames(6);
+        const p0 = await S.ev(() => window.__game.ref.snapshot().locks.boss.pan);
+        await S.press('right', 'grip', 6); await S.frames(8);
+        const p1 = await S.ev(() => window.__game.ref.snapshot().locks.boss.pan);
+        rec(G, 'The Scale: grip at it pays gold onto the pan', near && p1 > p0, 'near=' + near + ' pan ' + p0 + ' -> ' + p1);
+        await S.hand('right', { ax: [0, 0, 0, 1] }); await S.frames(6); await S.hand('right', { ax: [0, 0, 0, 0] }); await S.frames(8);
+        const p2 = await S.ev(() => window.__game.ref.snapshot().locks.boss.pan);
+        rec(G, 'The Scale: a hard push down on the right stick takes gold back (the flat game\'s Z)', p2 < p1, 'pan ' + p1 + ' -> ' + p2);
+        await shot(S, 'puzzle_scale');
+      }
+      if (found.wheels) {
+        await S.ev((sd) => { const r = window.__game.ref; r.setSeeds({ map: sd }); r.reset(); }, found.wheels); await S.frames(10);
+        const near = await atStation(S); await S.frames(6);
+        const w0 = await S.ev(() => { const s = window.__game.ref.snapshot(); return { g: s.gold, w: s.locks.boss.wheels.join(',') }; });
+        await S.press('right', 'grip', 6); await S.frames(8);
+        const w1 = await S.ev(() => { const s = window.__game.ref.snapshot(); return { g: s.gold, w: s.locks.boss.wheels.join(',') }; });
+        rec(G, 'Fortune Wheels: grip at them spins (gold spent)', near && w1.g < w0.g, 'near=' + near + ' gold ' + w0.g + ' -> ' + w1.g + ' wheels ' + w0.w + ' -> ' + w1.w);
+        await shot(S, 'puzzle_wheels');
+      }
+      if (found.sockets) {
+        await S.ev((sd) => { const r = window.__game.ref; r.setSeeds({ map: sd }); r.reset(); }, found.sockets); await S.frames(10);
+        const sk = await S.ev(() => { const r = window.__game.ref, q = r.snapshot().locks.boss.sockets[0]; r.clearWave(); r.place(q.x + q.nx * 4, q.z + q.nz * 4, Math.atan2(q.nx, q.nz)); return q; }); await S.frames(10);
+        let hitS = false;
+        for (let i = 0; i < 10 && !hitS; i++) { await pointAt(S, 'right', [sk.x, sk.y, sk.z]); await S.hold('right', 'trigger', true); await S.frames(4); await S.hold('right', 'trigger', false); await S.frames(4); hitS = await S.ev(() => window.__game.ref.snapshot().locks.boss.sockets[0].hit); if (!hitS && (await S.ev(() => window.__game.ref.snapshot().player.ammo)) === 0) { await S.press('left', 'x', 4); await S.frames(60); } }
+        rec(G, 'Coin Sockets: point the gun at a socket on the wall and shoot it', hitS, 'socket at ' + [sk.x, sk.y, sk.z].map((n) => n.toFixed(1)).join(','));
+        await rest(S);
+      }
+      // the stash at the door of the hall (a new run with things in the stash): take one gun in VR
+      await S.ev(() => { const r = window.__game.ref; r.setSeeds({ map: 12345 }); r.setStash([{ kind: 'gun', item: { id: 'sniper_bolt', rarity: 2, wave: 1, status: [], affixes: [] } }]); r.reset(); }); await S.frames(30);
+      const em = await debug(S); const etl = await S.ev(() => window.__pt.titles());
+      rec(G, 'New run with a stashed gun: the stash opens at the door of the hall in VR', em.menu && em.menuId === 'stashMenu', 'menu=' + em.menuId + ' tiles: ' + etl.join(', ').slice(0, 100));
+      if (em.menuId === 'stashMenu') {
+        await shot(S, 'stash_entry');
+        const tk = await clickTile(S, '^Take this gun');
+        const gid = await S.ev(() => window.__game.ref.snapshot().player.gun.id);
+        rec(G, 'At the door: laser + trigger on "Take this gun" gives you the stashed gun', !!tk && gid === 'sniper_bolt', 'gun ' + gid);
+        await yTap(S);
+        rec(G, 'Y ("Enter the hall") closes it and play starts', !(await menuOn(S)) && (await running(S)), '');
+      }
+      // the tuning panel's two useful buttons, on the VR pause menu: sound on/off and start over
+      await yTap(S);
+      const snd0 = await S.ev(() => window.__game.view.sound); const sb = await clickTile(S, '^SOUND');
+      const snd1 = await S.ev(() => window.__game.view.sound);
+      rec(G, 'Pause menu in VR: SOUND toggles the sound (the flat Tuning panel needs a mouse)', !!sb && snd1 !== snd0, snd0 + ' -> ' + snd1);
+      await clickTile(S, '^SOUND');
+      await S.ev(() => window.__game.ref.giveXp(50)); 
+      const nr = await clickTile(S, '^NEW RUN', { wait: 30 });
+      const af = await S.ev(() => { const s = window.__game.ref.snapshot(); return { wave: s.wave.n, lvl: s.level.n, run: window.__game.running(), menu: window.__game.xr.menuShown() }; });
+      rec(G, 'Pause menu in VR: NEW RUN starts over and play carries on', !!nr && af.wave === 1 && af.run && !af.menu, JSON.stringify(af));
+      const errs = await errsOf(S); rec(G, 'No script errors in the mechanics run', errs.length === 0, errs.join(' | ').slice(0, 200));
+    } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
+  }
+  return { gameGroup, menusGroup, feelGroup, mechanicsGroup, clickTile, allTiles, shot };
 };

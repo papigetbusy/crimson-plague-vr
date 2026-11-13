@@ -29,6 +29,18 @@ const Coop = (function () {
     const nameLine = document.createElement('div'); nameLine.id = 'coopSkinName'; skinsEl.appendChild(nameLine);
     chooseSkin(skin, false);
     const say = (t) => { info.textContent = t; };
+    // a headset has no keyboard: on-screen letter keys for the room code (shown only in VR, where the VR menu turns them into tiles)
+    const keysEl = $('coopKeys');
+    if (keysEl) {
+      const shown = document.createElement('div'); shown.id = 'coopKeysShow'; keysEl.appendChild(shown);
+      const upd = () => { shown.textContent = 'Room code: ' + (NetPeer.clean(codeIn.value) + '_____').slice(0, 5).split('').join(' '); };
+      for (const ch of 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'.split('').concat(['DEL'])) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'ck'; b.textContent = ch;
+        b.addEventListener('click', () => { const v = NetPeer.clean(codeIn.value); codeIn.value = ch === 'DEL' ? v.slice(0, -1) : (v + ch).slice(0, 5); upd(); });
+        keysEl.appendChild(b);
+      }
+      codeIn.addEventListener('input', upd); upd();
+    }
     function show() {
       menu.hidden = mode !== 'off'; leaveBtn.hidden = mode === 'off';
       if (mode === 'host') {

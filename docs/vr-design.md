@@ -152,3 +152,48 @@ The owner's playtest of e61a65f: "can't pick stuff up, can't open doors, the but
 | Grip hysteresis | A squeeze counts at 55% and re-arms when you ease off below 30%, so a loose grip never flickers | |
 
 **Doors:** gates and the boss door open with the grip from wherever you stand at them (like Alyx's "doors open both ways": no handle to find, no push/pull to guess). The boss door in the real game still needs the boss dead (and its puzzle solved); the grip now tells you that instead of doing nothing. **On the VR test map only** (`?sandbox`): the gold gate is shut again (you get 1000 gold to pay it), the boss door opens when you grip it so you can walk to the safe room (stash chest and merchant) and on to floor 2, and floor loot never fades. The test map's guns lie in an arc in front of you like a weapon rack.
+
+## Feel and co-op (research round 5, 2026-11-12 overnight)
+The owner asked for shooting and moving that feel like a real VR shooter (Pavlov, Contractors, Onward, Alyx), and for co-op to work in VR. Here is what those games and Meta's guides do, and what we chose.
+
+**Moving (Meta comfort guides: "Locomotion comfort and usability", "Locomotion best practices", the Horizon comfort checklist; Pavlov / Onward / Contractors all use smooth stick movement).**
+- Meta: speeding up and slowing down the camera is what makes people sick. Fixed speeds that switch on and off at once are better than slow ramps. A vignette (darkened edges) helps sensitive players. Snap turn should be offered.
+- Pavlov, Onward and Contractors all move at a steady speed the moment you push the stick, and stop the moment you let go.
+- **Our choice:** in VR the run speeds up and stops almost at once: full speed in about 0.04 s, a dead stop in about 0.04 s. On the flat screen it is unchanged (0.15 s). Walk 6.2 m/s and sprint 10 m/s are the game's own speeds. They are fast next to Meta's suggested 4–6 m/s, but changing them would change the whole game's balance, so that is the owner's call. Smooth turn stays the default because shooter players expect it; `?snap` gives snap turn, `?vignette` gives the comfort vignette.
+
+**Recoil (Pavlov, Contractors, Alyx).**
+- Pavlov and Contractors kick the gun up and back on every shot, with a fixed pattern per gun. Contractors pivots a pistol's kick at the wrist and a long gun's at the shoulder when aiming. Both have settings to steady the gun (Pavlov's virtual stock and hand smoothing, Contractors' scope stabiliser).
+- Players complain when recoil pulls the gun out of your hand so that your hand and the gun stop matching (Steam "Pavlov vs Contractors" thread).
+- **Our choice (src/screen/xr_feel.js):**
+  - Every shot kicks the gun model up and back, and a spring brings it home in 0.1–0.25 s. It is the look and the buzz only: the bullets still go where the controller points, so the gun never leaves your hand and there are no surprise misses.
+  - Heavier guns kick harder and settle slower:
+
+| Gun | Kick up | Kick back | Settles in about | Buzz |
+|---|---|---|---|---|
+| Pistol | 0.10 rad | 2.2 cm | 0.17 s | 0.40 / 28 ms |
+| SMG | 0.04 | 1.2 cm | 0.15 s | 0.26 / 16 ms |
+| Rifle | 0.06 | 1.8 cm | 0.17 s | 0.45 / 26 ms |
+| Shotgun | 0.20 | 5 cm | 0.25 s | 0.95 / 70 ms |
+| Sniper | 0.17 | 4.5 cm | 0.28 s | 0.85 / 60 ms |
+| HMG | 0.045 | 1.6 cm | 0.16 s | 0.50 / 22 ms |
+
+  - **Two hands:** with the left hand on the fore-end the kick is halved and the left hand feels every shot too (60% strength). That is the Pavlov/Onward reason to hold a rifle with both hands.
+  - **Aiming down sights:** trims the kick by a further 20%.
+  - Full auto can never flip the gun past 0.32 rad.
+
+**Hits.** Contractors and Pavlov rely on hit sounds; flat shooters use a crosshair hit marker, and VR has no crosshair. **Our choice:** a small white X flashes on the spot you hit (gold for a crit, a bigger red one for a kill). It always faces you and is sized for its distance. It comes with the game's hit sound, the damage number and a buzz in the gun hand.
+
+**Aim down sights and the scope (already in the build, checked tonight).** The left trigger brings each gun's own sight to the right eye at that gun's eye relief. The sniper shows a zoomed picture inside the scope only (the whole view never zooms; that makes people sick). Two hands steer the barrel like Contractors and Pavlov, and `?vstock` adds a virtual stock.
+
+**Not done, on purpose:** gun sway or lag for heavy guns. In H3VR and Pavlov a heavy gun held one-handed turns slowly. Here that would put the gun model and the laser out of line with your hand, which is the exact complaint players have about Pavlov's recoil. Worth trying on a real Quest later as an option.
+
+**Frame budget.** A Quest 3 has 11–14 ms per frame (72–90 Hz).
+- In the fake headset, the game's own work (rules, screen, VR) takes about 1 ms per frame in a fight with 4 monsters and the trigger held. Drawing is about 230–260 draw calls per eye.
+- The per-shot effects (recoil, hit marker) reuse the same few objects and make no new ones per frame.
+- The game still builds a fresh state snapshot every frame (that is how the rules talk to the screen). That is fine at 1 ms, but it is the first thing to look at if a real Quest stutters.
+
+**Co-op in VR.** The flat lobby needed a keyboard (room code, name). **Our choice:**
+- PLAY WITH FRIENDS and HOST A GAME are now on the VR start menu.
+- There are on-screen letter keys for the room code (only shown in VR), then JOIN, so a player in the headset can host or join with the laser alone.
+- The name box stays flat-only; the saved name or a random one is used.
+- The playtest runs two players in one headless Chrome with a stand-in for PeerJS (tools/xr_fake_peer.js) and checks both ways round (host in VR with a flat friend, and a friend in VR with a flat host): join, start, movement both ways, the same monsters, shots from either side, gates, pause, errors and traffic.

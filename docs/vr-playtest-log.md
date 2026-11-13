@@ -130,9 +130,55 @@ New playtest groups (in `tools/xr_playtest_more.js`, run by `tools/xr_playtest.j
 Gun mods in VR: **work** (open Gear with hold Y, fit to the gun in hands, take off, fit to the gun on your back, Y closes, play resumes).
 Stash in VR: **works** (grip at the chest, put in, take out into your hands, Save game here, Y closes).
 
+### Batch 2: multiplayer (co-op) and feel
+New groups:
+- **coop**: two players, each in their own browser window, linked by a fake PeerJS (same messages as the real one, carried over a BroadcastChannel). Pair 1: the host is in VR and opens a room with the laser on the VR menu; a flat friend joins with the code. Pair 2: a flat host; the friend is in VR and types the room code on new VR letter keys. Checks: both see each other move, the same monsters, the host's VR shot and the VR friend's shot hurt monsters on both screens, gold gates open for both, pause, no errors, sane traffic. **21/21.**
+- **feel**: recoil kicks and settles, shotgun kicks and buzzes harder than an SMG, two hands halve the kick and buzz the left hand too, a hit marker shows at close range, walking reaches full speed and stops within 0.1 s, frame time. **12/12.**
+
+| Found | Why | Fix |
+|---|---|---|
+| A friend in VR could not join a co-op room | the room-code box needs a keyboard, and the VR panel hid the co-op panel | VR letter keys (the code's own alphabet + DEL) on the co-op panel, shown only in VR; the VR menu lays them out 8 per row |
+| Shots at monsters closer than ~3 m missed even with the gun pointed right at them | bullets start at the eye, not at the gun, so up close the eye's line and the gun's line miss each other | the eye now aims at the point the gun's line meets first (monster, wall or floor), so whatever the gun points at is what gets hit; the reticle sits on that point |
+| No recoil or hit feedback in VR | not built | per-gun recoil (spring that kicks and settles, capped so it never pulls the gun off your hand), right-hand buzz per shot (stronger for heavy guns), left-hand buzz when two-handed, hit marker (red cross for crits, bigger for kills) |
+| Walking took 0.15 s to reach speed (felt like ice-skating; motion sickness risk) | flat game's acceleration | VR uses near-instant start/stop (0.04 s); flat unchanged |
+| (test tool) the second player's background tab froze | browsers slow background tabs | each player gets its own window |
+
+### Batch 3: the boss door's puzzles, stash at the door of the hall, flat-vs-VR gaps
+New group **mechanics**: **11/11.** The Scale (grip pays gold onto the pan; a hard push down on the right stick takes it back, the flat game's Z), Fortune Wheels (grip spins), Coin Sockets (point the gun at the socket and shoot it), a new run with a stashed gun (the stash opens at the door of the hall, "Take this gun" with the laser, Y enters the hall), and the two new pause-menu buttons.
+
+| Found | Why | Fix |
+|---|---|---|
+| In VR there was no way to turn the sound off or start over | those buttons live on the flat Tuning panel (Tab, mouse only) | SOUND: ON/OFF and NEW RUN tiles on the VR pause menu (NEW RUN is refused in a co-op room) |
+| Every gun felt the same weight in your hand | one aim smoothing for all guns | per-class weight: a pistol follows the hand fastest, rifle, shotgun/sniper, the heavy machine gun trails it a touch; two hands and aiming down sights keep their steadier rates. Gun and laser ride the same aim, so they never disagree |
+
+### Flat controls vs VR (every flat key has a VR way)
+| Flat | VR | Tested in the sim |
+|---|---|---|
+| WASD move, Shift sprint | left stick (click or push all the way to sprint) | yes |
+| Mouse look | head + right stick snap/smooth turn | yes |
+| Left mouse fire | right trigger | yes |
+| Right mouse aim down sights | left trigger (the gun comes up to your eye; sniper shows a 4x scope) | yes |
+| Space jump | A | yes |
+| C / Ctrl slide | B | yes |
+| R reload | X (or drop the mag) | yes |
+| Hold R / F inspect | hold X with a full magazine | not checked (look only) |
+| E pick up / use / stash | grip | yes |
+| Z take back from the Scale | hard push down on the right stick | yes |
+| Q swap gun | right stick click, or reach over your right shoulder + grip | yes |
+| G gear | hold Y | yes |
+| M map | double-tap Y | yes |
+| 1-6 level-up picks | laser + trigger on the card | yes |
+| Enter restart | RISE AGAIN tile | yes |
+| Tab Tuning panel | SOUND / NEW RUN on the Y pause menu (the dev sliders stay flat-only) | yes |
+
 ## Still needs a real Quest
 - How the 45 cm hand reach and the 13° pointing cone feel with real hands (the fake hands are perfectly still).
 - Whether the floor labels are readable at arm's length on the Quest 3 lenses, and whether the gold beam/ring is too much in a fight.
 - Haptic strength on real Touch Plus controllers (the browser may ignore very short pulses).
 - The over-the-shoulder swap spot (16 cm right, 12 cm behind the head) on a real body.
 - Jumping: A lifts the view by about 2 m (the game's own jump); check it is comfortable in a headset.
+- Recoil size and buzz strength per gun, the gun weight rates, and the aim-at-what-the-gun-points feel up close.
+- Typing a room code on the VR letter keys.
+- Walk 6.2 m/s and sprint 10 m/s are fast for VR (Meta suggests 4-6 m/s); left for the owner to decide.
+- Draw calls (~210-260 per eye in the sim) and frame time on the Quest's own GPU.
+- Co-op over real networks (the sim checks the game logic; real WebRTC links, NAT and lag need two headsets or a headset and a PC).

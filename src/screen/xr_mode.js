@@ -18,7 +18,6 @@ const XrMode = (function () {
     const hands = { left: null, right: null };
     const tmpS = new THREE.Vector3(), v3 = new THREE.Vector3(), q4 = new THREE.Quaternion(), fwd = new THREE.Vector3(), aimQ = new THREE.Quaternion(), aimP = new THREE.Vector3(), headQ = new THREE.Quaternion();
     let aimInit = false, fps = 0, fpsN = 0, fpsT = 0, moveK = 0;
-    const AIM_SMOOTH = 28;                                          // per second: takes the hand jitter out of the ray without feeling laggy
 
     // ---- controllers: rays (aim) and grips (where the hand mesh and the gun sit) ----
     const handMat = new THREE.MeshLambertMaterial({ color: 0x2a1a18, emissive: 0x120806 });
@@ -64,6 +63,30 @@ const XrMode = (function () {
     // grabbing and using things in the world (xr_interact.js): what each hand will take, the highlight, the squeeze
     const inter = XrInteract.create({ THREE, dolly, camera, hands, pulse: (h, s, ms) => pulse(h, s, ms), twoHand: () => twoHand, map: o.levelMap, toast: o.toast });
     const STEER = { pistol: 0.3, smg: 0.75, rifle: 0.8, shotgun: 0.8, sniper: 0.85, hmg: 0.85 };
+    // ---- feel (xr_feel.js): recoil kicks the gun in the hand and springs back (look and buzz only: bullets go where you point); a hit marker on what you hit ----
+    const recRot = XrFeel.createSpring(XrFeel.CAP_ROT), recBack = XrFeel.createSpring(XrFeel.CAP_BACK), recQ = new THREE.Quaternion(), AX_X = new THREE.Vector3(1, 0, 0);
+    let shotN = 0, lastKick = null;
+    function shotFx() {
+      const g = o.gunParts && o.gunParts(), K = XrFeel.kickOf((g && g.type) || 'rifle', twoHand, adsK > 0.5);
+      recRot.kick(K.rot, K.w); recBack.kick(K.back, K.w); pulse('right', K.hap, K.ms); if (K.left) pulse('left', K.left, K.ms);
+      shotN++; lastKick = K;
+    }
+    const hmMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthTest: false, depthWrite: false, fog: false });
+    const hitMk = new THREE.Group(); hitMk.visible = false;
+    { const geo = new THREE.PlaneGeometry(0.012, 0.045); for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2, m = new THREE.Mesh(geo, hmMat); m.position.set(Math.sin(a) * 0.04, Math.cos(a) * 0.04, 0); m.rotation.z = -a; m.renderOrder = 999; hitMk.add(m); } }
+    scene.add(hitMk);
+    let hmT = 0, hmDur = 0.12, hmS = 1, hitN = 0; const hmQ = new THREE.Quaternion(), hmC = new THREE.Vector3();
+    function hitMark(x, y, z, kind) {
+      if (!session) return;
+      hitMk.position.set(x, y, z); hmDur = hmT = kind === 'kill' ? 0.26 : 0.13; hmS = kind === 'kill' ? 1.6 : kind === 'crit' ? 1.25 : 1;
+      hmMat.color.setHex(kind === 'kill' ? 0xff3030 : kind === 'crit' ? 0xffd27a : 0xffffff); hitMk.visible = true; hitN++;
+    }
+    function hitFx(x, y, z, crit) { hitMark(x, y, z, crit ? 'crit' : 'hit'); pulse('right', crit ? 0.6 : 0.25, crit ? 40 : 20); }
+    function hitMarkStep(dt) {
+      if (hmT <= 0) return; hmT -= dt; if (hmT <= 0) { hitMk.visible = false; return; }
+      camera.getWorldQuaternion(hmQ); camera.getWorldPosition(hmC); hitMk.quaternion.copy(hmQ);
+      const k = hmT / hmDur; hitMk.scale.setScalar(hmS * Math.max(0.6, hitMk.position.distanceTo(hmC) * 0.35) * (1.3 - 0.3 * k)); hmMat.opacity = Math.min(1, k * 1.6);
+    }
     function supportHand() {
       const L = hands.left, R = hands.right, g = o.gunParts && o.gunParts();
       const held = !!L && btnOn(L.gamepad, 1, 0.35);
@@ -114,6 +137,8 @@ const XrMode = (function () {
       if (glove && adsK < 0.01) { gunAnchor.updateMatrixWorld(true); glove.getWorldPosition(gripW); dolly.worldToLocal(gripW); gripErr = gripW.distanceTo(h.grip.position); }   // (checked by the test) the gun's grip is in the hand
       // hands: the game's own gloves at this gun's grip and fore-end spots (no forearms: they crowded the left eye). The right glove is always
       // on the grip; the left one appears on the fore-end while the left grip holds the gun or you aim down sights.
+      const kr = recRot.step(lastDt), kb = recBack.step(lastDt);   // recoil: muzzle up and the gun back toward you, springing home
+      if (kr || kb) { recQ.setFromAxisAngle(AX_X, kr); gunAnchor.quaternion.multiply(recQ); v3.set(0, 0, kb).applyQuaternion(q); gunAnchor.position.add(v3); }
       const gR = o.arms && o.arms[1], gL = o.arms && o.arms[0], showL = twoHand || adsK > 0.35;
       if (gR) gR.visible = true; if (gL) gL.visible = showL;
       for (const m of h.grip.children) m.visible = false;              // the glove replaces the placeholder controller hand
@@ -303,6 +328,7 @@ const XrMode = (function () {
     function update(st, running, dt) {
       if (!session) return;
       lastDt = dt || lastDt;
+      lastSt = st;
       const p = st.player;
       const dYaw = turn.step(hands.right && hands.right.gamepad, dt, opts.snap ? 0 : TURN_SPEED); bodyYaw += dYaw;
       fpsN++; fpsT += dt; if (fpsT >= 0.5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; }
@@ -316,6 +342,7 @@ const XrMode = (function () {
       dolly.updateMatrixWorld(true);
       fall(dt); mapHand(dt, running);
       placeGun(p);
+      hitMarkStep(dt);
       menuPanel(running, dt);
       inter.update(st, running, dt, menuMesh.visible);
       laser(dt);
@@ -325,16 +352,29 @@ const XrMode = (function () {
     const rP = new THREE.Vector3(), magwell = new THREE.Vector3(), tgtQ = new THREE.Quaternion();
     const gl = new THREE.Vector3();
     function toRig(obj, local, out) { gl.copy(local); obj.localToWorld(gl); return dolly.worldToLocal(out.copy(gl)); }
+    const convO = [0, 0, 0], convD = [0, 0, 0], WALK = { '.': 1, c: 1, d: 1, P: 1 }; let convDist = 0, lastSt = null;
+    const wallAt = (x, z) => { const m = o.levelMap && o.levelMap(); if (!m) return false; const r = m.rows[Math.floor(z / m.CELL)]; return !r || !WALK[r[Math.floor(x / m.CELL)]]; };
     function aim() {
       if (!session) return null;
       const h = !opts.gaze && hands.right;
       if (h) { rP.copy(h.grip.position); supportHand(); handsAim(tgtQ); }
       else { camera.matrixWorld.decompose(v3, q4, tmpS); dollyInv.copy(dolly.quaternion).invert(); tgtQ.copy(dollyInv).multiply(q4); rP.copy(camera.position); }
-      if (!aimInit) { aimLocal.copy(tgtQ); aimInit = true; } else aimLocal.slerp(tgtQ, Math.min(1, (adsK > 0.5 ? adsOf().smooth : twoHand ? 18 : AIM_SMOOTH) * lastDt));   // steadier while aiming down sights
+      if (!aimInit) { aimLocal.copy(tgtQ); aimInit = true; } else { const gp = o.gunParts && o.gunParts(); aimLocal.slerp(tgtQ, Math.min(1, XrFeel.aimRate((gp && gp.type) || 'rifle', twoHand, adsK > 0.5 ? adsOf().smooth : 0) * lastDt)); }   // heavier guns trail the hand a touch; steadier while aiming down sights or with two hands
       aimQ.copy(dolly.quaternion).multiply(aimLocal);                // world aim
       fwd.set(0, 0, -1).applyQuaternion(aimQ);
       v3.copy(rP).applyMatrix4(dolly.matrixWorld);
-      reticle.visible = !menuMesh.visible; reticle.position.copy(v3).addScaledVector(fwd, 6); reticle.quaternion.copy(aimQ);
+      // the bullets start at your eye (the rules' player), a hand's width from the gun: aim the eye at the point the barrel points at, so the shot
+      // lands where the gun points at any range (xr_feel.js converge). The dot sits on that point.
+      const pl = lastSt && lastSt.player;
+      if (pl && h) {
+        convO[0] = v3.x; convO[1] = v3.y; convO[2] = v3.z; convD[0] = fwd.x; convD[1] = fwd.y; convD[2] = fwd.z;
+        const d = XrFeel.converge(convO, convD, lastSt.monsters, wallAt, 40); convDist = d;
+        v3.addScaledVector(fwd, d); reticle.visible = !menuMesh.visible; reticle.position.copy(v3); reticle.quaternion.copy(aimQ); reticle.scale.setScalar(Math.max(0.5, d / 6));
+        tmpS.set(v3.x - pl.x, v3.y - pl.eye, v3.z - pl.z); const L = tmpS.length();
+        if (L > 0.4) return XrInput.dirToAngles(tmpS.x / L, tmpS.y / L, tmpS.z / L);
+        return XrInput.dirToAngles(fwd.x, fwd.y, fwd.z);
+      }
+      reticle.visible = !menuMesh.visible; reticle.position.copy(v3).addScaledVector(fwd, 6); reticle.quaternion.copy(aimQ); reticle.scale.setScalar(1);
       return XrInput.dirToAngles(fwd.x, fwd.y, fwd.z);
     }
     // ---- reload: the game's own reload animation plays on the gun (screen.js animateReload); here only the old magazine falling away ----
@@ -456,7 +496,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();

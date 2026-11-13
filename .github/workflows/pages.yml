@@ -36,6 +36,8 @@ jobs:
         run: node tests/grab.test.js
       - name: VR game flow and menu checks
         run: node tests/vrflow.test.js
+      - name: VR gun feel checks
+        run: node tests/feel.test.js
       - name: Touch button settings checks
         run: node tests/touch.test.js
       - name: Effect checks

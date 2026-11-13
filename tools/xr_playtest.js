@@ -5,6 +5,7 @@ const { launch } = require('./xr_sim.js');
 const args = process.argv.slice(2), page = args.find((a) => /\.html$/.test(a)) || 'site/index.html';
 const mdOut = args.includes('--md') ? args[args.indexOf('--md') + 1] : null, shots = args.includes('--shots') ? args[args.indexOf('--shots') + 1] : null;
 const root = require('path').join(__dirname, '..');
+if (shots) require('fs').mkdirSync(shots, { recursive: true });
 const results = [];
 const rec = (group, name, pass, detail) => { results.push({ group, name, pass: !!pass, detail: detail || '' }); console.log((pass ? 'PASS ' : 'FAIL ') + '[' + group + '] ' + name + (detail ? '  -- ' + detail : '')); };
 const REST = { right: [0.18, -0.42, -0.32], left: [-0.18, -0.42, -0.32] };
@@ -307,9 +308,10 @@ async function controlsGroup() {
   } finally { if (S.logs.length) console.log('  page log:', S.logs.slice(0, 4).join(' | ')); await S.close(); }
 }
 
-const MORE = require('./xr_playtest_more.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, held });
+const MORE = require('./xr_playtest_more.js')({ open, rest, rec, debug, pointAt, shot, clearLevelUps, held, shotsDir: shots });
+const COOP = require('./xr_playtest_coop.js')({ rec, rest, debug, pointAt, shot: (S, n) => MORE.shot(S, n), root, page, HELPERS, MORE });
 (async () => {
-  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup]];
+  const ALL = [['pickup', pickupGroup], ['doors', doorGroup], ['controls', controlsGroup], ['game', MORE.gameGroup], ['menus', MORE.menusGroup], ['feel', MORE.feelGroup], ['mechanics', MORE.mechanicsGroup], ['coop', COOP.coopGroup]];
   const only = args.find((a) => /^--only=/.test(a)); const want = only ? only.slice(7).split(',') : ALL.map((g) => g[0]);
   for (const [n, f] of ALL) if (want.includes(n)) { try { await f(); } catch (e) { rec(n, 'group ran to the end', false, String(e && e.message || e).slice(0, 200)); } }
   const bad = results.filter((r) => !r.pass);

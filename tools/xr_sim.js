@@ -14,7 +14,11 @@ async function launch(o) {
   o = o || {};
   const srv = o.share ? o.share.srv : await serve(o.root); const port = srv.address().port;
   const browser = o.share ? o.share.browser : await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required', '--window-size=1600,800', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
-  const page = await browser.newPage();
+  let page;
+  if (o.share) {      // a second player: its own window, so both pages are in front and both keep drawing frames (a background tab stops)
+    const cdp = await browser.target().createCDPSession(); const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+    const tg = await browser.waitForTarget((t) => t._targetId === targetId || (t._getTargetInfo && t._getTargetInfo().targetId === targetId)); page = await tg.page();
+  } else page = await browser.newPage();
   await page.setViewport({ width: o.w || 1400, height: o.h || 700 });
   const logs = [];
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') logs.push(m.type() + ': ' + m.text()); });

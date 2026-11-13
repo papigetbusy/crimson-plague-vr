@@ -613,7 +613,7 @@
   function setRunning(v) {
     running = v; if (xr) xr.corner(v);
     overlay.hidden = v;
-    classPick.hidden = started; $('coopBtn').hidden = started && coop.mode === 'off';
+    classPick.hidden = started; $('coopBtn').hidden = started && coop.mode === 'off'; $('vrNewRun').hidden = !started;
     if (!v) {
       mouse.fire = mouse.ads = false; tch.fire = false; bFire.classList.remove('on');
       playLabel.textContent = started ? 'RESUME' : 'ENTER THE HALL';
@@ -811,6 +811,10 @@
   });
   $('tuneSound').addEventListener('click', () => { view.sound = view.sound ? 0 : 1; $('tuneSound').textContent = view.sound ? 'Sound on' : 'Sound off'; saveTune(); });
   $('tuneSound').textContent = view.sound ? 'Sound on' : 'Sound off';
+  // VR has no tuning panel (it needs a mouse): its two useful buttons are on the VR pause menu instead
+  const vrSoundLabel = () => { $('vrSound').textContent = 'SOUND: ' + (view.sound ? 'ON' : 'OFF'); };
+  $('vrSound').addEventListener('click', () => { $('tuneSound').click(); vrSoundLabel(); }); vrSoundLabel();
+  $('vrNewRun').addEventListener('click', () => { if (coop.mode !== 'off') { toast('Leave the room to start over'); return; } ref.reset(); state = ref.snapshot(); if (started) begin(true); });
   function togglePanel() {
     panelOpen = !panelOpen; panel.hidden = !panelOpen;
     if (panelOpen) { if (locked()) document.exitPointerLock(); mouse.fire = mouse.ads = false; }
@@ -880,20 +884,20 @@
     for (const e of events) {
       hud.event(e);
       if (e.type === 'shot') {
-        if (!e.extra && xr && xr.presenting()) xr.pulse('right', 0.45, 35);   // a kick in the gun hand
+        if (!e.extra && xr && xr.presenting()) xr.shotFx();   // VR: the gun kicks in your hand and springs back, with a buzz that fits the gun (xr_feel.js)
         if (!e.extra) { flashT = 0.06; kickG = 1; kickDir = [Math.random() * 2 - 1, Math.random() * 2 - 1]; inspK = 0; sfx('shot'); ejectShell(); if (fxOn()) { muzzle.getWorldPosition(tmpV); if (xr && xr.presenting()) xr.aimDir(tmpV2); else camera.getWorldDirection(tmpV2); fx.play(fxId(), 'muzzle', tmpV.x + tmpV2.x * 0.12, tmpV.y + tmpV2.y * 0.12, tmpV.z + tmpV2.z * 0.12); } }
         addTracer(e.ex, e.ey, e.ez);
         if (e.hit === 'wall') { burst(e.ex, e.ey, e.ez, 5, [0xffb347, 0xff7a1a, 0x888078], 4, 0.35, 12, 0.7); if (fxOn()) fx.play(fxId(), 'wall', e.ex, e.ey, e.ez); }
       } else if (e.type === 'peerShot') {
         if (e.key !== coopKey) friendShot(e);
       } else if (e.type === 'hit') {
-        if (xr && xr.presenting()) xr.pulse('right', e.crit ? 0.6 : 0.25, e.crit ? 40 : 20);   // feel the hit land
+        if (xr && xr.presenting()) xr.hitFx(e.x, e.y, e.z, e.crit);   // feel the hit land, and a hit marker on it (VR has no screen crosshair)
         burst(e.x, e.y, e.z, e.crit ? 9 : 5, [0xb01818, 0x701010, 0xe03030], 3.5, 0.4, 10, 0.8);
         if (fxOn() && !e.splash) fx.play(fxId(), 'flesh', e.x, e.y, e.z, { crit: e.crit });
         if (!e.splash) damageNumber(e.x, e.y + 0.2, e.z, e.dmg, e.crit);
         hitT = 0.14; hitKill = false; sfx(e.crit ? 'crit' : 'hit');
       } else if (e.type === 'kill') {
-        hitT = 0.28; hitKill = true; sfx('kill');
+        hitT = 0.28; hitKill = true; sfx('kill'); if (xr && xr.presenting()) xr.hitMark(e.x, 1.2 * e.scale, e.z, 'kill');
         const en = mons.get(e.id);
         if (en) { mons.delete(e.id); dropBadges(en); dying.push({ en, t: 0 }); }
         burst(e.x, 1.2 * e.scale, e.z, e.boss ? 40 : 24, [0xb01818, 0x701010, 0x3a0a0a, 0xff6a20], 5, 0.8, 11, e.boss ? 2 : 1.3);
@@ -1218,17 +1222,19 @@
   ensureFloor(state);
   chooseClass(0);
   GP.gunBody = gunBody; GP.magBase = MAG_BASE; GP.fore = HOLD;
+  const VR_ACCEL = 240;   // in VR you reach full speed and stop in about 0.04 s: Meta's comfort guides say speeding up and slowing down the view is what makes people sick (docs/vr-design.md, round 5)
   xr = XrMode.create({ THREE, renderer, scene, camera, gun, $, gunHome: GUN_DEFAULTS, toast: (t) => toast(t), started: () => started, menuOpen: () => gearMenu.isOpen || stashMenu.isOpen,
     turnSpeed: () => ref.cfg.padTurn, arms: [handL, handR, limbL, limbR], sight: () => SIGHT, eyeRelief: EYE_RELIEF, inShop: () => !!state.shop, shopClose: () => { I.shopClose = true; }, map: { open: (v) => minimap.setOpen(v), big: $('bigMap'), small: $('miniMap') },
     gunParts: () => { if (!mag || !charge) return null; GP.id = curGun; GP.type = (RefereeWeapons.GUNS[state.player.gun.id] || {}).type; GP.mag = mag; GP.charge = charge; GP.gunScale = view.gunScale; return GP; }, playerYaw: () => state.player.yaw, levelMap: () => ref.map });
-  xr.on(() => { renderer.setAnimationLoop(frame); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
-  , () => { renderer.setAnimationLoop(null); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
+  xr.on(() => { renderer.setAnimationLoop(frame); document.body.classList.add('xr'); ref.setCfg({ accel: VR_ACCEL }); if (!running && (started || SANDBOX)) begin(true); }   // a new game shows the start menu in VR first (pick a class, then Enter the hall); a paused run or the test map carries straight on
+  , () => { renderer.setAnimationLoop(null); document.body.classList.remove('xr'); ref.setCfg({ accel: ref.defaults.accel }); requestAnimationFrame(frame); });   // a headset drives the frames while in VR
   function frame(now) {
     if (!(xr && xr.presenting())) requestAnimationFrame(frame);
     const dt = Math.min((now - clock.last) / 1000, 0.05); clock.last = now;
     try { pollPad(dt); padMenus(); if (xr && xr.presenting()) { const ga = xr.grab(); if (ga && running && !panelOpen && !state.choices && !state.classChoices && !state.over) vrGrab(ga); } } catch (e) { /* a controller hiccup must not stop the frame */ }
     // each stage guards itself: one bad frame in the drawing code must never freeze the rules or the controller, and the first error is shown on screen so it can be read off a phone
-    const stage = (name, fn) => { try { fn(); } catch (e) { if (!frameErr) { frameErr = name + ': ' + (e && e.message ? e.message : e); toastEl.textContent = 'Error in ' + frameErr; toastEl.classList.add('show'); toastT = 1e9; if (window.console) console.error(e); } } };
+    perfN++;
+    const stage = (name, fn) => { const t0 = performance.now(); try { fn(); } catch (e) { if (!frameErr) { frameErr = name + ': ' + (e && e.message ? e.message : e); toastEl.textContent = 'Error in ' + frameErr; toastEl.classList.add('show'); toastT = 1e9; if (window.console) console.error(e); } } perfT[name] = (perfT[name] || 0) + performance.now() - t0; };
     if (running && !panelOpen) {
       stage('rules', () => { const out = ref.step(dt, gatherInput()); state = out.state; stage('events', () => handleEvents(out.events)); coop.tick(dt, out.events); });
     } else {
@@ -1247,7 +1253,8 @@
     stage('view', () => updateView(state, running && !panelOpen ? dt : 0, now / 1000));
     stage('draw', () => { if (xr && xr.presenting()) xr.renderScope(); renderer.render(scene, camera); });
   }
+  const perfT = {}; let perfN = 0;                                  // milliseconds spent in each stage of the frame (the playtest reads it to keep the frame Quest-friendly)
   requestAnimationFrame((t) => { clock.last = t; frame(t); });
   setRunning(false);
-  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin };   // handy for poking at numbers from the console
+  window.__game = { ref, view, THREE, fx, mouse, xr, vrShell, running: () => running, begin, perf: () => ({ ms: Object.assign({}, perfT), frames: perfN, reset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; } }), perfReset: () => { for (const k in perfT) delete perfT[k]; perfN = 0; }, renderer };   // handy for poking at numbers from the console
 })();

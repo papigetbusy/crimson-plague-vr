@@ -10,7 +10,7 @@ const XrMenu = (function () {
   const DISPLAY = "'Pirata One', Georgia, serif", BODY = "'Barlow Condensed', 'Arial Narrow', sans-serif";
   const CLICKABLE = 'button, [data-act], [data-bp], [data-load], [data-del], [data-keep], [role="button"]';
   const EXIT = '.gclose, .cxclose';
-  const SKIP = '.kbd, .touchhelp, .keys, .padk, .padhelp, .buildTag, .cheatTag, input, textarea, select, label, #coopPanel, #coopBtn, .phone, [data-act^="rename"]';   // text boxes need a keyboard: flat screen only
+  const SKIP = '.kbd, .touchhelp, .keys, .padk, .padhelp, .buildTag, .cheatTag, input, textarea, select, label, .phone, [data-act^="rename"]';   // text boxes need a keyboard: flat screen only
   const norm = (t) => (t || '').replace(/\s+/g, ' ').trim();
 
   // ---------- reading the page ----------
@@ -25,7 +25,7 @@ const XrMenu = (function () {
     const t = { el, primary: el.id === 'play' || el.id === 'restart', disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true', sel: el.classList.contains('sel') && el.matches('[data-cls]'),   // 'sel' is only a real choice for the class buttons; on cards it is the flat pad's focus, not shown in VR
       act: el.classList.contains('active') || el.getAttribute('aria-selected') === 'true', dim: el.classList.contains('poor') };
     if (b && (sp || em)) { t.style = 'card'; t.title = norm(b.textContent); t.color = b.style.color || ''; t.body = sp ? norm(sp.textContent) : ''; t.foot = em ? norm(em.textContent) : ''; t.ult = el.classList.contains('ult'); }
-    else { const l = lines(el); t.style = 'btn'; t.title = l[0] || norm(el.textContent) || '?'; t.body = l.slice(1).join('  ·  ').slice(0, 160); }
+    else { const l = lines(el); t.style = 'btn'; t.title = l[0] || norm(el.textContent) || norm(el.getAttribute('aria-label') || el.title || '') || '?'; t.body = l.slice(1).join('  ·  ').slice(0, 160); }
     return t;
   }
   // a Gear / stash place: the item's card (name first, then its numbers) with that place's own buttons underneath
@@ -110,7 +110,7 @@ const XrMenu = (function () {
         const n = b.tiles.length, card = b.style === 'card';
         let cols, tw, gap = 28;
         if (card) { cols = n <= 4 ? n : (n % 3 === 0 ? 3 : 4); tw = Math.min(340, Math.floor((W - PAD * 2 - gap * (cols - 1)) / cols)); }
-        else { const short = b.tiles.every((t) => t.title.length <= 28 && !t.body); cols = short && n > 1 ? Math.min(3, n) : 1; tw = cols === 1 ? 1040 : Math.floor((1240 - gap * (cols - 1)) / cols); }
+        else { const short = b.tiles.every((t) => t.title.length <= 28 && !t.body), keys = n > 6 && b.tiles.every((t) => t.title.length <= 3 && !t.body); cols = keys ? Math.min(8, n) : short && n > 1 ? Math.min(3, n) : 1; tw = cols === 1 ? 1040 : Math.floor((1240 - gap * (cols - 1)) / cols); }
         for (let r = 0; r * cols < n; r++) {
           const row = b.tiles.slice(r * cols, r * cols + cols);
           // every tile in a row gets the same height (the tallest one's), so rows line up cleanly
