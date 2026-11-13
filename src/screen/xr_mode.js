@@ -41,8 +41,9 @@ const XrMode = (function () {
       dolly.add(ray); dolly.add(grip);
       const body = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.035, 0.11), handMat); body.position.z = 0.01; grip.add(body);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.007, 6, 16), handMat); ring.position.set(0, 0.02, -0.05); ring.rotation.x = Math.PI / 3; grip.add(ring);
-      const laser = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 1), laserMat); laser.position.z = -0.5; laser.scale.z = 1; laser.visible = false; ray.add(laser);
-      const c = { ray, grip, laser, hand: null };
+      const lp = new THREE.Group(); ray.add(lp);                       // the menu laser hangs off a pivot that follows the hand smoothed (a steady beam, no tremor)
+      const laser = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.004, 1), laserMat); laser.position.z = -0.5; laser.scale.z = 1; laser.visible = false; lp.add(laser);
+      const c = { ray, grip, laser, lp, sq: new THREE.Quaternion(), sqOn: false, hand: null };
       ray.addEventListener('connected', (e) => { c.hand = e.data && e.data.handedness; if (c.hand === 'left' || c.hand === 'right') hands[c.hand] = c; });
       ray.addEventListener('disconnected', () => { if (c.hand && hands[c.hand] === c) hands[c.hand] = null; c.hand = null; laser.visible = false; });
       return c;
@@ -226,6 +227,49 @@ const XrMode = (function () {
     const menuMat = new THREE.MeshBasicMaterial({ map: vm.tex, transparent: true, depthTest: false, depthWrite: false, fog: false });
     const menuMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), menuMat); menuMesh.scale.set(PANEL_W, PANEL_W * vm.ASPECT, 1);
     menuMesh.renderOrder = 1001; menuMesh.visible = false; dolly.add(menuMesh);
+    // ---- menu smoothing (owner, 2026-11-13). Look and function stay the original menus; only the motion is new:
+    //  - open: the panel fades and grows in (94% -> 100%) over 150 ms, eased; close: a copy fades out over 150 ms (it takes no clicks)
+    //  - one menu straight to another (pause -> codex): the old one dips out in 75 ms, then the new one fades in (no flash of half-drawn content)
+    //  - hover: a soft gold frame floats over the whole card or button under the laser and glides between them; only clickable tiles
+    //    (the page's own buttons) ever get it, never titles or text. The canvas is not redrawn for hover (no texture upload, no hitch).
+    const MENU_FADE = 0.15, MENU_DIP = 0.075; let menuK = 1, ghostK = 0, dipT = 0;
+    const ghostMat = menuMat.clone(); const menuGhost = new THREE.Mesh(menuMesh.geometry, ghostMat); menuGhost.renderOrder = 1000; menuGhost.visible = false; dolly.add(menuGhost);
+    const ease = (k) => 1 - (1 - k) * (1 - k) * (1 - k);
+    const hiTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+      x.shadowColor = 'rgba(255,210,122,0.9)'; x.shadowBlur = 10; x.strokeStyle = '#ffd27a'; x.lineWidth = 5; x.beginPath(); x.moveTo(26, 8); x.arcTo(56, 8, 56, 56, 12); x.arcTo(56, 56, 8, 56, 12); x.arcTo(8, 56, 8, 8, 12); x.arcTo(8, 8, 56, 8, 12); x.closePath();
+      x.fillStyle = 'rgba(255,190,110,0.12)'; x.fill(); x.stroke(); const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t; })();
+    const hiGeo = new THREE.BufferGeometry(), hiPos = new Float32Array(16 * 3), hiUv = new Float32Array(16 * 2), hiIdx = [];
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) { const a = j * 4 + i; hiIdx.push(a, a + 4, a + 1, a + 1, a + 4, a + 5); }
+    const UV9 = [0, 24 / 64, 40 / 64, 1]; for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { hiUv[(j * 4 + i) * 2] = UV9[i]; hiUv[(j * 4 + i) * 2 + 1] = 1 - UV9[j]; }
+    hiGeo.setAttribute('position', new THREE.BufferAttribute(hiPos, 3)); hiGeo.setAttribute('uv', new THREE.BufferAttribute(hiUv, 2)); hiGeo.setIndex(hiIdx);
+    const hiMat = new THREE.MeshBasicMaterial({ map: hiTex, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false });
+    const hiMesh = new THREE.Mesh(hiGeo, hiMat); hiMesh.renderOrder = 1002; hiMesh.frustumCulled = false; hiMesh.position.z = 0.001; hiMesh.visible = false; menuMesh.add(hiMesh);
+    const hiCur = { x: 0, y: 0, w: 0, h: 0, a: 0, on: false };
+    function hiShape(r) {                                              // a 9-slice frame: the corners keep their size whatever the tile's shape (panel units)
+      const bx = 0.016 / PANEL_W, by = 0.016 / (PANEL_W * vm.ASPECT), xs = [r.x - r.w / 2 - bx * 0.3, r.x - r.w / 2 + bx, r.x + r.w / 2 - bx, r.x + r.w / 2 + bx * 0.3], ys = [r.y + r.h / 2 + by * 0.3, r.y + r.h / 2 - by, r.y - r.h / 2 + by, r.y - r.h / 2 - by * 0.3];
+      for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const k = (j * 4 + i) * 3; hiPos[k] = xs[i]; hiPos[k + 1] = ys[j]; hiPos[k + 2] = 0; }
+      hiGeo.attributes.position.needsUpdate = true;
+    }
+    function hiRect(t) {                                               // a tile's rectangle in panel units, cut to the visible part of the list
+      const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW; let y0 = t.y, y1 = t.y + t.h;
+      if (!t.exit) { y0 = Math.max(0, t.y - vm.scroll); y1 = Math.min(V, t.y + t.h - vm.scroll); }
+      return { x: (t.x + t.w / 2) / W - 0.5, y: 0.5 - (y0 + y1) / 2 / H, w: t.w / W, h: Math.max(0, y1 - y0) / H };
+    }
+    const panelScale = (m, k) => m.scale.set(PANEL_W * k, PANEL_W * vm.ASPECT * k, 1);
+    function menuAnim(dt) {
+      dt = Math.min(dt || 0, 0.05);                                    // one long frame never skips the whole transition
+      if (menuMesh.visible) { menuK = dipT > 0 ? Math.max(0, menuK - dt / MENU_DIP) : Math.min(1, menuK + dt / MENU_FADE); const e = ease(menuK); menuMat.opacity = e; panelScale(menuMesh, 0.94 + 0.06 * e); }
+      if (ghostK > 0) { ghostK = Math.max(0, ghostK - dt / MENU_FADE); const e = ghostK * ghostK; ghostMat.opacity = e; panelScale(menuGhost, 0.96 + 0.04 * e); menuGhost.visible = ghostK > 0; }
+      const t = dipT > 0 ? null : vm.hover, k = 1 - Math.exp(-dt * 26);
+      if (t && menuMesh.visible) { const r = hiRect(t); if (!hiCur.on || hiCur.a < 0.02) Object.assign(hiCur, r); else { hiCur.x += (r.x - hiCur.x) * k; hiCur.y += (r.y - hiCur.y) * k; hiCur.w += (r.w - hiCur.w) * k; hiCur.h += (r.h - hiCur.h) * k; } hiCur.on = true; }
+      hiCur.a += ((t && menuMesh.visible ? 1 : 0) - hiCur.a) * (1 - Math.exp(-dt * 22));
+      hiMesh.visible = hiCur.a > 0.01 && menuMesh.visible; if (hiMesh.visible) { hiShape(hiCur); hiMat.opacity = hiCur.a * menuMat.opacity; } else hiCur.on = false;
+    }
+    function menuGone() {                                              // the panel closed: a copy of it fades out where it was (the canvas keeps its last picture)
+      if (!menuMesh.visible) return;
+      menuGhost.position.copy(menuMesh.position); menuGhost.quaternion.copy(menuMesh.quaternion); ghostK = Math.max(0.05, menuMat.opacity); ghostMat.opacity = ghostK * ghostK; panelScale(menuGhost, menuMesh.scale.x / PANEL_W); menuGhost.visible = true;
+      hiCur.on = false; hiCur.a = 0; hiMesh.visible = false;
+    }
     const cursor = new THREE.Mesh(new THREE.RingGeometry(0.006, 0.011, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, depthWrite: false, fog: false, transparent: true }));
     cursor.renderOrder = 1003; cursor.visible = false; dolly.add(cursor);
     let menuPlacedFor = '', menuEl = null, modelT = 0, awayT = 0;
@@ -261,9 +305,15 @@ const XrMode = (function () {
     }
     function menuPanel(running, dt) {
       const el = openMenu(running);
-      if (!el) { if (menuPlacedFor) vm.reset(); menuMesh.visible = false; cursor.visible = false; menuPlacedFor = ''; menuEl = null; return false; }
+      if (!el) { if (menuPlacedFor) { menuGone(); vm.reset(); } menuMesh.visible = false; cursor.visible = false; menuPlacedFor = ''; menuEl = null; dipT = 0; return false; }
       if (!dt) return menuMesh.visible;
-      if (menuPlacedFor !== el.id) { menuPlacedFor = el.id; vm.reset(); placeMenu(); modelT = 0; awayT = 0; }
+      if (menuPlacedFor !== el.id) {
+        if (menuPlacedFor && menuMesh.visible && dipT <= 0 && menuK > 0.05) dipT = MENU_DIP;   // straight from one menu to another: dip the old one out first
+        if (dipT > 0) { dipT -= dt; if (dipT > 0) return true; }      // (still showing the old picture; it takes no clicks meanwhile, see laser())
+        dipT = 0; menuPlacedFor = el.id; vm.reset(); placeMenu(); modelT = 0; awayT = 0; scrollV = 0;
+        ghostK = 0; menuGhost.visible = false;                         // the canvas is about to hold the new menu: no old copy may show it
+        menuK = 0; menuMat.opacity = 0; panelScale(menuMesh, 0.94); hiCur.on = false; hiCur.a = 0;
+      }
       menuEl = el;
       modelT -= dt; if (modelT <= 0) { modelT = 0.25; const m = menuModel(el); if (!vm.setModel(m)) vm.refreshEls(m); }
       // turned well away from the panel (or it got left behind)? bring it back in front, so a menu can never be lost
@@ -271,6 +321,7 @@ const XrMode = (function () {
       const ang = Math.atan2(f.x * (menuMesh.position.z - hp.z) - f.z * (menuMesh.position.x - hp.x), f.x * (menuMesh.position.x - hp.x) + f.z * (menuMesh.position.z - hp.z));
       awayT = Math.abs(ang) > RECENTER ? awayT + dt : 0; if (awayT > 0.6) { placeMenu(); awayT = 0; }
       vm.draw(hintsFor(el));
+      if (!menuMesh.visible && vm.layout) { ghostK = 0; menuGhost.visible = false; menuK = 0; menuMat.opacity = 0; panelScale(menuMesh, 0.94); }   // just opened: starts clear and a touch small (menuAnim brings it in)
       menuMesh.visible = !!vm.layout; return menuMesh.visible;
     }
     // ---- laser pointer: point at a tile (it lights up, a soft tick in that hand), pull and RELEASE the trigger to press it.
@@ -293,7 +344,7 @@ const XrMode = (function () {
       modelT = 0.05;                                                   // redraw soon: the press usually changes the menu
     }
     function back() {                                                  // Y in a menu: the panel's exit, or resume from pause
-      if (!menuEl) return;
+      if (!menuEl || dipT > 0) return;
       const L0 = vm.layout; if (L0 && L0.exits.length) { press(L0.exits[0]); return; }
       if (menuEl.id === 'start' && o.started()) { const p = $('play'); if (p && !p.disabled) pressEl(p); }
     }
@@ -304,15 +355,19 @@ const XrMode = (function () {
       for (const c of ctl) {
         if (!c.hand) continue;
         const g = c.gamepad, on = btnOn(g, 0, 0.55), T = trig[c.hand];
-        if (!menuMesh.visible) { c.laser.visible = false; T.on = on; T.t = null; continue; }
-        c.ray.updateMatrixWorld(); rO.setFromMatrixPosition(c.ray.matrixWorld); rD.set(0, 0, -1).transformDirection(c.ray.matrixWorld);
-        rc.set(rO, rD); const hit = rc.intersectObject(menuMesh, false)[0];
+        if (!menuMesh.visible) { c.laser.visible = false; c.sqOn = false; T.on = on; T.t = null; continue; }
+        // a steady beam: the hand's tremor is filtered out. Light filtering when the hand is still (~55 ms), almost none on a quick sweep,
+        // and a jump of 20 degrees or more in one frame is taken at once. What the beam and cursor show is exactly what a pull presses.
+        c.ray.updateMatrixWorld(); rO.setFromMatrixPosition(c.ray.matrixWorld); c.ray.getWorldQuaternion(rq);
+        if (!c.sqOn) { c.sq.copy(rq); c.sqOn = true; } else { const ang = c.sq.angleTo(rq), spd = ang / Math.max(lastDt, 1e-3); if (ang > 0.35) c.sq.copy(rq); else c.sq.slerp(rq, 1 - Math.exp(-lastDt * (18 + 40 * Math.min(1, spd / 3)))); }
+        c.lp.quaternion.copy(rq).invert().multiply(c.sq); rD.set(0, 0, -1).applyQuaternion(c.sq);
+        rc.set(rO, rD); const hit = dipT > 0 ? null : rc.intersectObject(menuMesh, false)[0];
         c.laser.visible = true; const len = hit ? hit.distance : 1.2; c.laser.scale.z = len; c.laser.position.z = -len / 2;
         const t = hit && hit.uv ? vm.hit(hit.uv.x, hit.uv.y) : null; laserUv[c.hand] = hit && hit.uv ? [+hit.uv.x.toFixed(3), +hit.uv.y.toFixed(3)] : null;
         c.laser.material = t ? laserMatHi : laserMat;
         if (hit && hit.uv) {
-          if (on && !T.on) { T.t = t; T.v0 = hit.uv.y; T.last = hit.uv.y; T.drag = false; }
-          else if (on && T.on) { if (Math.abs(hit.uv.y - T.v0) > 0.035) T.drag = true; if (T.drag) vm.scrollBy((hit.uv.y - T.last) * XrMenu.H * 1.2); T.last = hit.uv.y; }
+          if (on && !T.on) { T.t = t; T.v0 = hit.uv.y; T.last = hit.uv.y; T.drag = false; scrollV = 0; }   // a pull stops a gliding list (it holds still under the laser)
+          else if (on && T.on) { if (Math.abs(hit.uv.y - T.v0) > 0.035) T.drag = true; if (T.drag) { const d = (hit.uv.y - T.last) * XrMenu.H * 1.2; vm.scrollBy(d); scrollV += ((lastDt > 0 ? d / lastDt : 0) - scrollV) * 0.35; dragging = true; } T.last = hit.uv.y; }
           if (c.hand === 'right' || !cursor.visible) { cursor.visible = true; cursor.position.copy(hit.point); dolly.worldToLocal(cursor.position); cursor.quaternion.copy(menuMesh.quaternion); cursor.translateZ(0.004); cursor.scale.setScalar(on ? 0.83 : 1); }
         }
         if (!on && T.on) { if (!T.drag && T.t && t && (T.t === t || (T.t.title === t.title && T.t.x === t.x && T.t.y === t.y))) {   // the same tile, even if the menu was redrawn while the trigger was down
@@ -320,10 +375,17 @@ const XrMode = (function () {
         T.on = on;
         if (t && (c.hand === 'right' || !hov)) { hov = t; hovHand = c.hand; }
       }
-      if (vm.setHover(hov) && hov) pulse(hovHand, 0.1, 8);
-      if (menuMesh.visible) { const rs = XrInput.rightStick(hands.right && hands.right.gamepad); if (Math.abs(rs.y) > 0.2) vm.scrollBy(rs.y * 1100 * lastDt); }
+      if (vm.setHover(hov) && hov) pulse(hovHand, 0.1, 8);              // a light tick each time the highlight moves to a new card or button
+      // scrolling: the right stick sets a speed the list eases to; a trigger-drag moves it 1:1 and, let go, it glides on and slows down
+      if (menuMesh.visible && dipT <= 0) {
+        const rs = XrInput.rightStick(hands.right && hands.right.gamepad), ry = Math.abs(rs.y) > 0.15 ? Math.sign(rs.y) * Math.pow((Math.abs(rs.y) - 0.15) / 0.85, 1.4) : 0;
+        if (dragging) { if (!trig.left.drag && !trig.right.drag) dragging = false; }
+        else if (ry) scrollV += (ry * 1500 - scrollV) * (1 - Math.exp(-lastDt * 10));
+        else scrollV *= Math.exp(-lastDt * 9);                         // a short, gentle glide after the stick or a drag lets go
+        if (!dragging && Math.abs(scrollV) > 4) { if (!vm.scrollBy(scrollV * lastDt)) scrollV = 0; } else if (!dragging) scrollV = 0;
+      } else { scrollV = 0; dragging = false; }
     }
-    const laserUv = { left: null, right: null };
+    const laserUv = { left: null, right: null }, rq = new THREE.Quaternion(); let scrollV = 0, dragging = false;
     let hudT = 0;
     const txt = (id) => { const e = $(id); return e ? (e.textContent || '').replace(/\s+/g, ' ').trim() : ''; };
     const shown = (id) => { const e = $(id); return !!e && !e.hidden && getComputedStyle(e).display !== 'none'; };
@@ -384,7 +446,7 @@ const XrMode = (function () {
       fall(dt); mapHand(dt, running);
       placeGun(p);
       hitMarkStep(dt);
-      menuPanel(running, dt);
+      menuPanel(running, dt); menuAnim(dt);
       inter.update(st, running, dt, menuMesh.visible);
       laser(dt);
       hudT -= dt; if (hudT <= 0) { hudT = 0.1; drawHud(st, running); hudTex.needsUpdate = true; }
@@ -444,9 +506,9 @@ const XrMode = (function () {
     const mapCv = o.map && o.map.big, mapTex = mapCv ? new THREE.CanvasTexture(mapCv) : null;
     const mapMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), new THREE.MeshBasicMaterial({ map: mapTex, transparent: true, opacity: 0.97, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide }));
     mapMesh.renderOrder = 997; mapMesh.visible = false;
-    const mapFrame = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), new THREE.MeshBasicMaterial({ color: 0x2a0d10, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+    const mapFrame = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), new THREE.MeshBasicMaterial({ color: 0x2a0d10, transparent: true, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide }));
     mapFrame.renderOrder = 996; mapFrame.position.z = -0.001; mapMesh.add(mapFrame);
-    let mapHeld = false, mapT = 0, mapHost = null;
+    let mapHeld = false, mapT = 0, mapHost = null, mapK = 0;          // mapK: the map's 150 ms fade/grow in and out (menu smoothing)
     // the map: double-tap Y toggles it, a single Y tap (or any menu) closes it. A button and nothing else: the old wrist-glance gesture
     // opened it in the middle of gunfights. It floats above the left controller, turned to face you, so the gun's sight line stays clear.
     let mapOpen = false;
@@ -456,8 +518,11 @@ const XrMode = (function () {
       const show = mapOpen;
       if (show !== mapHeld) { mapHeld = show; if (o.map) o.map.open(show); pulse('left', show ? 0.25 : 0.12, 15); }
       if (mapHost !== dolly) { dolly.add(mapMesh); mapHost = dolly; }
-      mapMesh.visible = show;
-      if (!show) return;
+      mapK = show ? Math.min(1, mapK + Math.min(dt, 0.05) / MENU_FADE) : Math.max(0, mapK - Math.min(dt, 0.05) / MENU_FADE);
+      if (!show && (!L || !mapTex)) mapK = 0;
+      mapMesh.visible = mapK > 0;
+      if (!mapMesh.visible) return;
+      const e = show ? ease(mapK) : mapK * mapK; mapMesh.material.opacity = 0.97 * e; mapMesh.children[0].material.opacity = e; mapMesh.scale.setScalar(0.9 + 0.1 * e);
       mapMesh.position.copy(L.grip.position); mapMesh.position.y += 0.13;                 // just above the hand
       mapMesh.lookAt(v3.copy(camera.position).applyMatrix4(dolly.matrixWorld));           // always turned to face you (lookAt works in world space)
       mapT -= dt; if (mapT <= 0) { mapT = 0.2; mapTex.needsUpdate = true; }
@@ -530,7 +595,7 @@ const XrMode = (function () {
         s.addEventListener('end', () => {
           session = null; inter.clear(); renderer.xr.enabled = false; vig.visible = false; hudMesh.visible = false; reticle.visible = false; fireDot.visible = false; menuMesh.visible = false;
           dolly.position.set(0, 0, 0); dolly.rotation.set(0, 0, 0); if (gun.parent !== camera) camera.add(gun);
-          for (const m of (o.arms || [])) m.visible = true; if (mapHeld && o.map) o.map.open(false); mapHeld = false; mapMesh.visible = false;
+          for (const m of (o.arms || [])) m.visible = true; if (mapHeld && o.map) o.map.open(false); mapHeld = false; mapK = 0; mapMesh.visible = false;
           btn.textContent = 'ENTER VR'; btn.hidden = false; if (onEnd) onEnd();
         });
         for (const m of (o.arms || [])) m.visible = false;          // no viewmodel hands or forearms in VR: just the gun
@@ -559,7 +624,7 @@ const XrMode = (function () {
       btn.style.left = on ? '10px' : '50%'; btn.style.top = on ? 'auto' : '14px'; btn.style.bottom = on ? '10px' : 'auto';
       btn.style.transform = on ? 'none' : 'translateX(-50%)'; btn.style.padding = on ? '8px 16px' : '18px 44px'; btn.style.fontSize = on ? '15px' : '28px';
     }
-    return { comfort: () => Object.assign({}, comfort), setComfort, poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, handYaw, walkYaw, turnSpeed: turnSpeedOf, snapDeg: snapDegOf, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible, dot: fireDot.visible ? fireDotPos.toArray() : null }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapMesh.visible, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
+    return { comfort: () => Object.assign({}, comfort), setComfort, poseGun, dropMag: dropMagFrom, update, aim, pad, headPose, headYaw, handYaw, walkYaw, turnSpeed: turnSpeedOf, snapDeg: snapDegOf, pulse, aimDir, corner, grab, questText, canFire, takeReload, onReloadStart, menuOpen: () => menuMesh.visible, menuCanvas: () => vm.canvas, renderScope, menuHit: (u, v) => { const t = vm.hit(u, v); return t ? t.title : null; }, shotFx, hitFx, hitMark, feel: () => ({ conv: convDist, shotN, hitN, kick: lastKick, rot: recRot.x, back: recBack.x, marker: hitMk.visible, dot: fireDot.visible ? fireDotPos.toArray() : null }), menuTiles: () => { const L = vm.layout; if (!L) return []; const W = XrMenu.W, H = XrMenu.H, V = XrMenu.VIEW, sc = vm.scroll; return L.tiles.map((t) => ({ title: t.title, disabled: !!t.disabled, u: (t.x + t.w / 2) / W, v: 1 - (t.y - sc + t.h / 2) / H, inView: t.y - sc >= 0 && t.y + t.h - sc <= V })).concat(L.exits.map((t) => ({ title: t.title, exit: true, u: (t.x + t.w / 2) / W, v: 1 - (t.y + t.h / 2) / H, inView: true }))); }, faceYaw: (y) => { bodyYaw = y; }, debug: () => ({ grab: inter.debug(), pressN, menuId: menuPlacedFor, dropN, dropping: !!dropMag, magwell: magwell.toArray(), mapShown: mapHeld, armsHidden: (o.arms || []).every((m) => !m.visible), magVisible: !!(o.gunParts() && o.gunParts().mag.visible), hover: vm.hover ? vm.hover.title : null, laserUv, scroll: vm.scroll, maxScroll: vm.maxScroll, tiles: vm.layout ? vm.layout.tiles.length : 0, exits: vm.layout ? vm.layout.exits.map((e) => e.title) : [], adsK, scopeOn, gloveOn: !!(o.arms && o.arms[0] && o.arms[0].visible), twoHand, gripErr, foreAt: (() => { const g = o.gunParts && o.gunParts(); if (!g || !g.gunBody) return null; g.gunBody.updateMatrixWorld(true); const v = g.fore.clone().applyMatrix4(g.gunBody.matrixWorld); dolly.worldToLocal(v); return [v.x, v.y, v.z].map((n) => +n.toFixed(3)); })(), hit: (u, v) => 0, menu: menuMesh.visible, menuPos: menuMesh.position.toArray(), menuScale: menuMesh.scale.toArray(), aim: aimLocal.toArray() }), menuShown: () => menuMesh.visible, smooth: () => ({ menuK, opacity: menuMat.opacity, scale: menuMesh.scale.x / PANEL_W, ghostK, ghost: menuGhost.visible, dip: dipT > 0, hiA: hiCur.a, hi: hiMesh.visible, hiRect: hiMesh.visible ? { x: hiCur.x, y: hiCur.y, w: hiCur.w, h: hiCur.h } : null, scrollV, dragging, mapK, mapVisible: mapMesh.visible, laserDir: (hands.right && hands.right.sqOn) ? new THREE.Vector3(0, 0, -1).applyQuaternion(hands.right.sq).toArray() : null }), vigOn: () => vig.visible, presenting: () => !!session, on: (start, end) => { onStart = start; onEnd = end; }, rig: dolly };
   }
   return { create };
 })();
