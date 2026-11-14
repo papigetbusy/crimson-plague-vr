@@ -30,7 +30,7 @@ const GunCard = (function () {
     if (c.affixes && !c.type) return modHtml(c);
     const h = held || {};
     const nums = '<span>Dmg <b>' + c.dmg + (c.pellets > 1 ? '×' + c.pellets : '') + '</b>' + arrow(c.dmg, h.dmg !== undefined ? { v: h.dmg } : null) + '</span>' +
-      '<span>Rate <b>' + c.rate + '/s</b>' + arrow(c.rate, h.rate !== undefined ? { v: h.rate } : null) + '</span>' +
+      '<span>Rate <b>' + (c.burst ? c.burst + '-round burst' : c.rate + '/s') + '</b>' + arrow(c.rate, h.rate !== undefined ? { v: h.rate } : null) + '</span>' +
       '<span>Mag <b>' + c.mag + '</b>' + arrow(c.mag, h.mag !== undefined ? { v: h.mag } : null) + '</span>' +
       '<span>Reload <b>' + c.reload + 's</b>' + arrow(c.reload, h.reload !== undefined ? { v: h.reload } : null, true) + '</span>';
     const aff = c.affixes.length ? c.affixes.map((a) => '<li' + (a.cls ? ' class="cls" title="' + esc(a.cls) + ' only"' : '') + '>' + (a.cls ? '★ ' : '') + esc(a.text) + ' <i>' + esc(a.name) + '</i></li>').join('') : '<li class="none">no affixes</li>';

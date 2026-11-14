@@ -21,10 +21,10 @@ const RefereeWeapons = (function () {
     hmg:     { dmg: 1.1,  rate: 1.2,  mag: 3.4,  reload: 1.9,  spread: 1.8, pellets: 1 }
   };
   // the guns: its type, how this version differs from the type's plain numbers, and its status effect (what Phase 6 will make each shot do; legendaries get a second one).
-  // The starting rifle stays the all-ones baseline. The M4 Carbine is a second rifle: a bit faster and lighter, obtainable like the other droppable guns.
+  // The starting rifle stays the all-ones baseline. The M4 Carbine is a second rifle: a 3-round burst, obtainable like the other droppable guns.
   const GUNS = {
     rifle:               { name: 'Gothic Rifle',   type: 'rifle', status: [] },
-    rifle_m4:            { name: 'M4 Carbine',     type: 'rifle', v: { dmg: 0.9, rate: 1.2, reload: 0.85, spread: 1.05 }, status: [] },
+    rifle_m4:            { name: 'M4 Carbine',     type: 'rifle', v: { dmg: 1.15, rate: 2, reload: 0.85, spread: 0.7 }, burst: 3, burstDelay: 0.25, burstClimb: 0.18, status: [] },
     pistol_service:      { name: 'Service Pistol', type: 'pistol', status: [] },
     pistol_cannon:       { name: 'Hand Cannon',    type: 'pistol', v: { dmg: 1.6, rate: 0.7, mag: 0.6 }, status: ['fire'] },
     pistol_machine:      { name: 'Machine Pistol', type: 'pistol', v: { dmg: 0.55, rate: 2.3, mag: 1.7, reload: 1.1 }, status: ['electric'] },
@@ -78,7 +78,8 @@ const RefereeWeapons = (function () {
       dmg: cfg.damage * k('dmg') * RARITIES[item.rarity].dmg * grow * (1 + a('dmg')), rate: cfg.fireRate * k('rate') * (1 + a('rate')), mag: Math.max(1, Math.round(cfg.magSize * k('mag') * (1 + a('mag')))),
       reload: cfg.reloadTime * k('reload') * Math.max(0.3, 1 - a('reload')), spread: k('spread') * Math.max(0.1, 1 - a('spread')), pellets: t.pellets,
       crit: a('crit'), critDmg: a('critdmg'), head: a('head'), leech: a('leech'), status: a('status'),    // extras the referee reads when a shot lands
-      ads: a('ads'), adsMove: a('adsmove')                                                              // from mods: faster aiming, faster walking while aiming
+      ads: a('ads'), adsMove: a('adsmove'),                                                              // from mods: faster aiming, faster walking while aiming
+      burst: g.burst || 0, burstDelay: g.burstDelay || 0, burstClimb: g.burstClimb || 0
     };
   }
   // a mod as a card: name, colour and its lines (and the reason it will not fit a gun, when a gun is given)
@@ -87,7 +88,7 @@ const RefereeWeapons = (function () {
   function view(item, cfg) {
     const st = stats(item, cfg), g = GUNS[item.id] || GUNS.pistol_service, r = RARITIES[item.rarity];
     return { id: item.id, name: item.label || g.name, baseName: g.name, label: item.label || '', type: g.type, rarity: item.rarity, rarityName: r.name, color: r.color, status: item.status.slice(),
-      dmg: Math.round(st.dmg), rate: Math.round(st.rate * 10) / 10, mag: st.mag, reload: Math.round(st.reload * 10) / 10, pellets: st.pellets,
+      dmg: Math.round(st.dmg), rate: Math.round(st.rate * 10) / 10, mag: st.mag, reload: Math.round(st.reload * 10) / 10, pellets: st.pellets, burst: st.burst || 0,
       affixes: (item.affixes || []).map(AF.describe), slots: MD.slotsFor(item.rarity), mods: (item.mods || []).map((m) => modView(m)) };
   }
   // the name you give a gun: letters, numbers and a few marks, 24 at most; empty means the regular name

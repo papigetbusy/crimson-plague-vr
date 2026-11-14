@@ -10,8 +10,31 @@ const face = (r, m) => { const p = r.snapshot().player; return Math.atan2(m.x - 
 
 // ---- the numbers
 t('Every gun in the weapon table has a model in the gun catalog, and every catalog gun has numbers', Cat.IDS.every((id) => W.GUNS[id]) && W.DROPPABLE.filter((id) => id !== 'rifle_m4').every((id) => Cat.IDS.includes(id)) && W.DROPPABLE.includes('rifle_m4') && W.DROPPABLE.length === 21 && W.GUNS.rifle_m4.name === 'M4 Carbine' && W.GUNS.rifle_m4.type === 'rifle');
-t('The M4 Carbine is a new droppable rifle: faster and lighter than the Gothic Rifle, with a quicker reload', (() => { const c = { damage: 14, fireRate: 10, magSize: 30, reloadTime: 2.1 }, a = W.stats(W.make('rifle', 0, 1), c), b = W.stats(W.make('rifle_m4', 0, 1), c); return W.GUNS.rifle_m4.type === 'rifle' && W.DROPPABLE.includes('rifle_m4') && !W.DROPPABLE.includes('rifle') && b.rate > a.rate && b.dmg < a.dmg && b.reload < a.reload && W.view(W.make('rifle_m4', 0, 1), c).name === 'M4 Carbine'; })());
+t('The M4 Carbine is a droppable 3-round burst rifle: harder hits than the Gothic Rifle, tighter spread, the same 30-round mag and a quicker reload', (() => { const c = { damage: 14, fireRate: 10, magSize: 30, reloadTime: 2.1 }, a = W.stats(W.make('rifle', 0, 1), c), b = W.stats(W.make('rifle_m4', 0, 1), c); return W.GUNS.rifle_m4.type === 'rifle' && W.DROPPABLE.includes('rifle_m4') && b.burst === 3 && b.burstDelay > 0 && b.burstClimb > 0 && b.dmg > a.dmg && b.spread < a.spread && b.mag === a.mag && b.reload < a.reload && W.view(W.make('rifle_m4', 0, 1), c).name === 'M4 Carbine' && W.view(W.make('rifle_m4', 0, 1), c).burst === 3; })());
 t('equipGun puts the M4 Carbine in your hands, full magazine, and giveGun drops one at your feet so it can be picked up', (() => { const r = mk({ manualGuns: true }); r.equipGun('rifle_m4', 1); const p = r.snapshot().player; const ok = p.gun.id === 'rifle_m4' && p.ammo === p.magSize; r.giveGun('rifle_m4', 0); const floor = r.snapshot().pickups.filter((q) => q.kind === 'gun' && (q.gun && q.gun.id === 'rifle_m4' || q.item && q.item.id === 'rifle_m4')); r.step(1 / 60, { pickup: true }); return ok && floor.length >= 1 && r.snapshot().player.gun.id === 'rifle_m4'; })());
+{
+  const count = (ev) => ev.filter((e) => e.type === 'shot' && !e.extra).length;
+  const fire = (r, n, held) => { const ev = []; for (let i = 0; i < n; i++) ev.push(...r.step(1 / 60, { fire: !!held }).events); return ev; };
+  const ready = () => { const r = mk({ manualGuns: true, playerHp: 1e7, regen: 0, startGun: 'pistol_service', gunDrops: true }); r.equipGun('rifle_m4', 0); fire(r, 24, false); return r; };   // the 0.3 s ready delay after a swap
+  const r = ready();
+  t('A short trigger pull on the M4 fires a tight 3-round burst and then stops', count(fire(r, 1, true).concat(fire(r, 20, false))) === 3 && r.snapshot().player.ammo === 27);
+  const held = ready();
+  t('Holding the trigger does not fire a second burst: you have to let go and pull again', count(fire(held, 120, true)) === 3 && held.snapshot().player.ammo === 27);
+  const mid = ready();
+  const midEv = fire(mid, 1, true).concat(fire(mid, 20, false));
+  t('If you let go during the burst, the remaining rounds of that burst still go out', count(midEv) === 3 && mid.snapshot().player.ammo === 27);
+  const two = ready();
+  fire(two, 10, true);                                            // first burst (done in ~0.10 s)
+  fire(two, 4, false);                                            // let go while the 0.25 s burst delay is still running
+  t('A second pull during the short delay between bursts does not fire', count(fire(two, 8, true)) === 0 && two.snapshot().player.ammo === 27);
+  fire(two, 24, false);                                           // finish the delay, trigger up
+  t('After you release and the burst delay has passed, a new pull fires another 3-round burst', count(fire(two, 20, true)) === 3 && two.snapshot().player.ammo === 24);
+  const empty = ready();
+  let bursts = 0;
+  for (let b = 0; b < 12; b++) { if (count(fire(empty, 10, true)) === 3) bursts++; fire(empty, 24, false); }
+  const p = empty.snapshot().player;
+  t('A 30-round magazine is ten bursts, then a reload starts', bursts === 10 && (p.reloading || p.ammo === p.magSize) && p.magSize === 30);
+}
 t('A run starts holding the plain silver Service Pistol with a 12 round magazine and nothing in the other hand', (() => { const p = mk().snapshot().player; return p.gun.id === 'pistol_service' && p.gun.rarity === 0 && p.gun.other === null && p.magSize === 12 && p.ammo === 12; })());
 t('The Service Pistol carries no status effect', W.GUNS.pistol_service.status.length === 0);
 t('Each gun type has its own feel: a shotgun fires 7 pellets slowly, a sniper hits hardest, an SMG fires fastest of the small guns, a heavy machine gun holds the most rounds', (() => { const c = { damage: 14, fireRate: 10, magSize: 30, reloadTime: 2.1 }, s = (id) => W.stats(W.make(id, 0, 1), c); return s('shotgun_pump').pellets === 7 && s('sniper_bolt').dmg > 4 * s('pistol_service').dmg && s('smg_compact').rate > s('pistol_service').rate * 2 && s('hmg_belt').mag > 3 * s('smg_compact').mag; })());

@@ -288,7 +288,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       vx: 0, vz: 0, eye: cfg.eyeStand,
       sliding: false, slideT: 0, slideCd: 0, sdx: 0, sdz: 0, jumpH: 0, jumpV: 0,
       sprinting: false, sprintK: 0, adsT: 0, kick: 0,
-      hp: cfg.playerHp, hurt: 0, sinceHit: 0, invuln: 0, fireCd: 0,
+      hp: cfg.playerHp, hurt: 0, sinceHit: 0, invuln: 0, fireCd: 0, burstLeft: 0, fireHeld: false,
       ammo: cfg.magSize, reloading: false, reloadT: 0, reloadDur: 0, reloadEmpty: false
     };
     let P = SELF;                                        // whoever the monsters are looking at right now (always SELF, except inside aim(), see the co-op section)
@@ -350,7 +350,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       P.x = M0.start.x; P.z = M0.start.z; P.yaw = M0.start.yaw; P.pitch = 0;
       P.vx = P.vz = 0; P.sliding = false; P.slideT = 0; P.kick = 0; P.jumpH = P.jumpV = 0;
       P.hp = maxHp(); P.invuln = 1.5; P.hurt = 0; P.sinceHit = 0; AIL.clear();
-      P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0;
+      P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0; P.burstLeft = 0;
       if (explored) reveal(P);
     }
     // a normal run starts on the floor its wave belongs to; a test link (#safe) starts in the safe room before that floor, with some gold in hand
@@ -795,7 +795,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
         dropGun(ok ? sx : P.x, ok ? sz : P.z, 0, W.slots[W.held]); pickups[pickups.length - 1].noPick = WP.DROP.noPick;
         W.slots[W.held] = it;
       }
-      P.ammo = it.ammo; P.reloading = false; P.reloadT = 0; P.fireCd = 0.3;
+      P.ammo = it.ammo; P.reloading = false; P.reloadT = 0; P.fireCd = 0.3; P.burstLeft = 0;
       events.push({ type: 'gunPickup', id: it.id, rarity: it.rarity });
     }
     // walking over gear: it goes on if the place is empty or it beats what you wear there (the old piece drops at your feet); worse gear stays on the floor
@@ -884,7 +884,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       if (door) { taken.add(i); if (cur && !W.slots[1 - h]) W.slots[1 - h] = cur; }          // at the hall's door your starting gun just moves to your back; the stash keeps its gun
       else if (cur && R.entry && !W.slots[1 - h]) { W.slots[1 - h] = cur; R.stash.splice(i, 1); }
       else if (cur) { delete cur.ammo; R.stash[i] = { kind: 'gun', item: cur }; } else R.stash.splice(i, 1);
-      if (h === W.held) { P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0.35; }
+      if (h === W.held) { P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0.35; P.burstLeft = 0; }
       if (R.entry) R.entryGun = true;
       return '';
     }
@@ -901,14 +901,14 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     function swapGun() {
       const other = 1 - W.held; if (!W.slots[other]) return;
       W.slots[W.held].ammo = P.ammo; W.held = other; P.ammo = W.slots[other].ammo;
-      P.reloading = false; P.reloadT = 0; P.fireCd = 0.35;
+      P.reloading = false; P.reloadT = 0; P.fireCd = 0.35; P.burstLeft = 0;
       events.push({ type: 'swap', id: W.slots[W.held].id, rarity: W.slots[W.held].rarity });
     }
 
     /* ---------------- reload ---------------- */
     function startReload() {
       if (P.reloading || P.ammo >= maxMag() || kit.mods().freeAmmo) return;
-      P.reloading = true; P.reloadT = 0; P.reloadEmpty = P.ammo <= 0;
+      P.reloading = true; P.reloadT = 0; P.reloadEmpty = P.ammo <= 0; P.burstLeft = 0;
       P.reloadDur = (gunStats().reload + (P.reloadEmpty ? cfg.reloadEmptyExtra : 0)) * M.reloadMul * kit.reloadMul(); kit.onReload();
       events.push({ type: 'reloadStart', dur: P.reloadDur, empty: P.reloadEmpty });
     }
@@ -935,7 +935,8 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
       const pe = clamp(P.pitch + P.kick, -1.5, 1.5);
       const speed = Math.hypot(P.vx, P.vz);
       const GS = gunStats();
-      let s0 = lerp(cfg.spread, cfg.spreadAds, P.adsT) * GS.spread * (1 + speed / cfg.walkSpeed * 0.5);
+      const burstI = (GS.burst && P.burstLeft) ? (GS.burst - P.burstLeft) : 0;   // 0, 1, 2: later rounds in a burst climb a little
+      let s0 = lerp(cfg.spread, cfg.spreadAds, P.adsT) * GS.spread * (1 + speed / cfg.walkSpeed * 0.5) * (1 + (GS.burstClimb || 0) * burstI);
       if (P.sliding) s0 *= 0.8;
       const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw), sp = Math.sin(pe), cp = Math.cos(pe);
       const fx = sy * cp, fy = sp, fz = -cy * cp;
@@ -984,7 +985,7 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
           }
         }
       }
-      P.kick += cfg.recoilKick;
+      P.kick += cfg.recoilKick * (1 + (GS.burstClimb || 0) * burstI);
       if (!kit.mods().freeAmmo) P.ammo--;
       if (P.ammo <= 0) startReload();
     }
@@ -1284,11 +1285,23 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
         if (p.reloadT >= p.reloadDur) { p.reloading = false; p.ammo = maxMag(); events.push({ type: 'reloadEnd' }); }
       }
       p.fireCd = Math.max(p.fireCd - dt, -dt);                  // the leftover of a frame carries over (so the rate stays exact), but never more than one frame: a long reload must not store up a burst
-      if (p.fireCd < 0 && !inp.fire) p.fireCd = 0;
-      const interval = 1 / (gunStats().rate * M.rate * CM.rate * (R.frenzy > 0 ? L.frenzyRate : 1));
+      if (p.fireCd < 0 && !inp.fire && !(p.burstLeft > 0)) p.fireCd = 0;
+      const GS = gunStats();
+      const interval = 1 / (GS.rate * M.rate * CM.rate * (R.frenzy > 0 ? L.frenzyRate : 1));
       let shots = 0;
-      if (inp.fire && !p.reloading && p.ammo <= 0) startReload();
-      while (inp.fire && !p.reloading && p.ammo > 0 && p.fireCd <= 0 && shots < 3) { shoot(); p.fireCd += interval; shots++; }
+      const pressed = !!(inp.fire && !p.fireHeld);
+      p.fireHeld = !!inp.fire;
+      if (inp.fire && !p.reloading && p.ammo <= 0 && !(p.burstLeft > 0)) startReload();
+      if (GS.burst) {
+        // a fresh trigger pull starts one tight burst; holding the trigger does not start another; an open burst finishes even if you let go
+        if (pressed && !p.reloading && p.ammo > 0 && p.fireCd <= 0 && !(p.burstLeft > 0)) p.burstLeft = Math.min(GS.burst, p.ammo);
+        while (p.burstLeft > 0 && !p.reloading && p.ammo > 0 && p.fireCd <= 0 && shots < 3) {
+          shoot(); if (p.burstLeft > 0) p.burstLeft--; p.fireCd += interval; shots++;
+          if (p.burstLeft === 0) p.fireCd += GS.burstDelay || 0;
+        }
+      } else {
+        while (inp.fire && !p.reloading && p.ammo > 0 && p.fireCd <= 0 && shots < 3) { shoot(); p.fireCd += interval; shots++; }
+      }
 
     }
 
@@ -1430,12 +1443,12 @@ const FG = typeof FloorGen !== 'undefined' ? FloorGen : require('./floorgen.js')
     function giveXp(v) { gainXp(v); }                                                  // tests: some experience right now
     function giveGun(id, rarity, wave, x, z) { dropGun(x === undefined ? P.x : x, z === undefined ? P.z : z, 0, WP.make(id, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a gun lies at your feet
     function equipGun(id, rarity) {                                                     // cheat build and tests: the gun in your hands becomes this one, full magazine
-      const it = WP.make(id, rarity || 0, R.wave, rngW, cfg.classId); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0.3;
+      const it = WP.make(id, rarity || 0, R.wave, rngW, cfg.classId); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0.3; P.burstLeft = 0;
     }
     function gearView() { const t = GR.total(GEAR.worn); return { worn: GEAR.worn.map((it, i) => it ? GR.view(it, null) : { slot: GR.WEAR[i], empty: true }), def: Math.round(t.def * 1000) / 10, hp: Math.round(t.hp), vit: Math.round(t.vit * 100), regen: Math.round(t.regen * 10) / 10, speed: Math.round(t.speed * 100), magnet: Math.round(t.magnet * 100), dmg: Math.round(t.dmg * 100), rate: Math.round(t.rate * 100), crit: Math.round(t.crit * 1000) / 10, critdmg: Math.round(t.critdmg * 100), leech: Math.round(t.leech * 10) / 10, reload: Math.round(t.reload * 100) }; }
     function giveGear(slot, rarity, wave, x, z) { dropGear(x === undefined ? P.x : x, z === undefined ? P.z : z, 0, GR.make(slot, rarity, wave || R.wave, rngW, cfg.classId)); }   // tests: a piece of gear lies at your feet
     function wearGear(item, at) { GEAR.worn[at === undefined ? GR.WEAR.indexOf(item.slot) : at] = item; M = computeMods(); P.hp = Math.min(P.hp, maxHp()); }   // tests: wear exactly this piece
-    function equipItem(item) { const it = Object.assign({}, item); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0; }   // tests: hold exactly this gun item (with the affixes it carries)
+    function equipItem(item) { const it = Object.assign({}, item); it.ammo = WP.stats(it, cfg).mag; W.slots[W.held] = it; P.ammo = maxMag(); P.reloading = false; P.reloadT = 0; P.fireCd = 0; P.burstLeft = 0; }   // tests: hold exactly this gun item (with the affixes it carries)
     function giveMod(rarity, wave, x, z) { dropMod(x === undefined ? P.x : x, z === undefined ? P.z : z, WP.MD.make(rarity, wave || R.wave, rngW)); }   // tests: a mod lies at your feet
     function addMod(item) { W.mods.push(item); }                                       // tests: this exact mod goes straight in the bag
     function setLoadout(list) { loadout = (list || []).map((e) => JSON.parse(JSON.stringify(e))); }   // blueprints for the next run (applied on reset)
