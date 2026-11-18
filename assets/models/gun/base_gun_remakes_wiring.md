@@ -92,3 +92,83 @@ Revolvers have no slide, so no `slide`/`slideTravel`. The cylinder is the `magaz
   4 for the machine pistol (slide, frame metal + polymer primitive, magazine).
 * Slide on the machine pistol is the only recoiling part; its barrel and compensator stay in `frame`.
 * Atlas colours: 20 / 25 / 20 (the 1911 is 16): brass, bone and engraving need a few more.
+
+---
+
+# Batch 2 (SMGs): wiring notes
+
+Same rules and format as batch 1. Art only; nothing here changes `src/` or `manifest.json`. Each model
+REPLACES its slot (one gun per slot):
+
+| slot id       | file                          | root node     | tris  | meshes                                              |
+|---------------|-------------------------------|---------------|-------|-----------------------------------------------------|
+| `smg_bullpup` | `gun/smg_bullpup_base.glb`    | `smg_bullpup` | 1,708 | `body`, `cocking_handle`, `magazine`                |
+| `smg_drum`    | `gun/smg_drum_base.glb`       | `smg_drum`    | 1,816 | `receiver`, `furniture`, `cocking_handle`, `magazine` |
+
+Empties under the root: `muzzle`, `mag_well`, `rear_sight`, `front_sight`. One 256 px albedo each; two embedded
+materials (metal = steel AND brass at metallic 1 / roughness 0.30 so the locked 1911 sheen applies; one non-metal:
+stippled polymer + bone on the bullpup, walnut + bone on the drum gun).
+
+## Sight line (xr_ads.js on grok/full-playtest-tonight @c3d56a6, `kind: "smg"`, relief 0.18 m)
+
+Both entries need `"redDot": false` (rear/front empties drive ADS). Rear and front share X = 0 and Y, so the sight
+direction is exactly (0,0,-1) (0.0000 deg off), the ADS pose rotation is the identity, and the bore sits a fixed
+distance below the sight line. `verify_ads.js <glb> smg`: rear on the eye axis, rear z == -relief, front ahead of rear,
+scale-invariant at gs = 1 and 2.2, `fire()` ray starts on the sight line (0.0000 deg).
+
+| gun     | rear_sight (x,y,z)     | front_sight (x,y,z)    | muzzle (x,y,z)         | sight radius | bore below line | 25 m zero convergence |
+|---------|------------------------|------------------------|------------------------|--------------|-----------------|-----------------------|
+| bullpup | 0, 0.1235, +0.0560     | 0, 0.1235, -0.2105     | 0, 0.0500, -0.2920     | 0.2665 m     | 73.5 mm         | 0.171 deg             |
+| drum    | 0, 0.1060, -0.0288     | 0, 0.1060, -0.3800     | 0, 0.0600, -0.4000     | 0.3512 m     | 46.0 mm         | 0.107 deg             |
+
+Empties sit on the TOP of each sight (rear = top of the notch posts, front = top of the blade bead), same convention
+as the 1911 and batch 1.
+
+## manifest.json `guns` entries (not applied)
+
+Following `smg_tactical -> gun/smg_mp5_base.glb`: `grip` [0,0,0] (the pistol grip is built around the origin),
+`slide` = the moving part (the brass cocking handle), `magazine` = the node dropped on reload.
+
+```json
+"smg_bullpup": {
+  "file": "gun/smg_bullpup_base.glb",
+  "root": "smg_bullpup",
+  "grip": [0, 0, 0],
+  "fore": [0, -0.028, -0.100],
+  "slide": "cocking_handle",
+  "slideTravel": 0.05,
+  "magazine": "magazine",
+  "muzzle": "muzzle",
+  "sight": "front_sight",
+  "redDot": false,
+  "kind": "smg",
+  "flatScale": 1
+},
+"smg_drum": {
+  "file": "gun/smg_drum_base.glb",
+  "root": "smg_drum",
+  "grip": [0, 0, 0],
+  "fore": [0, -0.045, -0.215],
+  "slide": "cocking_handle",
+  "slideTravel": 0.06,
+  "magazine": "magazine",
+  "muzzle": "muzzle",
+  "sight": "front_sight",
+  "redDot": false,
+  "kind": "smg",
+  "flatScale": 1
+}
+```
+
+## Things to know when wiring batch 2
+
+* **Bullpup magazine is top-loaded** (P90 style): `mag_well` is at (0, 0.0785, -0.075) on top of the body, so a
+  reload that drops the `magazine` node leaves an empty flat tray with the engraved rails; the sights stand clear of
+  it (the sight line is 24 mm above the magazine top). It is 0.231 m long, so it is the biggest `magazine` node of
+  any gun so far.
+* **Drum magazine** is a 96 mm round drum on an X axis; `mag_well` is the top of its neck at the receiver floor.
+  Dropping it leaves the open mag-well slot under the receiver. The brass ring and both hub faces ride with it.
+* `cocking_handle` is a small brass part in both guns (bullpup on the left side, drum on the right side); only it moves
+  with `slide` / `slideTravel`.
+* Draw calls: bullpup 3 meshes (5 primitives), drum 4 meshes (7 primitives).
+* Atlas colours: 24 (bullpup) / 25 (drum).
