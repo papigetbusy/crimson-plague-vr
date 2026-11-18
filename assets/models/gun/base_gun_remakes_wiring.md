@@ -246,3 +246,34 @@ plaques, brass plates and cuff straps), `magazine` (two spare shells in the left
 * `magazine` is the pair of spare shells carried in the brass-strapped cuff on the LEFT of the buttstock; dropping it on reload leaves
   the empty cuff straps. `mag_well` is the middle of that pair.
 * The brass top lever sits on the top strap in front of the eye in ADS (6 mm under the sight line, see the `_sights` render).
+
+## shotgun_combat (Saiga-12 / AA-12 style box-mag semi-auto)
+
+File `gun/shotgun_combat_base.glb`, root `shotgun_combat`, 1,448 tris. Meshes: `receiver` (receiver + raised top cover, engraved plates, barrel,
+gas tube + front-sight block, finned brake, guard, sights), `furniture` (walnut stock, pistol grip, upper + lower handguards, bone cross plaques,
+brass plates), `cocking_handle` (brass knob on the right, the moving part), `magazine` (curved 8-round box, brass base plate and band).
+
+| rear_sight (x,y,z) | front_sight (x,y,z) | muzzle (x,y,z) | mag_well (x,y,z) | sight radius | bore below line | 25 m zero convergence |
+|--------------------|---------------------|----------------|------------------|--------------|-----------------|-----------------------|
+| 0, 0.1020, -0.0300 | 0, 0.1020, -0.4500  | 0, 0.0620, -0.5800 | 0, 0.0300, -0.1100 | 0.4200 m | 40.0 mm | 0.094 deg |
+
+```json
+"shotgun_combat": {
+  "file": "gun/shotgun_combat_base.glb",
+  "root": "shotgun_combat",
+  "grip": [0, 0, 0],
+  "fore": [0, 0.005, -0.300],
+  "slide": "cocking_handle",
+  "slideTravel": 0.05,
+  "magazine": "magazine",
+  "muzzle": "muzzle",
+  "sight": "front_sight",
+  "redDot": false,
+  "kind": "shotgun",
+  "flatScale": 1
+}
+```
+
+* The sights are AK-style (tall rear ear posts on the top cover, front ears on the sight block), so the sight line is 40 mm above the bore.
+  The upper handguard and brass bands stay 6 mm under the line.
+* `magazine` is the curved box under the well collar: dropping it leaves the open collar. It is 0.129 m tall, hanging in front of the trigger guard.
