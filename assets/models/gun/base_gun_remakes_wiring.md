@@ -172,3 +172,46 @@ Following `smg_tactical -> gun/smg_mp5_base.glb`: `grip` [0,0,0] (the pistol gri
   with `slide` / `slideTravel`.
 * Draw calls: bullpup 3 meshes (5 primitives), drum 4 meshes (7 primitives).
 * Atlas colours: 24 (bullpup) / 25 (drum).
+
+---
+
+# Batch 3 (shotguns): wiring notes
+
+Same rules and format as batches 1 and 2 (art only; nothing here changes `src/` or `manifest.json`). Each model
+REPLACES its slot. Empties under every root: `muzzle`, `mag_well`, `rear_sight`, `front_sight`. One 256 px albedo each;
+two embedded materials (metal = steel AND brass at metallic 1 / roughness 0.30, locked 1911 sheen; one non-metal for
+walnut + bone). Sight line verified with `verify_ads.js <glb> shotgun` against xr_ads.js @c3d56a6 (`kind: "shotgun"`,
+relief 0.16 m), all entries need `"redDot": false`. These are bead-only guns: the rear reference is a pair of low brass-tipped
+posts on the vent rib / top strap (rear and front share X = 0 and Y, so the sight line is exactly (0,0,-1)).
+Sight-view previews are rendered with the real shotgun relief (0.16 m).
+
+## shotgun_pump (Remington 870 / Ithaca build)
+
+File `gun/shotgun_pump_base.glb`, root `shotgun_pump`, 1,620 tris. Meshes: `receiver` (receiver, plates, barrel, vent rib,
+mag tube, guard, sights), `furniture` (walnut stock, bone cross plaques, brass butt plate), `pump` (walnut forend, the sliding
+part), `magazine` (a shell at the loading gate, bone hull + brass head).
+
+| rear_sight (x,y,z) | front_sight (x,y,z) | muzzle (x,y,z) | mag_well (x,y,z) | sight radius | bore below line | 25 m zero convergence |
+|--------------------|---------------------|----------------|------------------|--------------|-----------------|-----------------------|
+| 0, 0.0650, -0.1890 | 0, 0.0650, -0.5385  | 0, 0.0470, -0.5600 | 0, -0.0035, -0.1275 | 0.3495 m | 18.0 mm | 0.042 deg |
+
+```json
+"shotgun_pump": {
+  "file": "gun/shotgun_pump_base.glb",
+  "root": "shotgun_pump",
+  "grip": [0, 0, 0],
+  "fore": [0, -0.010, -0.287],
+  "slide": "pump",
+  "slideTravel": 0.08,
+  "magazine": "magazine",
+  "muzzle": "muzzle",
+  "sight": "front_sight",
+  "redDot": false,
+  "kind": "shotgun",
+  "flatScale": 1
+}
+```
+
+* The pump forend is the only moving part (`slide` / `slideTravel`, it rides back along +Z). The `magazine` node is just the shell at the
+  loading gate; dropping it leaves the brass-edged gate plate.
+* Hand spot `grip` is the stock wrist (z = 0, just behind the trigger guard); the receiver sits directly in front of it.
