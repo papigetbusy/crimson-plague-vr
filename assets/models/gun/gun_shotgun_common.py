@@ -58,11 +58,11 @@ def make_mats(name, tex, rough=0.55, spec=0.25):
     return mats
 
 
-def sight_pair(part, y_top, z_rear, z_front, y_base_rear, y_base_front, rear_w=0.0125, rear_len=0.018, bead_h=0.0016):
+def sight_pair(part, y_top, z_rear, z_front, y_base_rear, y_base_front, rear_w=0.0125, rear_len=0.018, bead_h=0.0016, post_in=0.0040):
     """Gothic notch-post rear (two brass-tipped posts) and a blade front with a brass bead."""
     part.box((-rear_w, y_base_rear, z_rear - rear_len * 0.5), (rear_w, y_top - 0.0016, z_rear + rear_len * 0.5), 'steel', top='steel_top')
     for sgn in (-1, 1):
-        lo, hi = (0.0040, rear_w - 0.0020) if sgn > 0 else (-(rear_w - 0.0020), -0.0040)
+        lo, hi = (post_in, rear_w - 0.0020) if sgn > 0 else (-(rear_w - 0.0020), -post_in)
         part.box((lo, y_top - 0.0016, z_rear - rear_len * 0.35), (hi, y_top, z_rear + rear_len * 0.35), 'steel', top='steel_top')
         part.box((lo, y_top - 0.0008, z_rear - rear_len * 0.35), (hi, y_top, z_rear + rear_len * 0.35), 'brass')
     part.box((-0.0030, y_base_front, z_front - 0.0030), (0.0030, y_top - bead_h, z_front + 0.0030), 'steel', top='steel_top')

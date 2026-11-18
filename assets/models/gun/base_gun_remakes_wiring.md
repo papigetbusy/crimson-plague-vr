@@ -215,3 +215,34 @@ part), `magazine` (a shell at the loading gate, bone hull + brass head).
 * The pump forend is the only moving part (`slide` / `slideTravel`, it rides back along +Z). The `magazine` node is just the shell at the
   loading gate; dropping it leaves the brass-edged gate plate.
 * Hand spot `grip` is the stock wrist (z = 0, just behind the trigger guard); the receiver sits directly in front of it.
+
+## shotgun_double (side-by-side coach / English sidelock build)
+
+File `gun/shotgun_double_base.glb`, root `shotgun_double`, 1,932 tris. Meshes: `receiver` (action, engraved sideplates, hinge pin,
+short brass top lever, guard, two triggers), `hammers` (two exposed hammers), `barrels` (two blued barrels, vent rib, brass bands,
+sights; its own mesh so a break animation can be added later), `furniture` (walnut stock + pistol grip + splinter forend, bone cross
+plaques, brass plates and cuff straps), `magazine` (two spare shells in the left stock cuff).
+
+| rear_sight (x,y,z) | front_sight (x,y,z) | muzzle (x,y,z) | mag_well (x,y,z) | sight radius | bore below line | 25 m zero convergence |
+|--------------------|---------------------|----------------|------------------|--------------|-----------------|-----------------------|
+| 0, 0.0690, -0.1350 | 0, 0.0690, -0.4975  | 0, 0.0520, -0.5200 | -0.0275, 0.0292, +0.1760 | 0.3625 m | 17.0 mm | 0.040 deg |
+
+```json
+"shotgun_double": {
+  "file": "gun/shotgun_double_base.glb",
+  "root": "shotgun_double",
+  "grip": [0, 0, 0],
+  "fore": [0, 0.005, -0.200],
+  "magazine": "magazine",
+  "muzzle": "muzzle",
+  "sight": "front_sight",
+  "redDot": false,
+  "kind": "shotgun",
+  "flatScale": 1
+}
+```
+
+* No `slide`: break-action, nothing recoils. `muzzle` sits between the two barrels (x = 0), so a pellet spread fires from the centre.
+* `magazine` is the pair of spare shells carried in the brass-strapped cuff on the LEFT of the buttstock; dropping it on reload leaves
+  the empty cuff straps. `mag_well` is the middle of that pair.
+* The brass top lever sits on the top strap in front of the eye in ADS (6 mm under the sight line, see the `_sights` render).
