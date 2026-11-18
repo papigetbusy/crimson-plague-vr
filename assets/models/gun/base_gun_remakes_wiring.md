@@ -277,3 +277,34 @@ brass plates), `cocking_handle` (brass knob on the right, the moving part), `mag
 * The sights are AK-style (tall rear ear posts on the top cover, front ears on the sight block), so the sight line is 40 mm above the bore.
   The upper handguard and brass bands stay 6 mm under the line.
 * `magazine` is the curved box under the well collar: dropping it leaves the open collar. It is 0.129 m tall, hanging in front of the trigger guard.
+
+## shotgun_blunderbuss (flintlock coaching blunderbuss)
+
+File `gun/shotgun_blunderbuss_base.glb`, root `shotgun_blunderbuss`, 1,160 tris. Meshes: `receiver` (octagonal blued barrel, fluted brass bell, engraved lock
+plate, brass pan, frizzen, brass guard + trigger, sights), `furniture` (walnut stock, bone cross plaque, brass tang / wrist cap / butt plate / fore bands,
+bone fore tip), `hammer` (the flint cock, origin at its pivot, 4 draw-call mesh like the revolvers' hammers), `magazine` (brass powder flask on the left of
+the stock).
+
+| rear_sight (x,y,z) | front_sight (x,y,z) | muzzle (x,y,z) | mag_well (x,y,z) | sight radius | bore below line | 25 m zero convergence |
+|--------------------|---------------------|----------------|------------------|--------------|-----------------|-----------------------|
+| 0, 0.1060, -0.0650 | 0, 0.1060, -0.3920  | 0, 0.0700, -0.4040 | -0.0235, -0.0020, +0.1700 | 0.3270 m | 36.0 mm | 0.084 deg |
+
+```json
+"shotgun_blunderbuss": {
+  "file": "gun/shotgun_blunderbuss_base.glb",
+  "root": "shotgun_blunderbuss",
+  "grip": [0, 0, 0],
+  "fore": [0, 0.005, -0.150],
+  "magazine": "magazine",
+  "muzzle": "muzzle",
+  "sight": "front_sight",
+  "redDot": false,
+  "kind": "shotgun",
+  "flatScale": 1
+}
+```
+
+* Rear reference = two thin brass-tipped spires on the breech; front reference = a bead on the rim of the bell (a blunderbuss has no real sights, so the
+  line is 36 mm above the bore to clear the bell). `muzzle` is the centre of the bell mouth.
+* `hammer` is its own mesh (pivot at its origin) for a later cock / fall animation; `glb_guns.js` does not animate it. No `slide`.
+* `magazine` is the brass powder flask on the LEFT of the buttstock; dropping it on reload leaves a clean stock side.
