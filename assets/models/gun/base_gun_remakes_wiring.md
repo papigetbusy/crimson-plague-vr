@@ -327,3 +327,9 @@ three meshes (`body`, `cocking_handle`, `magazine`), 1,400 tris (was 1,708). The
 the sight line. The manifest entry for `smg_bullpup` above stays valid, with two changes: `"fore": [0, -0.028, -0.100]` can drop to `[0, 0.030, -0.100]`
 (the finger-grip block is gone, the hand now holds the shell front) and `slideTravel` 0.05 is fine for the smaller left-side handle.
 * The top-loaded magazine is now 0.2075 m long and 20 mm thick (`mag_well` moved to y = 0.062); dropping it leaves the slotted rail bridge on the shell.
+
+## Batch 3 revision: `shotgun_pump` v2 (sleek pass)
+
+Same file name, root, meshes, empties and sight numbers as above. Slimmer receiver (30 mm wide), 28 mm stock with a thinner wrist and butt, 30 mm forend with
+thin brass ferrules, thinner barrel / tube, small bone cross inlays, thin brass straps, finer engraving. 1,564 tris (was 1,620). `verify_ads.js shotgun` unchanged:
+rear (0, 0.0650, -0.1890), front (0, 0.0650, -0.5385), bore 18 mm below the line, 0.042 deg. Rib top is now 0.0610 (was 0.0620); sight tops did not move.
