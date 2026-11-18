@@ -308,3 +308,22 @@ the stock).
   line is 36 mm above the bore to clear the bell). `muzzle` is the centre of the bell mouth.
 * `hammer` is its own mesh (pivot at its origin) for a later cock / fall animation; `glb_guns.js` does not animate it. No `slide`.
 * `magazine` is the brass powder flask on the LEFT of the buttstock; dropping it on reload leaves a clean stock side.
+
+---
+
+# Batch 2 revision: `smg_bullpup` v2 (sleek P90 redo, supersedes the batch 2 bullpup numbers above)
+
+Papi found the first bullpup chunky, so `gun/smg_bullpup_base.glb` was rebuilt: slim octagonal-section polymer shell (31-32 mm wide,
+tapering into the muzzle end and sweeping into a thumbhole butt), thin top-loaded magazine (20 mm) under a slotted low-profile rail,
+realistic-size grip (25 mm thick) and slender guard / trigger, shrouded 14 mm barrel with a small hider. Gothic detail kept fine: two thin
+engraved inlay plates per side, thin brass trim, tiny bone cross inlay on the butt. Same file name, root `smg_bullpup`, same empties and the same
+three meshes (`body`, `cocking_handle`, `magazine`), 1,400 tris (was 1,708). The old v1 builder is saved outside the repo only.
+
+| rear_sight (x,y,z) | front_sight (x,y,z) | muzzle (x,y,z) | mag_well (x,y,z) | sight radius | bore below line | 25 m zero convergence |
+|--------------------|---------------------|----------------|------------------|--------------|-----------------|-----------------------|
+| 0, 0.0970, +0.0500 | 0, 0.0970, -0.2050  | 0, 0.0500, -0.2920 | 0, 0.0620, -0.0650 | 0.2550 m | 47.0 mm (was 73.5) | 0.109 deg |
+
+`verify_ads.js smg`: sight dir exactly (0,0,-1), rear on the eye axis at z = -0.18, front ahead, scale-invariant at gs 1 / 2.2, `fire()` ray starts on
+the sight line. The manifest entry for `smg_bullpup` above stays valid, with two changes: `"fore": [0, -0.028, -0.100]` can drop to `[0, 0.030, -0.100]`
+(the finger-grip block is gone, the hand now holds the shell front) and `slideTravel` 0.05 is fine for the smaller left-side handle.
+* The top-loaded magazine is now 0.2075 m long and 20 mm thick (`mag_well` moved to y = 0.062); dropping it leaves the slotted rail bridge on the shell.
