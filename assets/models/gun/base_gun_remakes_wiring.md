@@ -333,3 +333,32 @@ the sight line. The manifest entry for `smg_bullpup` above stays valid, with two
 Same file name, root, meshes, empties and sight numbers as above. Slimmer receiver (30 mm wide), 28 mm stock with a thinner wrist and butt, 30 mm forend with
 thin brass ferrules, thinner barrel / tube, small bone cross inlays, thin brass straps, finer engraving. 1,564 tris (was 1,620). `verify_ads.js shotgun` unchanged:
 rear (0, 0.0650, -0.1890), front (0, 0.0650, -0.5385), bore 18 mm below the line, 0.042 deg. Rib top is now 0.0610 (was 0.0620); sight tops did not move.
+
+## Batch 2 revision: `smg_bullpup` v3 (compact P90-style SMG, supersedes the v2 numbers above)
+
+Papi: v2 still read as a long AR rifle. `gun/smg_bullpup_base.glb` is now a COMPACT SMG: 0.455 m overall (v2 was ~0.55 m), rounded P90-style polymer body with an
+integrated thumbhole butt, grip bar and trigger hole, stubby 12 mm barrel with a small hider barely past the shell (muzzle at z = -0.168), thin top-loaded mag
+(20 mm) between low shoulder rails, engraved steel sight housing, two thin engraved butt plates, tiny bone cross inlay, brass pinstripes and trim. Same file,
+root `smg_bullpup`, same empties, meshes `body`, `cocking_handle`, `magazine`, 2,488 tris (bevelled edges).
+
+| rear_sight (x,y,z) | front_sight (x,y,z) | muzzle (x,y,z) | mag_well (x,y,z) | sight radius | bore below line | 25 m zero convergence |
+|--------------------|---------------------|----------------|------------------|--------------|-----------------|-----------------------|
+| 0, 0.0960, +0.0500 | 0, 0.0960, -0.1120  | 0, 0.0470, -0.1680 | 0, 0.0580, +0.0400 | 0.1620 m | 49 mm | 0.113 deg |
+
+`verify_ads.js smg`: sight dir exactly (0,0,-1), rear on the eye axis at z = -0.18, front ahead, scale-invariant at gs 1 / 2.2, `fire()` ray starts on the sight
+line. The manifest entry's `fore` should be about `[0, 0.0, -0.040]` (hand on the grip bar) and the front sight is short (0.162 m radius), which is normal for a P90.
+
+# HD albedo + linear filtering (applies to every gun built from now on, starting with `smg_bullpup` v3)
+
+Papi's quality bar: crisp, shiny, no pixelated textures. What changed in the art pipeline (assets only, nothing in `src/` touched):
+
+* Albedo is now **1024 x 1024** (was 256 x 256). Painters still work on a 256 grid, then `gun_gothic_common.hd_upscale` does a smooth-label x4 upscale: every palette
+  colour becomes a soft mask, the result is blended with a steep softmax, so contours are clean anti-aliased curves with no stair-steps and thin engraving lines stay crisp,
+  plus a faint (2 %) fine grain. File size is ~0.4-0.5 MB per gun (GLB ~0.6 MB), so it stays at 1024 rather than being cut to 512.
+* The GLB sampler is now **LINEAR** (glTF magFilter 9729 / minFilter 9987 mip-linear), not NEAREST. If the loader overrides filters on gun textures (the old pixel-art
+  convention `tex.magFilter = tex.minFilter = THREE.NearestFilter`), remove that override for the guns built from now on, and keep `tex.generateMipmaps = true`, `tex.anisotropy = 4..8`,
+  `tex.colorSpace = THREE.SRGBColorSpace`, `flipY = false` (glTF default). Old pistols / SMG GLBs that were not rebuilt are still 256 px NEAREST; set the filter per gun if the loader
+  is global (or rebuild them with the same scripts, which is now a one-liner each).
+* Key hard edges (> 40 deg, longer than 4 mm) get a 0.7 mm bevel so the locked 1911 steel sheen (metallic 1, roughness 0.30) catches them; this is what adds triangles (still < 3,000).
+* Polymer is now a matte material (roughness 0.68, specular 0.14) with a fine stipple instead of a blotchy hatch; steel, brass and bone are unchanged.
+* `export_lowpoly.py --max-tex 1024` is needed (the default cap for guns is 256 px); `--max-tris 3000 --allow-multi-material` as before.

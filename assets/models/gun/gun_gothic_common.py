@@ -13,11 +13,15 @@ bone / polymer. Two materials, one 256 px nearest-filtered atlas per gun.
 import math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy, bmesh
+import numpy as np
 from mathutils import Vector
 import gun_lowpoly_common as C
 
 M, G = C.M, C.G
 S = 256
+HD = 1024                      # final albedo size (smooth, anti-aliased); painters still work on the 256 logical grid
+C.TEX_INTERP = 'Linear'        # linear filtering for the HD albedo (glTF sampler LINEAR)
+C.BEVEL_W = 0.0007             # small bevel on hard edges so the locked steel sheen catches them
 
 PAL = {
     'recess': (7, 8, 11), 'steel_black': (11, 12, 18), 'steel_dark': (19, 22, 32),
@@ -328,8 +332,15 @@ class Atlas:
             self.put(cx + dx, cy + dy, c)
 
     # ---- polymer -------------------------------------------------------
-    def poly(self, r, seed=41, dark=False, checker=False):
+    def poly(self, r, seed=41, dark=False, checker=False, fine=False):
         x0, y0, x1, y1 = self.reg[r]
+        if fine:       # HD pass: uniform dark polymer with a fine stipple, no blotches / hatch / edge lines
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    hv = _h(x, y, seed)
+                    c = 'p_shadow' if hv < 0.38 else 'p_mid' if hv > 0.985 else 'p_dark'
+                    self.put(x, y, c)
+            return
         for y in range(y0, y1):
             for x in range(x0, x1):
                 hv = _h(x, y, seed)
@@ -456,9 +467,102 @@ class Atlas:
 
     def save(self, path):
         used = set(self.buf)
-        M._write_png(path, S, S, bytes(v for c in self.buf for v in c), bottom_up=True)
-        print('atlas colours', len(used), 'region px', self.used_px)
+        arr = np.array(self.buf, dtype=np.uint8).reshape(S, S, 3)
+        up = hd_upscale(arr)
+        M._write_png(path, HD, HD, up.tobytes(), bottom_up=True)
+        print('atlas colours', len(used), 'region px', self.used_px, 'hd', HD)
         return len(used)
+
+
+def _epx(a):
+    """Scale2x / EPX pixel-art upscale: smooth diagonals, keeps edges crisp (no blur)."""
+    h, w, _ = a.shape
+    P = a
+    Ap = np.vstack([a[:1], a[:-1]])          # up
+    Dp = np.vstack([a[1:], a[-1:]])          # down
+    Cp = np.hstack([a[:, :1], a[:, :-1]])    # left
+    Bp = np.hstack([a[:, 1:], a[:, -1:]])    # right
+    eq = lambda x, y: np.all(x == y, axis=2)
+    out = np.zeros((h * 2, w * 2, 3), dtype=a.dtype)
+    c_a, a_b, d_c, b_d = eq(Cp, Ap), eq(Ap, Bp), eq(Dp, Cp), eq(Bp, Dp)
+    c_d, a_c, b_dd, a_d = eq(Cp, Dp), eq(Ap, Cp), eq(Bp, Dp), eq(Ap, Dp)
+    ne = lambda m: ~m
+    p1 = c_a & ne(eq(Cp, Dp)) & ne(eq(Ap, Bp))
+    p2 = a_b & ne(eq(Ap, Cp)) & ne(eq(Bp, Dp))
+    p3 = d_c & ne(eq(Dp, Bp)) & ne(eq(Cp, Ap))
+    p4 = b_d & ne(eq(Bp, Ap)) & ne(eq(Dp, Cp))
+    out[0::2, 0::2] = np.where(p1[..., None], Ap, P)
+    out[0::2, 1::2] = np.where(p2[..., None], Bp, P)
+    out[1::2, 0::2] = np.where(p3[..., None], Cp, P)
+    out[1::2, 1::2] = np.where(p4[..., None], Dp, P)
+    return out
+
+
+def _cr_up2(a, axis):
+    """Catmull-Rom 2x upsample along an axis (edge clamped)."""
+    a = a.astype(np.float32)
+    n = a.shape[axis]
+    idx = np.arange(n)
+    def take(off):
+        return np.take(a, np.clip(idx + off, 0, n - 1), axis=axis)
+    p0, p1, p2, p3 = take(-1), take(0), take(1), take(2)
+    def cr(t):
+        return (0.5 * (-t ** 3 + 2 * t ** 2 - t) * p0 + 0.5 * (3 * t ** 3 - 5 * t ** 2 + 2) * p1 +
+                0.5 * (-3 * t ** 3 + 4 * t ** 2 + t) * p2 + 0.5 * (t ** 3 - t ** 2) * p3)
+    lo, hi = cr(0.75), cr(0.25)       # samples at -0.25 / +0.25 of the source pixel (centres)
+    # output sample k=2i is at source i-0.25 (between i-1 and i, t=0.75 of p_{i-1}), k=2i+1 at i+0.25
+    lo = _shift_cr(a, axis, -1, 0.75)
+    hi = _shift_cr(a, axis, 0, 0.25)
+    shp = list(a.shape); shp[axis] *= 2
+    out = np.empty(shp, dtype=np.float32)
+    sl = [slice(None)] * 3
+    sl[axis] = slice(0, None, 2); out[tuple(sl)] = lo
+    sl[axis] = slice(1, None, 2); out[tuple(sl)] = hi
+    return out
+
+
+def _shift_cr(a, axis, base, t):
+    n = a.shape[axis]; idx = np.arange(n)
+    g = lambda off: np.take(a, np.clip(idx + base + off, 0, n - 1), axis=axis)
+    p0, p1, p2, p3 = g(-1), g(0), g(1), g(2)
+    return (0.5 * (-t ** 3 + 2 * t ** 2 - t) * p0 + 0.5 * (3 * t ** 3 - 5 * t ** 2 + 2) * p1 +
+            0.5 * (-3 * t ** 3 + 4 * t ** 2 + t) * p2 + 0.5 * (t ** 3 - t ** 2) * p3)
+
+
+def _gblur(f, sig):
+    r = max(1, int(sig * 3))
+    k = np.exp(-0.5 * (np.arange(-r, r + 1) / sig) ** 2); k /= k.sum()
+    for ax in (0, 1):
+        pad = [(r, r) if d == ax else (0, 0) for d in range(f.ndim)]
+        p = np.pad(f, pad, mode='edge')
+        out = np.zeros_like(f)
+        for t, w in enumerate(k):
+            sl = [slice(None)] * f.ndim; sl[ax] = slice(t, t + f.shape[ax]); out += w * p[tuple(sl)]
+        f = out
+    return f
+
+
+def hd_upscale(arr, sig=0.55, beta=12.0):
+    """256 logical painter grid -> 1024 smooth, anti-aliased albedo.
+    Smooth-label upscale: every palette colour becomes a soft mask (gaussian + Catmull-Rom x4); each output texel is the
+    softmax blend of the colours, so contours become clean curves with a ~1px anti-aliased edge and NO stair-steps,
+    thin engraving lines stay crisp. A faint fine grain keeps flat areas from looking like plastic."""
+    h, w, _ = arr.shape
+    cols, inv = np.unique(arr.reshape(-1, 3), axis=0, return_inverse=True)
+    inv = inv.reshape(h, w)
+    num = np.zeros((h * 4, w * 4, 3), np.float32); den = np.zeros((h * 4, w * 4), np.float32)
+    for k, c in enumerate(cols):
+        s = _gblur((inv == k).astype(np.float32), sig)
+        s = np.repeat(s[..., None], 3, 2)
+        for _ in range(2):
+            s = _cr_up2(_cr_up2(s, 0), 1)
+        e = np.exp(beta * np.clip(s[..., 0], 0, 1))
+        num += e[..., None] * c.astype(np.float32); den += e
+    f = num / den[..., None]
+    rng = np.random.RandomState(7)
+    g = rng.normal(0.0, 1.0, f.shape[:2]).astype(np.float32)[..., None]
+    f = f * (1.0 + 0.02 * g)
+    return np.clip(f + 0.5, 0, 255).astype(np.uint8)
 
 
 # ---- mesh helpers ----------------------------------------------------------
@@ -590,7 +694,7 @@ def render_gun(glb, out_dir, gid, relief=0.30, small=False):
         for slot in o.material_slots:
             for n in slot.material.node_tree.nodes:
                 if n.type == 'TEX_IMAGE':
-                    n.interpolation = 'Closest'
+                    n.interpolation = 'Linear'
     emp = {o.name: M.game_of(o.matrix_world.translation) for o in bpy.context.scene.objects if o.type == 'EMPTY'}
     mn, mx, center, size = M.mesh_bounds_game(meshes)
     L = max(size.z, size.y * 1.6, 0.2)

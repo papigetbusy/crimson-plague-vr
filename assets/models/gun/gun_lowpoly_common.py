@@ -27,6 +27,8 @@ G = M.G
 
 S = 256
 PAD = 2
+TEX_INTERP = 'Closest'   # gun_gothic_common switches this to 'Linear' (smooth HD albedo)
+BEVEL_W = None       # metres; gun_gothic_common sets a small value so edges catch the sheen
 STEEL = {
     'recess':      (7, 8, 11),
     'steel_black': (11, 12, 18),
@@ -317,7 +319,18 @@ class Part:
         # strip/cap orientation for concave prisms is handled by recalc below
         bmesh.ops.recalc_face_normals(self.bm, faces=faces)
 
+    def _bevel(self):
+        w = BEVEL_W
+        if not w:
+            return
+        bm = self.bm
+        edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_length() > 6 * w
+                 and e.calc_face_angle(0.0) > math.radians(40)]
+        if edges:
+            bmesh.ops.bevel(bm, geom=edges, offset=w, segments=1, affect='EDGES', profile=0.5)
+
     def to_object(self, mats, smooth=35):
+        self._bevel()
         me = bpy.data.meshes.new(self.name)
         self.bm.to_mesh(me); self.bm.free()
         for m in mats:
@@ -339,7 +352,7 @@ def make_materials(name, img_path, furn='wood'):
         mat = bpy.data.materials.new(name + ('' if key == 'steel' else '_' + key))
         mat.use_nodes = True
         nt = mat.node_tree; bsdf = nt.nodes.get('Principled BSDF')
-        tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = img; tex.interpolation = 'Closest'
+        tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = img; tex.interpolation = TEX_INTERP
         nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
         bsdf.inputs['Metallic'].default_value = metal
         bsdf.inputs['Roughness'].default_value = rough
