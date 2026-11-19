@@ -40,22 +40,22 @@ Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.1350, -0.4975
 TH = math.radians(14)
 GRIP_TOP, GRIP_BOT = 0.040, -0.062
 PH = -math.pi / 12
-SHELL_X, SHELL_Y0, SHELL_Y1, SHELL_Z0, SHELL_Z1 = -0.0275, 0.0395, 0.0190, 0.140, 0.208
-MAGW = (SHELL_X, 0.0292, (SHELL_Z0 + SHELL_Z1) / 2)
+SHELL_X, SHELL_Y0, SHELL_Y1, SHELL_Z0, SHELL_Z1 = -0.0275, 0.0200, 0.0000, 0.140, 0.208
+MAGW = (SHELL_X, 0.0100, (SHELL_Z0 + SHELL_Z1) / 2)
 
 
 def build(out_dir):
     C.M.reset_scene()
     A = K.Atlas([
-        ('barrel', 128, 72), ('panel', 112, 36), ('lock', 64, 40), ('wood', 64, 64), ('bone_stock', 48, 48), ('bone_fore', 40, 28),
+        ('barrel', 128, 72), ('panel', 112, 36), ('lock', 64, 40), ('wood', 128, 48), ('bone_stock', 40, 40), ('bone_fore', 32, 32),
         ('steel', 48, 32), ('steel_top', 48, 24), ('muzzle', 28, 28), ('brass', 24, 24), ('bone_end', 16, 16), ('wood_end', 16, 16),
         ('shell', 32, 16),
     ])
     A.install()
     A.steel('steel', seed=5, grime=0.84)
     A.steel('steel_top', ('steel_mid', 'steel_light', 'sheen', 'steel_edge'), seed=6, grime=0.74)
-    A.engraved('panel', seed=9, lam=22, grime=0.82)
-    A.engraved('lock', seed=14, lam=18, grime=0.82, cross=True)
+    A.engraved('panel', seed=9, lam=14, grime=0.84, arches=False)
+    A.engraved('lock', seed=14, lam=13, grime=0.84, arches=False, cross=True)
     A.wrap('barrel', 12, 6, lambda j: 'eng' if j in (0, 6) else 'hi' if j == 3 else 'dark' if j == 9 else 'plain', seed=11, lam=18)
     A.muzzle('muzzle'); A.brass('brass', engrave=True)
     A.bone('bone_stock', seed=37, motif='cross'); A.bone('bone_fore', seed=41, motif='cross'); A.bone('bone_end', motif=None, rim=False)
@@ -114,34 +114,33 @@ def build(out_dir):
 
     # ---------------- walnut furniture ----------------
     fu = C.Part('furniture')
-    stock = [(0.030, 0.0600), (0.200, 0.0560), (0.310, 0.0480), (0.345, 0.0440), (0.352, -0.045), (0.336, -0.062), (0.300, -0.040),
-             (0.200, 0.010), (0.130, 0.020), (0.030, 0.025)]
-    fu.prism(stock, -0.0175, 0.0175, 'wood', side='wood_end')
-    fu.prism([(0.3500, 0.0460), (0.3585, 0.0460), (0.3585, -0.0560), (0.3380, -0.0660), (0.3330, -0.0580), (0.3500, -0.0540)], -0.0185, 0.0185, 'brass', side='brass')
-    grip = [(-0.0225, GRIP_TOP), (-0.0235, 0.020), (-0.0240, -0.015), (-0.0225, GRIP_BOT), (0.0205, GRIP_BOT), (0.0235, -0.030),
-            (0.0245, 0.000), (0.0240, 0.030), (0.0220, GRIP_TOP)]
-    K.prism_ah(fu, K.chaikin(grip, 1), TH, -0.0140, 0.0140, 'wood', side='wood_end')
-    zb = K.ah_to_zy([(-0.0235, GRIP_BOT), (0.0212, GRIP_BOT), (0.0212, GRIP_BOT - 0.0070), (-0.0235, GRIP_BOT - 0.0070)], TH)
-    fu.prism(zb, -0.0152, 0.0152, 'brass', side='brass')
-    zb2 = K.ah_to_zy([(-0.0150, GRIP_BOT - 0.0070), (0.0100, GRIP_BOT - 0.0070), (0.0090, GRIP_BOT - 0.0130), (-0.0140, GRIP_BOT - 0.0130)], TH)
-    fu.prism(zb2, -0.0105, 0.0105, 'bone_end', side='bone_end')
+    # stock side profile traced from the side-by-side coach gun photo (/workspace/gun_brief/refs/shotgun_double), z stretched to this model's stock length
+    top_t = [(0.3378, 0.0162), (0.3177, 0.0214), (0.2969, 0.0236), (0.2768, 0.0259), (0.2560, 0.0281), (0.2352, 0.0311), (0.2151, 0.0325),
+             (0.1943, 0.0348), (0.1742, 0.0370), (0.1534, 0.0392), (0.1326, 0.0415), (0.1125, 0.0377), (0.0917, 0.0325), (0.0716, 0.0370),
+             (0.0508, 0.0444), (0.0300, 0.0549)]
+    bot_t = [(0.3378, -0.0924), (0.3155, -0.0968), (0.2925, -0.0886), (0.2694, -0.0797), (0.2464, -0.0715), (0.2233, -0.0626), (0.2010, -0.0544),
+             (0.1780, -0.0455), (0.1549, -0.0373), (0.1319, -0.0329), (0.1088, -0.0366), (0.0858, -0.0381), (0.0754, -0.0202), (0.0642, -0.0069),
+             (0.0530, 0.0006), (0.0419, 0.0050), (0.0300, 0.0058)]
+    zs = lambda z: 0.030 + (z - 0.030) * (0.352 - 0.030) / (0.3400 - 0.030)
+    stock = [(zs(z), y) for z, y in top_t] + [(zs(z), y) for z, y in reversed(bot_t)]
+    stock[0] = (0.352, stock[0][1]); stock[-1] = (0.352, stock[-1][1])
+    K.shell(fu, K.chaikin(stock, 1), [], 0.0150, region='wood', bevel=0.0050, segs=1, gmap=True)
+    fu.prism([(0.3500, 0.0162), (0.3585, 0.0162), (0.3585, -0.0924), (0.3500, -0.0924)], -0.0155, 0.0155, 'brass', side='brass')
     for sgn in (-1, 1):
-        lo, hi = (0.0175, 0.0194) if sgn > 0 else (-0.0194, -0.0175)
-        fu.prism(K.chaikin(S.cham(0.052, 0.124, -0.002, 0.050, 0.010), 1), lo, hi, 'bone_stock', side='bone_end')
-        fu.cyl((sgn * 0.0172, 0.0480, 0.0300), (sgn * 0.0204, 0.0480, 0.0300), 0.0034, 8, 'brass', cap='brass')    # tang bolt
-        zy = K.ah_to_zy([(0.0, 0.012)], TH)[0]
-        fu.cyl((sgn * 0.0138, zy[1], zy[0]), (sgn * 0.0160, zy[1], zy[0]), 0.0030, 8, 'brass', cap='brass')
+        x0, x1 = (0.0150 - 0.0005, 0.0150 + 0.0016) if sgn > 0 else (-0.0150 - 0.0016, -0.0150 + 0.0005)
+        fu.cyl((x0, -0.0150, 0.2000), (x1, -0.0150, 0.2000), 0.0150, 12, 'brass', cap='bone_stock')       # brass-rimmed bone cross badge
+        fu.cyl((sgn * 0.0148, 0.0480, 0.0300), (sgn * 0.0166, 0.0480, 0.0300), 0.0030, 8, 'brass', cap='brass')    # tang bolt
     # splinter forend under the barrels + brass tip + bone plaques
     fe = K.chaikin([(-0.118, 0.0420), (-0.118, 0.0200), (-0.180, 0.0190), (-0.250, 0.0235), (-0.286, 0.0300), (-0.290, 0.0420)], 1)
-    fu.prism(fe, -0.0235, 0.0235, 'wood', side='wood_end')
-    fu.box((-0.0243, 0.0285, -0.2960), (0.0243, 0.0438, -0.2860), 'brass')
-    fu.box((-0.0243, 0.0170, -0.1250), (0.0243, 0.0430, -0.1180), 'brass')
+    K.shell(fu, fe, [], 0.0212, region='wood', bevel=0.0045, segs=1, gmap=True)
+    fu.box((-0.0220, 0.0285, -0.2960), (0.0220, 0.0438, -0.2860), 'brass')
+    fu.box((-0.0220, 0.0170, -0.1250), (0.0220, 0.0430, -0.1180), 'brass')
     for sgn in (-1, 1):
-        lo, hi = (0.0235, 0.0252) if sgn > 0 else (-0.0252, -0.0235)
-        fu.prism(K.chaikin(S.cham(-0.236, -0.164, 0.0225, 0.0405, 0.0040), 1), lo, hi, 'bone_fore', side='bone_end')
+        x0, x1 = (0.0212 - 0.0005, 0.0212 + 0.0014) if sgn > 0 else (-0.0212 - 0.0014, -0.0212 + 0.0005)
+        fu.cyl((x0, 0.0300, -0.2000), (x1, 0.0300, -0.2000), 0.0090, 12, 'brass', cap='bone_fore')
     # shell cuff straps on the left of the buttstock (the shells are the magazine node)
     for zc in (0.1500, 0.2020):
-        fu.box((-0.0388, 0.0090, zc - 0.0030), (-0.0170, 0.0500, zc + 0.0030), 'brass')
+        fu.box((-0.0388, -0.0140, zc - 0.0030), (-0.0148, 0.0310, zc + 0.0030), 'brass')
 
     # ---------------- two spare shells in the cuff (= magazine) ----------------
     mg = C.Part('magazine')
@@ -150,7 +149,10 @@ def build(out_dir):
         mg.cyl((SHELL_X, sy, SHELL_Z0), (SHELL_X, sy, SHELL_Z0 + 0.012), 0.0098, 8, 'brass', cap='brass')
         mg.cyl((SHELL_X, sy, SHELL_Z1), (SHELL_X, sy, SHELL_Z1 + 0.005), 0.0070, 8, 'brass', cap='brass', r1=0.0058)
 
-    objs = {p.name: p.to_object(mats) for p in (rc, hm, br, fu, mg)}
+    objs = {}
+    for p, ml in ((rc, 0.024), (hm, 0.020), (br, 0.024), (fu, 0.020), (mg, 0.014)):
+        C.BEVEL_MINLEN = ml
+        objs[p.name] = p.to_object(mats, smooth=(50 if p is fu else 35))
     return objs, mats
 
 
