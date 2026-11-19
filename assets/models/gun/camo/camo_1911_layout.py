@@ -26,3 +26,14 @@ SLIDE_Y = (0.04723803299665451, 0.07123803299665452)
 FRAME_Z = (-0.160, 0.018)
 FRAME_Y = (0.03423803299665451, 0.04763803299665451)
 SERR_LEN = 0.030     # rear serration length (m)
+
+# ---- EPIC / LEGENDARY additions (free block above the muzzle disc: x 440..1020, y 392..580) ----
+SKULL_REGION = (448, 396, 576, 524)        # 128 x 128 planar face map for the skull muzzle brake
+CELL64 = 64
+CELLS64 = ['bk_steel', 'silver_p', 'gold', 'gold_dark', 'bone', 'bone_dark', 'violet', 'crimson', 'black', 'steel_hi']
+def cell64_rect(name):
+    i = CELLS64.index(name)
+    col, row = i % 5, i // 5
+    x0 = 600 + 72 * col; y0 = 396 + 72 * row
+    return (x0, y0, x0 + CELL64, y0 + CELL64)
+CELL_MATERIAL = {'bone': 'ivory', 'bone_dark': 'ivory', 'violet': 'energy', 'crimson': 'energy'}
