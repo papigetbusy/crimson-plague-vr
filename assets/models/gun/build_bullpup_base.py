@@ -43,9 +43,15 @@ def P(pts):
     return [T(x, y) for x, y in pts]
 
 
-SHELL_PX = [(70, 226), (74, 214), (86, 208), (95, 207), (322, 207), (334, 222), (342, 245), (780, 245), (834, 262), (836, 332), (820, 372),
-            (790, 372), (768, 372), (752, 395), (730, 422), (700, 436), (660, 438), (632, 432), (624, 412), (600, 408), (560, 415),
-            (520, 428), (470, 440), (425, 440), (395, 426), (345, 410), (292, 405), (95, 405), (86, 404), (74, 399), (70, 388)]
+def _arc(cx, cy, r, a0, a1, n):
+    return [(round(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / n)), 1), round(cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / n)), 1)) for i in range(n + 1)]
+
+
+# big ~4.5 cm (74 px) radius rear-top corner and ~3.6 cm rear-bottom corner (butt) -> one moulded pebble; smooth front lower corner
+SHELL_PX = (_arc(144, 281, 74, 180, 270, 7)[:-1] + [(160, 207), (322, 207), (334, 222), (342, 245), (780, 245), (834, 262), (837, 300), (835, 330), (828, 356),
+            (812, 378), (790, 396), (766, 410), (744, 422), (722, 432), (700, 438), (660, 439), (632, 433), (624, 414), (600, 409), (560, 415),
+            (520, 428), (470, 440), (425, 440), (395, 426), (345, 410), (292, 405), (190, 405)]
+            + _arc(130, 345, 60, 90, 180, 6)[:-1] )
 THUMB_PX = [(445, 320), (520, 312), (542, 330), (535, 352), (500, 372), (450, 380), (415, 375), (406, 358), (420, 335)]
 TRIG_PX = [(645, 305), (690, 302), (715, 318), (722, 345), (700, 368), (668, 372), (640, 366), (622, 350), (618, 325)]
 HOUSE_PX = [(545, 262), (550, 222), (562, 182), (590, 152), (632, 142), (640, 106), (832, 106), (836, 262), (780, 262), (780, 212), (600, 212), (594, 262)]
@@ -92,7 +98,7 @@ def dome_shell(part, outer, holes, hw, bevel, bevel_hole, crown, D):
 def paint_glass(A, r):
     """Smoked translucent magazine side: dark smoke, faint ribs, a row of brass round discs."""
     x0, y0, x1, y1 = A.reg[r]
-    A.steel(r, ('steel_black', 'steel_dark', 'steel_dark', 'steel_mid'), 61, grime=0.78, edge=False)
+    A.fill(r, 'steel_black')
     cy = (y0 + y1) // 2
     n = 12
     step = (x1 - x0 - 8) / n
@@ -102,9 +108,9 @@ def paint_glass(A, r):
             for x in range(int(cx) - 7, int(cx) + 8):
                 d = math.hypot(x - cx, y - cy)
                 if d <= 4.6:
-                    A.put(x, y, 'brass_light' if d < 2.0 else 'brass')
+                    A.put(x, y, (98, 72, 28) if d < 2.0 else (84, 60, 24))
                 elif d <= 5.8:
-                    A.put(x, y, 'brass_dark')
+                    A.put(x, y, (48, 34, 14))
 
 
 def glass_mat(base_mat):
@@ -117,7 +123,7 @@ def glass_mat(base_mat):
     b.inputs['Metallic'].default_value = 0.0
     b.inputs['Roughness'].default_value = 0.10
     b.inputs['Specular IOR Level'].default_value = 0.6
-    b.inputs['Alpha'].default_value = 0.80
+    b.inputs['Alpha'].default_value = 0.90
     try:
         mat.blend_method = 'BLEND'
     except Exception:
@@ -133,7 +139,7 @@ def build(out_dir):
     C.M.reset_scene()
     A = K.Atlas([
         ('barrel', 128, 72), ('glass', 128, 32), ('poly', 128, 40), ('steel', 48, 32), ('steel_top', 48, 24),
-        ('muzzle', 28, 28), ('brass', 24, 24), ('bone_end', 16, 16),
+        ('muzzle', 28, 28), ('brass', 24, 24), ('bone_end', 16, 16), ('round', 16, 16),
     ])
     A.install()
     C.ENERGY_REGIONS.clear(); C.ENERGY_REGIONS.add('glass')
@@ -141,7 +147,8 @@ def build(out_dir):
     A.steel('steel_top', ('steel_mid', 'steel_light', 'sheen', 'steel_edge'), seed=6, grime=0.74)
     A.wrap('barrel', 12, 6, lambda j: 'eng' if j in (0, 6) else 'hi' if j == 3 else 'dark' if j == 9 else 'plain', seed=11, lam=18)
     A.muzzle('muzzle'); A.brass('brass', engrave=True); A.bone('bone_end', motif=None, rim=False)
-    A.poly('poly', seed=43, fine=True)
+    A.fill('poly', 'pf_dark')                      # clean smooth polymer: no stipple / blotches
+    A.fill('round', (104, 76, 30))                 # dull aged brass
     paint_glass(A, 'glass')
     tex = os.path.join(out_dir, NAME + '_albedo.png')
     A.save(tex)
@@ -150,12 +157,18 @@ def build(out_dir):
 
     # ---------------- lower shell: one smooth bulbous polymer moulding (thumbhole + trigger hole) ----------------
     bd = C.Part('body')
-    dome_shell(bd, P(SHELL_PX), [P(THUMB_PX), P(TRIG_PX)], HW, bevel=0.0125, bevel_hole=0.0080, crown=CROWN, D=0.040)
+    dome_shell(bd, P(SHELL_PX), [P(THUMB_PX), P(TRIG_PX)], HW, bevel=0.0165, bevel_hole=0.0085, crown=CROWN, D=0.045)
+    zg, yg = T(235, 312)
+    for sgn in (-1, 1):                              # small inset brass gothic cross on each side
+        x0, x1 = (0.0286, 0.0306) if sgn > 0 else (-0.0306, -0.0286)
+        bd.cyl((x0, yg, zg), (x1, yg, zg), 0.0095, 14, 'brass', cap='bone_end')
     bd.prism(P([(655, 296), (668, 296), (671, 338), (665, 356), (654, 354), (656, 335)]), -0.0018, 0.0018, 'brass', side='brass')   # brass trigger blade
 
-    # ---------------- steel receiver group ----------------
+    # smooth rounded polymer sight hood flowing into the shell (same polymer, heavily rounded, real crown)
+    dome_shell(bd, K.chaikin(P(HOUSE_PX), 1), [K.chaikin(P(WINDOW_PX), 1)], 0.0215, bevel=0.0085, bevel_hole=0.0055, crown=0.0045, D=0.030)
+
+    # ---------------- receiver group: only ring sight / iron sight / barrel stay steel ----------------
     rc = C.Part('receiver')
-    K.shell(rc, P(HOUSE_PX), [P(WINDOW_PX)], 0.0215, region='steel', bevel=0.0055, segs=1, bevel_hole=0.0035)
     zd0, yd0 = T(780, 262); zd1, yd1 = T(600, 243)
     rc.box((-0.0150, yd0, zd0), (0.0150, yd1 + 0.0004, zd1), 'steel', top='steel_top')                                  # deck under the magazine
     # ring sight on the top plate (octagon ring centred on the sight line) + front post with brass bead
@@ -165,24 +178,22 @@ def build(out_dir):
         quad = [(ro * math.cos(a0), Y_SIGHT + ro * math.sin(a0)), (ro * math.cos(a1), Y_SIGHT + ro * math.sin(a1)),
                 (ri * math.cos(a1), Y_SIGHT + ri * math.sin(a1)), (ri * math.cos(a0), Y_SIGHT + ri * math.sin(a0))]
         rc.loft([(rz1, quad), (rz0, quad)], 'steel', top='steel_top')
-    rc.box((-0.0022, 0.1470, Z_BEAD - 0.0030), (0.0022, Y_SIGHT - 0.0008, Z_BEAD + 0.0030), 'steel', top='steel_top')
+    rc.box((-0.0042, 0.1330, Z_RING - 0.0048), (0.0042, Y_SIGHT - 0.0080, Z_RING + 0.0048), 'steel', top='steel_top')   # ring sight stem into the hood
+    rc.box((-0.0022, 0.1330, Z_BEAD - 0.0030), (0.0022, Y_SIGHT - 0.0008, Z_BEAD + 0.0030), 'steel', top='steel_top')
     rc.box((-0.0014, Y_SIGHT - 0.0008, Z_BEAD - 0.0016), (0.0014, Y_SIGHT + 0.0004, Z_BEAD + 0.0016), 'brass')
     # round ring-sight caps on both sides of the front block (brass rim, dark centre)
     zc, yc = T(795, 160)
     for sgn in (-1, 1):
-        rc.cyl((sgn * 0.0212, yc, zc), (sgn * 0.0229, yc, zc), 0.0115, 12, 'brass', cap='brass')
-        rc.cyl((sgn * 0.0228, yc, zc), (sgn * 0.0233, yc, zc), 0.0085, 12, 'muzzle', cap='muzzle')
+        rc.cyl((sgn * 0.0200, yc, zc), (sgn * 0.0262, yc, zc), 0.0115, 12, 'brass', cap='brass')
+        rc.cyl((sgn * 0.0260, yc, zc), (sgn * 0.0267, yc, zc), 0.0085, 12, 'muzzle', cap='muzzle')
     # barrel + slotted flash hider
     K.revolve(rc, [(-0.150, 0.0078), (-0.1760, 0.0078)], BY, segs=10, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
     K.revolve(rc, [(-0.1760, 0.0078), (-0.1775, 0.0108), (-0.1860, 0.0108), (-0.1870, 0.0094), (-0.1920, 0.0094), (-0.1930, 0.0108),
                    (-0.2000, 0.0108), (-0.2010, 0.0094), (Z_MUZ, 0.0094)], BY, segs=10, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
     # charging handles / rods on both sides under the magazine, rear tabs
     for sgn in (-1, 1):
-        rc.cyl((sgn * 0.0262, 0.0440, T(600, 0)[0]), (sgn * 0.0262, 0.0440, T(780, 0)[0]), 0.0044, 8, 'steel', cap='steel')
-        zt0, zt1 = T(290, 0)[0], T(335, 0)[0]
-        x0, x1 = (0.0200, 0.0318) if sgn > 0 else (-0.0318, -0.0200)
-        rc.box((x0, 0.0610, zt1), (x1, 0.0790, zt0), 'steel', top='steel_top')
-        rc.cyl((sgn * 0.0262, 0.0440, T(780, 0)[0]), (sgn * 0.0262, 0.0440, T(790, 0)[0]), 0.0066, 8, 'steel', cap='steel')
+        rc.cyl((sgn * 0.0262, 0.0440, T(600, 0)[0]), (sgn * 0.0262, 0.0440, T(780, 0)[0]), 0.0044, 8, 'poly', cap='poly')
+        rc.cyl((sgn * 0.0262, 0.0440, T(780, 0)[0]), (sgn * 0.0262, 0.0440, T(790, 0)[0]), 0.0066, 8, 'poly', cap='poly')
 
     # ---------------- translucent top magazine ----------------
     mg = C.Part('magazine')
@@ -190,7 +201,7 @@ def build(out_dir):
     mg.box((-0.0185, ym0, zm1), (0.0185, ym1, zm0), 'glass')
     for i in range(12):
         zr = zm0 - 0.0105 - i * 0.0210
-        mg.cyl((-0.0160, (ym0 + ym1) / 2, zr), (0.0160, (ym0 + ym1) / 2, zr), 0.0050, 5, 'brass', cap='brass')
+        mg.cyl((-0.0160, (ym0 + ym1) / 2, zr), (0.0160, (ym0 + ym1) / 2, zr), 0.0050, 5, 'round', cap='round')
 
     objs = {}
     for p, ml in ((bd, 0.9), (rc, 0.020), (mg, 0.9)):
