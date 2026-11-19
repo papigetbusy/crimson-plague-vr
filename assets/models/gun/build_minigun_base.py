@@ -25,7 +25,9 @@ RING_R = 0.0215
 
 
 def build(out_dir):
-    A = H.make_atlas(out_dir, NAME, wood=False)
+    A = H.make_atlas(out_dir, NAME, wood=False, extra=(('leather', 24, 24),))
+    A.fill('leather', (40, 26, 18))
+    C.FURN_REGIONS.add('leather')
     mats = H.finish_mats(A, out_dir, NAME, wood=False)
 
     rc = C.Part('receiver')
@@ -51,7 +53,7 @@ def build(out_dir):
         rc.prism(S.cham(-0.120, 0.060, BY - 0.0600, BY - 0.0360, 0.004), a_, b_, 'panel', side='steel', top='steel_top')
     # carry handle (steel arch + polymer grip sleeve)
     K.tube(rc, [(0.0500, BY + 0.0500), (0.0500, BY + 0.1050), (-0.1100, BY + 0.1050), (-0.1100, BY + 0.0500)], 0.0180, 0.0120, 'steel')
-    rc.cyl((0, BY + 0.1050, 0.0000), (0, BY + 0.1050, -0.0900), 0.0135, 10, 'poly', cap='poly')
+    rc.cyl((0, BY + 0.1050, 0.0000), (0, BY + 0.1050, -0.0900), 0.0135, 12, 'leather', cap='leather')
     # sights on the housing top / front clamp
     S.sight_pair(rc, Y_SIGHT, Z_REAR, Z_FRONT, BY + 0.0540, BY + 0.0330, rear_w=0.0100, rear_len=0.014, post_in=0.0030)
     # trigger guard band + trigger
@@ -61,12 +63,12 @@ def build(out_dir):
     # polymer furniture
     fu = C.Part('furniture')
     K.shell(fu, H.grip_poly(0.0780, BY - 0.0560, length=0.125), [], 0.0175, region='poly', bevel=0.0045, segs=2, gmap=True)
-    fg = K.chaikin([(-0.4040, BY - 0.0300), (-0.4360, BY - 0.0300), (-0.4420, BY - 0.1150), (-0.4300, BY - 0.1400), (-0.4100, BY - 0.1400), (-0.3980, BY - 0.1150)], 1)
-    K.shell(fu, fg, [], 0.0170, region='poly', bevel=0.0050, segs=2, gmap=True)
+    S.horn(fu, [(0, BY - 0.0300, -0.4200), (0, BY - 0.0600, -0.4200), (0, BY - 0.0950, -0.4200), (0, BY - 0.1250, -0.4200), (0, BY - 0.1450, -0.4200)],
+           [0.0150, 0.0175, 0.0180, 0.0165, 0.0120], segs=10, regions=['poly'] * 4, cap_region='poly')       # round vertical grip
     fu.box((-0.0140, BY - 0.0460, -0.4400), (0.0140, BY - 0.0280, -0.4000), 'steel')
     for sgn in (-1, 1):
-        x0, x1 = (0.0170 - 0.0005, 0.0170 + 0.0016) if sgn > 0 else (-0.0170 - 0.0016, -0.0170 + 0.0005)
-        fu.cyl((x0, BY - 0.0800, -0.4200), (x1, BY - 0.0800, -0.4200), 0.0130, 12, 'brass', cap='bone_stock')       # brass-rimmed bone cross badge
+        x0, x1 = (0.0180 - 0.0005, 0.0180 + 0.0016) if sgn > 0 else (-0.0180 - 0.0016, -0.0180 + 0.0005)
+        fu.cyl((x0, BY - 0.0900, -0.4200), (x1, BY - 0.0900, -0.4200), 0.0100, 12, 'brass', cap='bone_stock')       # brass-rimmed bone cross badge
 
     # ammo box under the chassis + brass belt up the right side into the housing
     mg = C.Part('magazine')
