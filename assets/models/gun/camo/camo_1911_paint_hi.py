@@ -15,8 +15,8 @@ GOLD = dict(shadow=C(78, 52, 14), base=C(184, 140, 46), hi=C(238, 204, 108), str
 GOLD_DARK = dict(shadow=C(40, 26, 8), base=C(112, 80, 26), hi=C(176, 134, 58), streak=C(214, 176, 96))
 VIOLET = C(168, 96, 255); VIOLET_HOT = C(236, 200, 255); VIOLET_DEEP = C(70, 20, 150)
 CRIMSON = C(255, 22, 40); CRIMSON_HOT = C(255, 150, 130); CRIMSON_DEEP = C(110, 0, 12)
-BONE = dict(shadow=C(150, 130, 100), base=C(214, 200, 170), hi=C(240, 232, 212), streak=C(250, 246, 234))
-BONE_DARK = dict(shadow=C(60, 48, 38), base=C(120, 102, 80), hi=C(170, 150, 120), streak=C(200, 184, 156))
+BONE = dict(shadow=C(104, 80, 52), base=C(176, 148, 102), hi=C(210, 186, 140), streak=C(232, 214, 172))
+BONE_DARK = dict(shadow=C(36, 26, 18), base=C(86, 66, 44), hi=C(130, 106, 76), streak=C(160, 134, 98))
 
 def ramp_cell(d, T=64):
     return np.repeat(vramp(T, d['shadow'], d['base'], d['hi'], d['streak']), T, axis=1).astype(np.float32)
@@ -38,6 +38,7 @@ def paint_cells64(tier, atlas):
         'black': ramp_cell(dict(shadow=C(4, 4, 6), base=C(9, 10, 14), hi=C(18, 20, 28), streak=C(40, 44, 58))),
         'steel_hi': ramp_cell(dict(shadow=P_['hi'], base=P_['streak'], hi=P_['edge'], streak=P_['silver_hi'])),
     }
+    if tier == 'legendary': cells['crimson'] = np.tile(C(196, 6, 22), (64, 64, 1)).astype(np.float32)
     for name, img in cells.items():
         x0, y0, x1, y1 = LY.cell64_rect(name)
         atlas[y0:y1, x0:x1] = img[::-1]
@@ -79,6 +80,23 @@ def skull_face(tier, S=128):
     img = P.over(img, C(10, 10, 14), blur(m, 0.6) * 0.8)
     return img
 
+def bone_aged(S=128):
+    """aged ivory/bone swatch (v up): warm yellowed, fine grain along u, dark crevices at the top (under the slide) and bottom, hairline cracks"""
+    yy = np.linspace(0, 1, S, dtype=np.float32)[:, None] * np.ones((1, S), np.float32)
+    base = np.zeros((S, S, 3), np.float32) + C(178, 150, 104)
+    gr = noise(S, S, 36, 2, 5) * 0.6 + noise(S, S, 6, 1, 6) * 0.5
+    base *= (1 + 0.09 * gr)[..., None]
+    base = P.over(base, C(206, 182, 134), 0.35 * smooth(0.2, 1.4, fbm(S, S, 30, 22, 7, 3)))
+    base = P.over(base, C(132, 100, 62), 0.40 * smooth(0.3, 1.5, fbm(S, S, 22, 16, 8, 3)))
+    cr = Ink(S, S); rng = np.random.default_rng(11)
+    for _ in range(14):
+        x, y = rng.uniform(0, S), rng.uniform(0.15, 0.85) * S; pts = [(x, y)]
+        for k in range(4): x += rng.normal(5, 3); y += rng.normal(0, 3); pts.append((x, y))
+        cr.line(pts, 0.7)
+    base = P.over(base, C(46, 32, 20), cr.mask() * 0.7)
+    shade = 0.25 + 0.75 * smooth(0.0, 0.30, yy) * smooth(1.0, 0.72, yy)
+    return np.clip(base * shade[..., None], 0, 255)
+
 def paint(tier):
     P_ = PAL[tier]
     atlas = np.zeros((LY.ATLAS, LY.ATLAS, 3), np.float32) + P_['recess']
@@ -87,7 +105,7 @@ def paint(tier):
         atlas[ty * LY.CELL:(ty + 1) * LY.CELL, tx * LY.CELL:(tx + 1) * LY.CELL] = cell[::-1]
     paint_cells64(tier, atlas)
     sx0, sy0, sx1, sy1 = LY.SKULL_REGION
-    atlas[sy0:sy1, sx0:sx1] = skull_face(tier, sx1 - sx0)[::-1]
+    atlas[sy0:sy1, sx0:sx1] = (bone_aged(sx1 - sx0) if tier == 'legendary' else skull_face(tier, sx1 - sx0))[::-1]
     return atlas
 
 
@@ -181,34 +199,18 @@ def metal_inlay(img, mask, tier, h, ramp, groove=1.3):
 def slide_art_legendary(side, w, h):
     ink = Ink(w, h); R_side = side == 'R'
     xa, xb = (0.168 * w, 0.975 * w) if R_side else (0.025 * w, 0.832 * w)
-    for y in (0.865, 0.90): ink.line([(xa, y * h), (xb, y * h)], 1.5)
-    for y in (0.47, 0.83): ink.line([(xa + 6, y * h), (xb - 6, y * h)], 1.0)          # rune band rails
+    for y in (0.90, 0.935): ink.line([(xa, y * h), (xb, y * h)], 1.5)
+    if not R_side:
+        for y in (0.07, 0.10): ink.line([(xa, y * h), (xb, y * h)], 1.5)
     xd = 0.153 * w + 6 if R_side else 0.847 * w - 6
     ink.line([(xd, 0.09 * h), (xd, 0.91 * h)], 1.4); ink.line([(xd + (5 if R_side else -5), 0.12 * h), (xd + (5 if R_side else -5), 0.88 * h)], 1.0)
-    # upper filigree band (rows 0.13 .. 0.44): tiny S-scrolls, skipping the ejection port on the right side
-    def field(x0, x1, yc, R):
-        step = R * 2.9; n = max(1, int(round((x1 - x0) / step))); stp = (x1 - x0) / n
-        for i in range(n):
-            path = P.scroll_S(ink, x0 + stp * (i + 0.5), yc, R * stp / step * 0.95, flip=(i % 2 == 1), wmax=1.9, wmin=0.9)
-            P.decorate_scroll(ink, path, R * 0.7, R * 0.45, 1 if i % 2 == 0 else -1)
-    yc = 0.285 * h
-    if R_side:
-        field(xa + 10, 0.30 * w, yc, 11.5)
-        field(0.57 * w, 0.715 * w - 22, yc, 11.5); field(0.715 * w + 22, xb - 10, yc, 11.5)
-        medx = 0.715 * w
-    else:
-        medx = 0.42 * w
-        field(xa + 10, medx - 28, yc, 11.5); field(medx + 28, xb - 10, yc, 11.5)
-    ink.ring(medx, yc, 13.5, 1.5)
-    P.quatrefoil(ink, medx, yc, 12.0, 1.4)
-    P.cross_fleury(ink, medx, yc, 11.0, 1.4)
     return ink.mask()
 
 def rune_channel(side, w, h):
-    """dark engraved channel + painted crimson fallback line under the emissive ribbons"""
+    """dark engraved channel + painted crimson fallback line under the emissive ribbons (sigil polylines)"""
     chan = Ink(w, h); core = Ink(w, h)
-    for (a, b) in RN.strokes(side):
-        chan.line([a, b], 6.8); core.line([a, b], 2.4)
+    for pl in RN.polylines(side):
+        chan.line(pl, RN.STROKE_PX + 4.5); core.line(pl, RN.STROKE_PX)
     return chan.mask(), core.mask()
 
 def slide_panel_legendary(side, w, h):
@@ -251,8 +253,8 @@ def grip_panel_legendary(flipx):
     # fine dark scrimshaw hairline halo around the gold, then the gold inlay
     img = P.scrim_etch(img, np.clip(dilate(art, 1.6) - art, 0, 1) * 0.6, tone=C(60, 40, 22), halo=0.0)
     img = metal_inlay(img, art, 'legendary', h, GOLD, groove=0.9)
-    sc = P.screw_boss(img, w / 2, 0.29 * h, 'rare')
-    img = sc
+    img = P.screw_boss(img, w / 2, 0.29 * h, 'rare')
+    img = img * np.array([0.93, 0.85, 0.70], np.float32)[None, None]
     if flipx: img = img[:, ::-1]
     return img
 

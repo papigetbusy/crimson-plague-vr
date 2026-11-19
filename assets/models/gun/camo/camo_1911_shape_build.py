@@ -37,6 +37,10 @@ def unwrap_custom(ob, bm, skull_xy=None):
                 u = 0.5 + (g.x - cx) / sx; v = 0.5 + (g.y - cy) / sy
                 u = min(max(u, 0.03), 0.97); v = min(max(v, 0.03), 0.97)
                 l[uvl].uv = Vector(((sx0 + (sx1 - sx0) * u) / A, (sy0 + (sy1 - sy0) * v) / A))
+            elif tag == 'bonetex':
+                u = min(max((-.1560 - g.z) / .0900 if False else (g.z + .1700) / .0900, 0.03), 0.97)
+                v = min(max((g.y - .0335) / .0160, 0.03), 0.97)
+                l[uvl].uv = Vector(((sx0 + (sx1 - sx0) * u) / A, (sy0 + (sy1 - sy0) * v) / A))
             else:
                 if tag not in LY.CELLS64: tag = 'bk_steel'
                 cu, cv0, ch = cell_uv_center(tag)
@@ -262,7 +266,7 @@ def epic_spine():
     return bm, bmc
 
 # ------------------------------------------------------------------ build
-EMIT = {'epic': ((0.52, 0.16, 1.0), 5.0), 'legendary': ((1.0, 0.02, 0.05), 6.0)}
+EMIT = {'epic': ((0.52, 0.16, 1.0), 5.0), 'legendary': ((1.0, 0.02, 0.05), 0.9)}
 
 def build(tier, out_dir):
     name = f'pistol_1911_camo_{tier}'

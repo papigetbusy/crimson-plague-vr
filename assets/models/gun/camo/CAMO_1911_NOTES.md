@@ -49,3 +49,16 @@ These are suggested starting values; I could not tune them in-engine.
 - Legendary ribs are plain smooth bone tubes (no vertebral detail), the grip panels are flat slabs with painted tracery (only the arch outline and ridge are geometry), and the muzzle crown reads thin from the front view. The hammer looks like a tombstone arch at close range and is visible in the ADS view below the sight line (does not block it).
 - Rune ribbons are about 0.8 mm wide; at the 1200x700 preview they read as red glyphs, at gameplay distance they will be thin.
 - Tier meshes differ in shape, so these two GLBs are not texture-only swaps against common/uncommon/rare (those three remain texture-only swaps of each other).
+
+---
+
+# v2 fixes (Gamez review)
+- UNCOMMON: wear pulled back to light edge wear only (no nicks/chips, no brown fade, no mottling). Same mesh; texture only.
+- EPIC v2 (3935 tris): angular demon-skull compensator built from convex hulls + exact booleans (hard brow ridges, side-open eye sockets with violet emissive shards, fanged jaw with tusks, 3 vent slots cut across the snout through the bore, swept cheek horns), muzzle empty at the bore exit z=-0.2332; ONE continuous forged dorsal ridge (bevelled base rail + raked-tooth blade, max 3.8 mm above the slide, clear of the sights); barbed dust-cover shroud = central keel plate + two flared wings with raked barbs and violet strips; swept spur beavertail. Implemented in `camo_1911_epic2.py`.
+- LEGENDARY v2 (4737 tris): ribcage handguard = 12 staggered tapered curved ribs (flatter shaft, flared ends) joined to a beaded 17-vertebra sternum spine, aged warm bone with grain, hairline cracks and dark crevices (new 128 px `bonetex` swatch in the former skull region of the atlas); gothic/demonic sigils (inverted thorned cross, seals, Leviathan cross, horned crescent, trident, blackletter M) replace the runes, 2.4 mm emissive crimson flat ribbons over an engraved channel with painted crimson fallback (`camo_1911_runes.py`); crowned gold muzzle untouched; reliquary additions: sealed relic window (gold lancet bezel + faceted crimson relic crystal) on each frame side and a spired gold beavertail; grips and bone cells tinted to warm aged ivory. Emissive strength lowered to 0.9 (crimson 196,6,22) because 6.0 washed the thick sigils to pink in the preview.
+- Both: `verify_ads.js` passes, sight-line check shows no new blockers, node table = base except the moved muzzle empty, 4 empties, redDot:false.
+
+Honest notes (v2)
+- Epic: the demon skull reads as an angular dragon/demon head but is a long box snout from some angles; the thorn/keel shroud is flat extruded plates (faceted, not sculpted); preview is lit blue so the fangs/horns (bright steel) look a bit white.
+- Legendary: the relic crystal is one flat emissive colour, so its facets do not show; sigils still read slightly salmon in the preview (tone-mapping), the glow will differ in game; the ribcage only reads clearly from the front three-quarter/underside; relic window is small (about 14 mm) and sits on the dust-cover stub above the trigger.
+- Tracer specs above (violet plasma / blood-smoke) are unchanged.

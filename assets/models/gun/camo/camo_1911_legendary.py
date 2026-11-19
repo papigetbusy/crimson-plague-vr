@@ -26,33 +26,40 @@ def legendary_frame():
     return bm
 
 def cage_parts():
-    """ribcage: 6 bone hoops sweeping forward at the bottom, bone sternum bar, dark core, gold sternum spire; returns (bone_bm, gold_bm, core_bm)"""
+    """ribcage handguard: staggered, tapered, curved ribs (aged bone texture) that sweep forward and join a beaded sternum spine.
+    returns (bone_bm, gold_bm, core_bm)"""
     M = _M(); S = _S()
     bone = bmesh.new(); M._tex_layer(bone)
     gold = bmesh.new(); M._tex_layer(gold)
     core = bmesh.new(); M._tex_layer(core)
     yc = M.Y_SLIDE_BOT + 0.0008
-    a, b = 0.0111, 0.0138
-    zs = [-0.1515 + i * 0.0134 for i in range(6)]
-    for z0 in zs:
-        pts = []
-        n = 9
-        for k in range(n):
-            t = k / (n - 1)
-            ang = math.pi * t                       # 0 .. pi : right attach -> bottom -> left attach
-            x = a * math.cos(ang); depth = math.sin(ang)
-            y = yc - b * depth
-            z = z0 - 0.0085 * depth ** 1.3        # ribs bow forward toward the sternum
-            pts.append((x, y, z))
-        r = 0.00165
-        S.tube_path(bone, pts, [r * 0.55, r * 0.9, r, r, r, r, r, r * 0.9, r * 0.55], [r * 0.55, r * 0.9, r, r, r, r, r, r * 0.9, r * 0.55], segs=7, tex='bone', up=(0, 1, 0), caps=(True, True))
-    # sternum bar
-    S.tube_path(bone, [(0, yc - b + 0.0004, -0.1700), (0, yc - b + 0.0004, -0.1560), (0, yc - b + 0.0004, -0.0900), (0, yc - b + 0.0004, -0.0820)],
-                [0.0020, 0.0033, 0.0033, 0.0022], [0.0020, 0.0030, 0.0030, 0.0020], segs=10, tex='bone', up=(0, 1, 0))
-    # gold sternum spire (points forward under the barrel)
-    S.tube_path(gold, [(0, yc - b + 0.0004, -0.1650), (0, yc - b + 0.0010, -0.1780), (0, yc - b + 0.0022, -0.1900), (0, yc - b + 0.0035, -0.1985)],
+    b = 0.0138
+    ys = yc - b + 0.0004
+    zs = [-0.1500, -0.1375, -0.1250, -0.1125, -0.1000, -0.0875]
+    amp = [0.0128, 0.0146, 0.0160, 0.0160, 0.0150, 0.0136]
+    for side in (1, -1):
+        for j, z0 in enumerate(zs):
+            zj = z0 + (0.0030 if side < 0 else 0.0)
+            pts = []
+            n = 6
+            for k in range(n):
+                t = k / (n - 1)
+                ph = math.pi * t
+                x = side * (amp[j] * math.sin(ph) ** 0.8 * (1.0 + 0.10 * math.sin(2 * ph)) + 0.0006 * (1 - t) )
+                y = yc - b * (1 - math.cos(ph)) * 0.5
+                z = zj - 0.0090 * t ** 1.4
+                pts.append((x, y, z))
+            rx = [0.0032, 0.0021, 0.0016, 0.0018, 0.0027, 0.0034]
+            ry = [0.0023, 0.0016, 0.0012, 0.0014, 0.0018, 0.0020]
+            S.tube_path(bone, pts, rx, ry, segs=5, tex='bonetex', up=(0, 1, 0), caps=(False, True), phase=math.pi / 5)
+    # beaded sternum spine joining the ribs
+    zst = [-0.1700 + 0.0050 * i for i in range(17)]
+    pts = [(0, ys, z) for z in zst]
+    rx = [0.0030 if i % 2 == 0 else 0.0019 for i in range(17)]; ry = [0.0028 if i % 2 == 0 else 0.0018 for i in range(17)]
+    S.tube_path(bone, pts, rx, ry, segs=6, tex='bonetex', up=(0, 1, 0), phase=math.pi / 6)
+    # gold sternum spire pointing forward under the barrel
+    S.tube_path(gold, [(0, ys, -0.1700), (0, ys + 0.0006, -0.1800), (0, ys + 0.0018, -0.1900), (0, ys + 0.0032, -0.1985)],
                 [0.0034, 0.0026, 0.0015, 0.00008], [0.0024, 0.0019, 0.0011, 0.00008], segs=8, tex='gold', up=(0, 1, 0))
-    # dark core so the cage is not see-through
     S.box(core, (0, M.Y_SLIDE_BOT - 0.0058, -0.1200), (0.0100, 0.0128, 0.0800), bevel=0.0010, segs=1, tex='black')
     return bone, gold, core
 
@@ -79,8 +86,8 @@ def hammer_spire():
     M = _M(); S = _S()
     bm = bmesh.new(); M._tex_layer(bm)
     zc = 0.0278
-    outer = S.lancet_up(zc, 0.0498, 0.0598, 0.0716, 0.0072)
-    hole = S.lancet_up(zc, 0.0528, 0.0598, 0.0668, 0.0034)
+    outer = S.lancet_up(zc, 0.0498, 0.0598, 0.0716, 0.0072, n=8)
+    hole = S.lancet_up(zc, 0.0528, 0.0598, 0.0668, 0.0034, n=8)
     hole = [(z, y) for z, y in hole][::-1]
     S.extrude_zy(bm, outer, -0.0034, 0.0034, tex='gold', bevel=0.0006, segs=1, holes=[hole])
     S.tube_path(bm, [(0, 0.0712, zc), (0, 0.0724, zc), (0, 0.0734, zc)], [0.0016, 0.0009, 0.00008], [0.0016, 0.0009, 0.00008], segs=6, tex='gold', up=(0, 0, 1))
@@ -96,7 +103,7 @@ def panel(side):
         return (c * math.cos(th) + a * math.sin(th), c * math.sin(th) - a * math.cos(th))
     a_top, a_bot = -0.0300, 0.0480
     hw = 0.01766
-    ptsca = S.lancet_pts(0.0, a_bot, -0.0105, a_top, hw, n=12)      # (c, a): base-left, arch, base-right
+    ptsca = S.lancet_pts(0.0, a_bot, -0.0105, a_top, hw, n=8)      # (c, a): base-left, arch, base-right
     poly = [zy(c, a) for c, a in ptsca]
     # bottom corners rounded by a small chamfer: cut the two lowest corners
     poly = [zy(c, a) for c, a in _round_bottom(ptsca, 0.0045)]
@@ -121,29 +128,72 @@ def panel_ridge(side):
     bm = bmesh.new(); M._tex_layer(bm)
     th = math.radians(18.0)
     xo = side * (M.GRIP_FRAME_W * 0.5 + 0.0036 - 0.0015 + 0.0018 + 0.0002)
-    pts = S.lancet_pts(0.0, 0.0420, -0.0100, -0.0262, 0.0136, n=10)
+    pts = S.lancet_pts(0.0, 0.0420, -0.0100, -0.0262, 0.0136, n=6)
     path = []
     for c, a in pts:
         z = c * math.cos(th) + a * math.sin(th); y = c * math.sin(th) - a * math.cos(th)
         path.append((xo, y, z))
     r = 0.00062
-    S.tube_path(bm, path, [r] * len(path), [r * 0.8] * len(path), segs=4, tex='gold', up=(1, 0, 0), caps=(True, True))
+    S.tube_path(bm, path, [r] * len(path), [r * 0.8] * len(path), segs=3, tex='gold', up=(1, 0, 0), caps=(True, True))
     return bm
 
 def rune_ribbons(side):
-    """emissive crimson rune strokes on the slide wall (side +1 right / -1 left)"""
+    """emissive crimson sigil strokes (2.4 mm wide flat ribbons, 0.3 mm proud of the slide wall); side +1 right / -1 left"""
     M = _M(); S = _S()
     import camo_1911_layout as LY
     bm = bmesh.new(); M._tex_layer(bm)
     z0, z1 = LY.SLIDE_Z; y0, y1 = LY.SLIDE_Y
     sd = 'R' if side > 0 else 'L'
-    x = side * (M.SLIDE_W * 0.5 + 0.00018)
+    x = side * (M.SLIDE_W * 0.5 + 0.00030)
+    hw = 0.00120
     def pos(px, py):
         uu = px / RN.W; vv = 1.0 - py / RN.H
         z = (z1 - uu * (z1 - z0)) if sd == 'R' else (z0 + uu * (z1 - z0))
-        return (x, y0 + vv * (y1 - y0), z)
-    for (a, b) in RN.strokes(sd):
-        S.tube_path(bm, [pos(*a), pos(*b)], 0.00042, 0.00030, segs=4, tex='crimson', up=(1, 0, 0), caps=(False, False), phase=math.pi / 4)
+        return (y0 + vv * (y1 - y0), z)
+    for pl in RN.polylines(sd):
+        P = [pos(*p) for p in pl]
+        before = set(bm.faces)
+        nrm = []
+        for i in range(len(P)):
+            a_ = P[max(i - 1, 0)]; b_ = P[min(i + 1, len(P) - 1)]
+            dy, dz = b_[0] - a_[0], b_[1] - a_[1]
+            L = math.hypot(dy, dz) or 1.0
+            nrm.append((-dz / L, dy / L))
+        L_, R_ = [], []
+        for (yy, zz), (ny, nz) in zip(P, nrm):
+            L_.append(bm.verts.new(M.G(x, yy + ny * hw, zz + nz * hw))); R_.append(bm.verts.new(M.G(x, yy - ny * hw, zz - nz * hw)))
+        for i in range(len(P) - 1):
+            bm.faces.new((L_[i], L_[i + 1], R_[i + 1], R_[i]))
+        new = [f for f in bm.faces if f not in before]
+        bmesh.ops.recalc_face_normals(bm, faces=new)
+        if sum(f.normal.x for f in new) * side < 0: bmesh.ops.reverse_faces(bm, faces=new)
+        S._tag_faces(bm, new, 'crimson')
+    return bm
+
+def relic_window(side):
+    """sealed reliquary window on the frame: gold lancet bezel + faceted crimson relic crystal (emissive)"""
+    M = _M(); S = _S()
+    bez = bmesh.new(); M._tex_layer(bez)
+    xs = side * (M.FRAME_W * 0.5)
+    zc = -0.0560
+    outer = S.lancet_up(zc, 0.0358, 0.0420, 0.0470, 0.0070, n=6)
+    hole = S.lancet_up(zc, 0.0372, 0.0420, 0.0454, 0.0050, n=6)[::-1]
+    x0, x1 = (xs - side * 0.0004, xs + side * 0.0016)
+    S.extrude_zy(bez, outer, min(x0, x1), max(x0, x1), tex='gold', bevel=0.0003, segs=1, holes=[hole])
+    gem = bmesh.new(); M._tex_layer(gem)
+    xo = xs + side * 0.0004; xr = xs + side * 0.0017
+    P = [(xo, 0.0380, zc - 0.0030), (xo, 0.0380, zc + 0.0030), (xo, 0.0412, zc - 0.0042), (xo, 0.0412, zc + 0.0042), (xo, 0.0444, zc - 0.0028), (xo, 0.0444, zc + 0.0028),
+         (xo, 0.0366, zc), (xo, 0.0458, zc), (xr, 0.0398, zc), (xr, 0.0426, zc)]
+    import camo_1911_epic2 as E2
+    E2.init(SB); E2.hull_bm(P, 'crimson', gem)
+    return bez, gem
+
+def gold_spur():
+    """spired gold beavertail: a swept gothic blade rising behind the frame"""
+    M = _M(); S = _S()
+    bm = bmesh.new(); M._tex_layer(bm)
+    poly = [(0.0100, 0.0385), (0.0300, 0.0396), (0.0480, 0.0420), (0.0600, 0.0462), (0.0668, 0.0524), (0.0600, 0.0496), (0.0480, 0.0462), (0.0300, 0.0446), (0.0160, 0.0452), (0.0100, 0.0476)]
+    S.extrude_zy(bm, poly, -0.0046, 0.0046, tex='gold', bevel=0.0007, segs=1)
     return bm
 
 def add_legendary(SBm, add_base, add_new, groups):
@@ -153,5 +203,8 @@ def add_legendary(SBm, add_base, add_new, groups):
     add_new('spire_muzzle', mg, 'frame'); add_new('spire_fins', mb, 'frame')
     for sd in (1, -1):
         add_new('panel_ridge_%d' % sd, panel_ridge(sd), 'frame')
-        add_new('runes_%d' % sd, rune_ribbons(sd), 'slide')
+        add_new('sigils_%d' % sd, rune_ribbons(sd), 'slide')
+        bz, gm = relic_window(sd)
+        add_new('relic_bezel_%d' % sd, bz, 'frame'); add_new('relic_gem_%d' % sd, gm, 'frame')
+    add_new('gold_spur', gold_spur(), 'frame')
     return tip

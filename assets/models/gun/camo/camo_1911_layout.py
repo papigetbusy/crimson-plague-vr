@@ -36,4 +36,4 @@ def cell64_rect(name):
     col, row = i % 5, i // 5
     x0 = 600 + 72 * col; y0 = 396 + 72 * row
     return (x0, y0, x0 + CELL64, y0 + CELL64)
-CELL_MATERIAL = {'bone': 'ivory', 'bone_dark': 'ivory', 'violet': 'energy', 'crimson': 'energy'}
+CELL_MATERIAL = {'bonetex': 'ivory', 'bone': 'ivory', 'bone_dark': 'ivory', 'violet': 'energy', 'crimson': 'energy'}
