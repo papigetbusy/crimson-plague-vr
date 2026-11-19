@@ -480,6 +480,14 @@ class Atlas:
             for r in self.smooth_regions:
                 x0, y0, x1, y1 = self.reg[r]
                 up[y0 * 4:y1 * 4, x0 * 4:x1 * 4] = np.clip(cr[y0 * 4:y1 * 4, x0 * 4:x1 * 4] + 0.5, 0, 255).astype(np.uint8)
+        ov = getattr(self, 'overlay', None)       # smooth gradient regions (copper wire, energy glow) painted as RGB after the label upscale
+        if ov is not None:
+            cr = ov.astype(np.float32)
+            for _ in range(2):
+                cr = _cr_up2(_cr_up2(cr, 0), 1)
+            for r in self.overlay_regions:
+                x0, y0, x1, y1 = self.reg[r]
+                up[y0 * 4:y1 * 4, x0 * 4:x1 * 4] = np.clip(cr[y0 * 4:y1 * 4, x0 * 4:x1 * 4] + 0.5, 0, 255).astype(np.uint8)
         M._write_png(path, HD, HD, up.tobytes(), bottom_up=True)
         print('atlas colours', len(used), 'region px', self.used_px, 'hd', HD)
         return len(used)
@@ -642,7 +650,7 @@ def shell(part, outer, holes, hw, region='poly', bevel=0.0055, segs=2, bevel_hol
         for f in new:
             for l, q in zip(f.loops, P[f]):
                 l[part.uv].uv = (u0 + (u1 - u0) * (q[0] - mnx) / (mxx - mnx), v0 + (v1 - v0) * (q[1] - mny) / (mxy - mny))
-            f.material_index = 1 if region in C.FURN_REGIONS else 0
+            f.material_index = C.mat_index(region)
         return new
     for f in new:
         part._uv_face(f, region)
@@ -711,7 +719,7 @@ def revolve(part, stations, cy, segs=10, region='barrel', cx=0.0, cap_f='steel',
             kk = vi if not (k == segs - 1 and vi == 0) else segs
             z = za if l.vert in rings[si] else zb
             l[part.uv].uv = (u0 + (u1 - u0) * (z - zmin) / span, v0 + (v1 - v0) * kk / segs)
-        f.material_index = 1 if region in C.FURN_REGIONS else 0
+        f.material_index = C.mat_index(region)
     part._uv_face(cap0, cap_b); part._uv_face(capN, cap_f)
 
 

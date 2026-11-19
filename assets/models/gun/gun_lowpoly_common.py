@@ -68,6 +68,11 @@ REGION = {
     'rail':      (192, 192, 256, 256),# steel with cross slots
 }
 FURN_REGIONS = {'furn', 'furn_end', 'grip', 'vents', 'furn_dark'}
+ENERGY_REGIONS = set()          # optional 3rd (emissive) material; empty = classic 2-material guns
+
+
+def mat_index(region):
+    return 1 if region in FURN_REGIONS else (2 if region in ENERGY_REGIONS else 0)
 
 
 # ---- texture ---------------------------------------------------------------
@@ -223,7 +228,7 @@ class Part:
             uu = margin + (1 - 2 * margin) * (p[0] - mnx) / dx
             vv = margin + (1 - 2 * margin) * (p[1] - mny) / dy
             l[self.uv].uv = (u0 + (u1 - u0) * uu, v0 + (v1 - v0) * vv)
-        f.material_index = 1 if region in FURN_REGIONS else 0
+        f.material_index = mat_index(region)
 
     def _faces(self, vs, quads, region, cap_region=None, caps=()):
         out = []
@@ -305,7 +310,7 @@ class Part:
                 along = 0.0 if l.vert in A else 1.0
                 kk = i if not (k == segs - 1 and i == 0) else segs
                 l[self.uv].uv = (u0 + (u1 - u0) * along, v0 + (v1 - v0) * kk / segs)
-            f.material_index = 1 if region in FURN_REGIONS else 0
+            f.material_index = mat_index(region)
         self._uv_face(caps[0], cap0 or cap); self._uv_face(caps[1], cap)
 
     def _fix_normals(self, faces, rings):
@@ -338,7 +343,7 @@ class Part:
         for m in mats:
             me.materials.append(m)
         used = {p.material_index for p in me.polygons}
-        if used == {0} and len(mats) > 1:
+        if used == {0} and len(mats) == 2:
             me.materials.pop(index=1)
         ob = bpy.data.objects.new(self.name, me)
         bpy.context.collection.objects.link(ob)
