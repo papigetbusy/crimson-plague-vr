@@ -79,7 +79,8 @@ def horn(part, path, radii, segs=10, regions=None, cap_region='brass'):
     for i, (x, y, z) in enumerate(path):
         a = Vector(path[max(i - 1, 0)]); b = Vector(path[min(i + 1, n - 1)])
         t = (b - a).normalized()
-        u = Vector((1, 0, 0)); v = t.cross(u).normalized()
+        ax = Vector((1, 0, 0)) if abs(t.x) < 0.9 else Vector((0, 1, 0))
+        u = (ax - t * ax.dot(t)).normalized(); v = t.cross(u).normalized()
         ring = []
         for k in range(segs):
             ang = 2 * math.pi * k / segs
