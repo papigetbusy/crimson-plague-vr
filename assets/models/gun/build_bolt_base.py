@@ -67,20 +67,19 @@ def build(out_dir):
     rc.box((-0.0085, BY + 0.0050, 0.0400), (0.0085, BY + 0.0160, 0.0850), 'steel', top='steel_top')                              # rear bridge / tang
     K.revolve(rc, [(0.0400, 0.0095), (0.1000, 0.0095)], BY, segs=10, region='barrel', cap_f='steel', cap_b='steel')                # bolt body
     K.revolve(rc, [(0.0980, 0.0108), (0.1040, 0.0108)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass')                 # bolt shroud ring
-    S.horn(rc, [(0.009, 0.0520, 0.0500), (0.030, 0.0500, 0.0520), (0.042, 0.0440, 0.0600), (0.047, 0.0360, 0.0720), (0.0485, 0.0335, 0.0755)],
-           [0.0050, 0.0045, 0.0045, 0.0050, 0.0050], segs=8, regions=['steel'] * 4, cap_region='steel')
-    S.horn(rc, [(0.0488, 0.0330, 0.0762), (0.0510, 0.0310, 0.0792), (0.0540, 0.0285, 0.0840)], [0.0092, 0.0098, 0.0080], segs=10,
-           regions=['brass', 'brass'], cap_region='brass')                                                                         # brass bolt knob
+    S.horn(rc, [(0.008, BY + 0.0020, 0.0560), (0.034, BY + 0.0020, 0.0580), (0.058, BY + 0.0000, 0.0640), (0.070, BY - 0.0140, 0.0740), (0.074, BY - 0.0300, 0.0840)],
+           [0.0055, 0.0048, 0.0048, 0.0052, 0.0052], segs=8, regions=['steel'] * 4, cap_region='steel')                           # swept bolt stem, turned down off the right side
+    S.horn(rc, [(0.0745, BY - 0.0290, 0.0845), (0.0765, BY - 0.0400, 0.0900), (0.0780, BY - 0.0520, 0.0960), (0.0785, BY - 0.0600, 0.1000)],
+           [0.0080, 0.0140, 0.0140, 0.0075], segs=10, regions=['brass'] * 3, cap_region='brass')                                  # round brass bolt knob
     # barrel + crown + bands + nose cap
-    K.revolve(rc, [(-0.115, 0.0125), (-0.200, 0.0105), (-0.400, 0.0086), (-0.560, 0.0076)], BY, segs=12, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
-    K.revolve(rc, [(-0.560, 0.0076), (-0.568, 0.0084), (-0.576, 0.0072), (Z_MUZ, 0.0066)], BY, segs=12, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
+    K.revolve(rc, [(-0.115, 0.0162), (-0.200, 0.0137), (-0.400, 0.0112), (-0.560, 0.0099)], BY, segs=12, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
+    K.revolve(rc, [(-0.560, 0.0099), (-0.568, 0.0110), (-0.576, 0.0094), (Z_MUZ, 0.0086)], BY, segs=12, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
     for zz in (-0.2400, -0.3600):
-        K.revolve(rc, [(zz, 0.0112), (zz - 0.0050, 0.0112)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
-    rc.loft([(-0.4680, K.hexp(-0.0170, 0.0170, -0.0015, 0.0530, 0.0080)), (-0.4800, K.hexp(-0.0170, 0.0170, -0.0015, 0.0530, 0.0080))], 'steel', top='steel')
+        K.revolve(rc, [(zz, 0.0146), (zz - 0.0050, 0.0146)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
     rc.loft([(-0.4560, K.hexp(-0.0166, 0.0166, -0.0010, 0.0525, 0.0070)), (-0.4640, K.hexp(-0.0166, 0.0166, -0.0010, 0.0525, 0.0070))], 'brass')
     rc.loft([(-0.3000, K.hexp(-0.0162, 0.0162, -0.0010, 0.0515, 0.0070)), (-0.3070, K.hexp(-0.0162, 0.0162, -0.0010, 0.0515, 0.0070))], 'brass')
-    rc.box((-0.0034, BY + 0.0070, -0.5750), (0.0034, BY + 0.0112, -0.5600), 'steel', top='steel_top')                              # front sight blade
-    rc.box((-0.0016, BY + 0.0110, -0.5700), (0.0016, BY + 0.0130, -0.5650), 'brass')
+    rc.box((-0.0034, BY + 0.0094, -0.5750), (0.0034, BY + 0.0136, -0.5600), 'steel', top='steel_top')                              # front sight blade
+    rc.box((-0.0016, BY + 0.0134, -0.5700), (0.0016, BY + 0.0154, -0.5650), 'brass')
     # scope on tall rings
     SN.scope(rc, Y_SIGHT, Z_OC, Z_OBJ, y_base=BY + RR - 0.0030)
     # trigger guard band + trigger
