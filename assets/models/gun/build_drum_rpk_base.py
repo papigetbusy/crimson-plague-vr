@@ -85,13 +85,14 @@ def build(out_dir):
     # trigger guard band + trigger
     K.tube(rc, [(-0.1500, 0.0000), (-0.1480, -0.0190), (-0.1200, -0.0280), (-0.0900, -0.0220), (-0.0810, 0.0000)], 0.0090, 0.0060, 'steel')
     rc.prism([(-0.1180, 0.0000), (-0.1240, 0.0000), (-0.1235, -0.0110), (-0.1210, -0.0200), (-0.1160, -0.0210), (-0.1170, -0.0100)], -0.0016, 0.0016, 'brass', side='brass')
-    # deployed A-frame bipod: hinge block + clamp ring on the barrel, two splayed legs reaching the ground, feet, cross brace
-    K.revolve(rc, [(-0.7300, 0.0180), (-0.7520, 0.0180)], BY, segs=10, region='steel', cap_f='steel', cap_b='steel', phase=PH)
-    rc.box((-0.0260, BY - 0.0300, -0.7540), (0.0260, BY - 0.0130, -0.7260), 'steel', top='steel_top')
+    # bipod FOLDED tight under the barrel: clamp ring + hinge block at the gas block, two thick legs lying together pointing forward, feet near the muzzle, front clip strap
+    K.revolve(rc, [(-0.4950, 0.0160), (-0.5300, 0.0160)], BY, segs=10, region='steel', cap_f='steel', cap_b='steel', phase=PH)
+    rc.box((-0.0180, BY - 0.0350, -0.5350), (0.0180, BY - 0.0100, -0.4900), 'steel', top='steel_top')
     for sgn in (-1, 1):
-        rc.cyl((sgn * 0.0200, BY - 0.0260, -0.7400), (sgn * 0.0750, -0.1800, -0.7900), 0.0085, 8, 'steel', cap='steel')
-        rc.cyl((sgn * 0.0750, -0.1800, -0.7900), (sgn * 0.0790, -0.1980, -0.7960), 0.0120, 8, 'muzzle', cap='muzzle')
-    rc.cyl((-0.0475, -0.0600, -0.7620), (0.0475, -0.0600, -0.7620), 0.0055, 6, 'steel', cap='steel')
+        x = sgn * 0.0090
+        rc.cyl((x, BY - 0.0225, -0.5100), (x, BY - 0.0225, -0.7250), 0.0082, 8, 'steel', cap='steel')
+        rc.cyl((x, BY - 0.0225, -0.7250), (x, BY - 0.0225, -0.7480), 0.0112, 8, 'muzzle', cap='muzzle')
+    rc.box((-0.0200, BY - 0.0360, -0.6500), (0.0200, BY - 0.0110, -0.6380), 'steel', top='steel_top')
 
     # ---------------- walnut furniture ----------------
     fu = C.Part('furniture')
