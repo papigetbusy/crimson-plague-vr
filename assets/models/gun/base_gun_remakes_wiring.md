@@ -392,3 +392,8 @@ model's stock length). Format unchanged: 4 empties (muzzle, mag_well, rear_sight
 | shotgun_double | shotgun_double_base.glb | side-by-side coach gun side (one-piece stock with drop + semi-pistol wrist, grip part removed) | 2,760 |
 | shotgun_combat | shotgun_combat_base.glb | Benelli M4 / L128A1 side (tall butt pad, slim dropped neck, pistol grip, deeper lower handguard) | 2,404 |
 | shotgun_blunderbuss | shotgun_blunderbuss_base.glb | Met flintlock blunderbuss side (raked butt, wedge stock, full-length slim forestock, realistic gentle bell, slimmer barrel, 14-sided) | 2,060 |
+
+### smg_bullpup polish3 (glossy near-black polymer, big butt radius)
+Butt top-rear and bottom-rear corners are now 3.5 cm radius arcs (5 segments each), brass parting-line seam band follows the arc, polymer is near-black
+(palette ~RGB 12-17) with roughness 0.30, specular 0.30, clearcoat weight 0.55 / roughness 0.10. The side-face crown is done with custom (domed) shading
+normals on the cap faces (geometry stays flat; glTF exports the normals) - the loader must not recompute normals. 2,980 tris, verify_ads pass.

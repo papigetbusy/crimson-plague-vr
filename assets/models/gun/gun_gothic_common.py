@@ -36,7 +36,7 @@ PAL = {
     'bone_light': (244, 238, 218), 'bone_cut': (74, 54, 38),
     'p_shadow': (7, 7, 8), 'p_dark': (12, 12, 14), 'p_mid': (21, 21, 24),
     'p_light': (33, 33, 37), 'p_high': (64, 64, 70),
-    'pf_dark': (22, 22, 26), 'pf_shadow': (19, 19, 23), 'pf_mid': (27, 27, 32),
+    'pf_dark': (12, 12, 15), 'pf_shadow': (10, 10, 13), 'pf_mid': (17, 17, 21),
 }
 FURN = {'bone', 'bone_panel', 'bone_inlay', 'poly', 'poly_dark', 'bone_end'}
 

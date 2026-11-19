@@ -29,6 +29,8 @@ to the bore (dir 0,0,-1); the bore is 49 mm below it (v1 73.5 mm).
 import math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gun_gothic_common as K
+from mathutils import Vector
+M, G = K.M, K.G
 C, M, G = K.C, K.M, K.G
 
 def paint_mag_h(A, r):
@@ -67,15 +69,19 @@ CH_Z0, CH_Z1 = -0.085, 0.148     # magazine channel (rails on both sides)
 
 # Side profile traced from the FN P90 photo (/workspace/bullpup_refs/fn_p90_right_side.jpg), scaled to 0.408 m shell length,
 # bore axis at y = 0.047; (z, y), top edge rear -> front, then front face, nose foot, grip, bottom, butt.
-OUTER = [(0.2825, 0.0640), (0.2840, 0.0450), (0.2835, 0.0150), (0.2820, -0.0050), (0.2790, -0.0190), (0.2720, -0.0252),
-         (0.2600, -0.0263), (0.1711, -0.0263),
+RAD = 0.035                      # big butt radius (top-rear and bottom-rear corners), 3.5 cm
+_tc, _bc = (0.2475, TOP - RAD), (0.2475, -0.0263 + RAD)
+ARC_TOP = [(_tc[0] + RAD * math.sin(math.radians(d)), _tc[1] + RAD * math.cos(math.radians(d))) for d in (15, 30, 45, 60, 75)]
+ARC_BOT = [(_bc[0] + RAD * math.cos(math.radians(d)), _bc[1] - RAD * math.sin(math.radians(d))) for d in (15, 30, 45, 60, 75)]
+OUTER = [(_tc[0] + RAD, _tc[1]), (_bc[0] + RAD, _bc[1])] + ARC_BOT + [(0.2475, -0.0263),
+         (0.1711, -0.0263),
          (0.1690, -0.0221), (0.1594, -0.0221), (0.1082, -0.0381), (0.1045, -0.0439), (0.0847, -0.0439), (0.0618, -0.0429),
          (0.0437, -0.0381), (0.0261, -0.0285), (0.0095, -0.0130), (0.0042, -0.0109), (-0.0086, -0.0109), (-0.0142, -0.0138),
          (-0.0158, -0.0197), (-0.0110, -0.0373), (-0.0110, -0.0415), (-0.0129, -0.0434), (-0.0427, -0.0434), (-0.0502, -0.0418),
          (-0.0641, -0.0349), (-0.0745, -0.0239), (-0.0803, -0.0111), (-0.0819, 0.0054), (-0.0843, 0.0089), (-0.0881, 0.0110),
          (-0.1030, 0.0110), (-0.1075, 0.0081), (-0.1091, 0.0038), (-0.1091, -0.0069), (-0.1121, -0.0087), (-0.1201, -0.0087),
          (-0.1230, 0.0097), (-0.1230, 0.0560), (-0.1190, 0.0640), (-0.1000, 0.0725), (-0.0850, TOP),
-         (CH_Z0, DECK), (CH_Z1, DECK), (CH_Z1, TOP), (0.2420, TOP), (0.2640, 0.0785), (0.2765, 0.0735)]
+         (CH_Z0, DECK), (CH_Z1, DECK), (CH_Z1, TOP), (0.2475, TOP)] + ARC_TOP
 THUMB = [(0.0823, -0.0117), (0.0543, -0.0002), (0.0466, 0.0054), (0.0439, 0.0107), (0.0434, 0.0161), (0.0461, 0.0230),
          (0.0501, 0.0270), (0.0554, 0.0291), (0.0863, 0.0291), (0.0954, 0.0259), (0.1015, 0.0203), (0.1047, 0.0123),
          (0.1047, 0.0049), (0.1026, -0.0010), (0.0954, -0.0087), (0.0890, -0.0114)]
@@ -86,6 +92,28 @@ TRIGHOLE = [(-0.0441, -0.0063), (-0.0497, -0.0039), (-0.0542, 0.0022), (-0.0547,
 
 def cham(z0, z1, y0, y1, c):
     return [(z0 + c, y0), (z1 - c, y0), (z1, y0 + c), (z1, y1 - c), (z1 - c, y1), (z0 + c, y1), (z0, y1 - c), (z0, y0 + c)]
+
+
+def crown_normals(ob, crown=0.0045):
+    """Slight convex crown on the big shell side faces: the flat cap triangles get domed shading normals
+    (n ~ (+-1, 2c(y-yc)/Ly^2, 2c(z-zc)/Lz^2)), so the clearcoat catches a gradient instead of one flat plane. Geometry is unchanged."""
+    me = ob.data
+    zc, zh = 0.0800, 0.2025          # shell centre / half length (z)
+    yc, yh = 0.0266, 0.0529          # centre / half height (y)
+    cn = [l.normal.copy() for l in me.loops]
+    for poly in me.polygons:
+        if abs(poly.normal.x) < 0.97:
+            continue
+        vs = [M.game_of(me.vertices[me.loops[li].vertex_index].co) for li in poly.loop_indices]
+        if not all(abs(abs(v.x) - HW) < 2e-4 for v in vs):
+            continue
+        for li in poly.loop_indices:
+            g = M.game_of(me.vertices[me.loops[li].vertex_index].co)
+            sx = 1.0 if g.x > 0 else -1.0
+            dy = max(-1.2, min(1.2, (g.y - yc) / yh)); dz = max(-1.2, min(1.2, (g.z - zc) / zh))
+            n = Vector((sx, 2 * crown * dy / yh, 2 * crown * dz / zh)).normalized()
+            cn[li] = G(n.x, n.y, n.z)
+    me.normals_split_custom_set(cn)
 
 
 def build(out_dir):
@@ -107,10 +135,10 @@ def build(out_dir):
     mats = C.make_materials(NAME, tex, furn='polymer')
     mats[1].name = NAME + '_polymer'
     b = mats[1].node_tree.nodes['Principled BSDF']
-    b.inputs['Roughness'].default_value = 0.45        # satin polymer: visible specular roll-off over the rounded shell
-    b.inputs['Specular IOR Level'].default_value = 0.17
-    b.inputs['Coat Weight'].default_value = 0.10
-    b.inputs['Coat Roughness'].default_value = 0.35
+    b.inputs['Roughness'].default_value = 0.30        # glossy molded near-black polymer: clearcoat streak along the top and sides
+    b.inputs['Specular IOR Level'].default_value = 0.30
+    b.inputs['Coat Weight'].default_value = 0.55
+    b.inputs['Coat Roughness'].default_value = 0.10
 
     bd = C.Part('body')
     # ---- polymer shell: traced P90 profile with the thumbhole and the trigger-hand hole, rounded sides ----
@@ -144,20 +172,27 @@ def build(out_dir):
         x0, x1 = xs(HW - 0.0006, HW + 0.0017)
         bd.cyl((x0, cy, cz), (x1, cy, cz), R, 18, 'bone_inlay', cap='bone_inlay')          # bone cross sunk inside the bezel
         for (zz, yy) in ((0.1145, 0.0525), (0.2740, 0.0525), (0.1145, -0.0120)):
-            bd.cyl((sgn * HW, yy, zz), (sgn * (HW + 0.0014), yy, zz), 0.0018, 8, 'brass', cap='brass')
+            bd.cyl((sgn * HW, yy, zz), (sgn * (HW + 0.0014), yy, zz), 0.0018, 6, 'brass', cap='brass')
         # brass pinstripe along the upper rear block
         x0, x1 = xs(HW - 0.0004, HW + 0.0005)
         bd.box((x0, 0.0640, 0.1520), (x1, 0.0654, 0.2740), 'brass')
-    # thin brass butt pad
-    rear = [(0.2825, 0.0640), (0.2840, 0.0450), (0.2835, 0.0150), (0.2820, -0.0050), (0.2790, -0.0190)]
-    bd.prism([(z + 0.0015, y) for z, y in rear] + [(z - 0.0010, y) for z, y in reversed(rear)], -0.0118, 0.0118, 'brass', side='brass')
+    # brass parting-line seam around the big butt radius (thin band on the mid plane, proud of the rim by 0.5 mm)
+    def arcp(c, r, d0, d1, top, n=6):
+        out = []
+        for k in range(n + 1):
+            d = math.radians(d0 + (d1 - d0) * k / n)
+            out.append((c[0] + r * (math.sin(d) if top else math.cos(d)), c[1] + r * (math.cos(d) if top else -math.sin(d))))
+        return out
+    pathO = arcp(_tc, RAD + 0.0005, 0, 90, True) + arcp(_bc, RAD + 0.0005, 0, 90, False)
+    pathI = arcp(_tc, RAD - 0.0022, 0, 90, True) + arcp(_bc, RAD - 0.0022, 0, 90, False)
+    bd.prism(pathO + pathI[::-1], -0.0007, 0.0007, 'brass', side='brass')
     # ---- trigger: steel blade hung from a brass pivot pin, seated inside the trigger-hand hole ----
     trig = [(-0.0200, 0.0300), (-0.0262, 0.0300), (-0.0270, 0.0200), (-0.0298, 0.0100), (-0.0322, 0.0050), (-0.0305, 0.0034),
             (-0.0275, 0.0060), (-0.0243, 0.0120), (-0.0225, 0.0200)]
     bd.prism(trig, -0.0013, 0.0013, 'steel', side='steel', top='steel_top')
     bd.cyl((-0.0150, 0.0238, -0.0235), (0.0150, 0.0238, -0.0235), 0.0024, 8, 'brass', cap='brass')
-    bd.cyl((-HW, 0.0238, -0.0235), (-HW - 0.0010, 0.0238, -0.0235), 0.0030, 8, 'brass', cap='brass')
-    bd.cyl((HW, 0.0238, -0.0235), (HW + 0.0010, 0.0238, -0.0235), 0.0030, 8, 'brass', cap='brass')
+    bd.cyl((-HW, 0.0238, -0.0235), (-HW - 0.0010, 0.0238, -0.0235), 0.0030, 6, 'brass', cap='brass')
+    bd.cyl((HW, 0.0238, -0.0235), (HW + 0.0010, 0.0238, -0.0235), 0.0030, 6, 'brass', cap='brass')
     # ---- sights: front ears + post, rear bridge with two thin posts (same sight line as before) ----
     for sgn in (-1, 1):
         lo, hi = (0.0030, 0.0046) if sgn > 0 else (-0.0046, -0.0030)
@@ -172,10 +207,10 @@ def build(out_dir):
     bd.box((-0.0012, Y_SIGHT - 0.0014, -0.1142), (0.0012, Y_SIGHT, -0.1098), 'brass')
     # ---- barrel + small slotted hider, thin brass rings (barely clears the nose) ----
     K.revolve(bd, [(Z_NOSE + 0.004, 0.0085), (-0.1340, 0.0085), (-0.1350, 0.0070), (-0.1560, 0.0070), (Z_MUZ, 0.0064)],
-              BY, segs=10, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
+              BY, segs=8, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
     for z0, z1, r in ((-0.1300, -0.1335, 0.0098), (-0.1580, -0.1605, 0.0082)):
-        K.revolve(bd, [(z0, r), (z1, r)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass', phase=PH)
-    for zz in (-0.1410, -0.1450, -0.1490):
+        K.revolve(bd, [(z0, r), (z1, r)], BY, segs=8, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    for zz in (-0.1430, -0.1470):
         bd.box((-0.0022, BY + 0.0062, zz - 0.0013), (0.0022, BY + 0.0074, zz + 0.0013), 'steel')
 
     # ---------------- cocking handle (small brass, left side, slides back) ----------------
@@ -190,6 +225,7 @@ def build(out_dir):
     mg.box((-0.0106, MAG_Y0 + 0.0008, -0.0825), (0.0106, MAG_Y1 - 0.0008, -0.0780), 'brass')
 
     objs = {p.name: p.to_object(mats, smooth=(50 if p is bd else 35)) for p in (bd, ch, mg)}
+    crown_normals(objs['body'])
     return objs, mats
 
 
