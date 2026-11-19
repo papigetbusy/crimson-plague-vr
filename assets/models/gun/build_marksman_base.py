@@ -68,11 +68,11 @@ def build(out_dir):
         rc.box((-0.0152, 0.0202, zc - 0.0030), (0.0152, 0.0800, zc + 0.0030), 'brass')
     K.revolve(rc, [(-0.296, 0.0150), (-0.304, 0.0150)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
     # barrel, gas tube, gas block, front sight, flash hider
-    K.revolve(rc, [(-0.296, 0.0095), (-0.560, 0.0080), (-0.820, 0.0070), (-0.9000, 0.0070)], BY, segs=10, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
-    K.revolve(rc, [(-0.9000, 0.0090), (-0.9050, 0.0112), (-0.9300, 0.0112), (-0.9350, 0.0095), (-0.9926, 0.0102), (Z_MUZ, 0.0070)], BY, segs=10, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
+    K.revolve(rc, [(-0.296, 0.0118), (-0.560, 0.0098), (-0.820, 0.0086), (-0.9000, 0.0086)], BY, segs=10, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
+    K.revolve(rc, [(-0.9000, 0.0108), (-0.9050, 0.0128), (-0.9300, 0.0128), (-0.9350, 0.0112), (-0.9926, 0.0116), (Z_MUZ, 0.0086)], BY, segs=10, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
     for z0 in (-0.9060, -0.9340, -0.9900):
-        K.revolve(rc, [(z0, 0.0122), (z0 - 0.0050, 0.0122)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass', phase=PH)
-    rc.cyl((0, BY + 0.0210, -0.296), (0, BY + 0.0210, -0.640), 0.0058, 8, 'steel', cap='steel')            # gas tube
+        K.revolve(rc, [(z0, 0.0138), (z0 - 0.0050, 0.0138)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    rc.cyl((0, BY + 0.0230, -0.296), (0, BY + 0.0230, -0.640), 0.0058, 8, 'steel', cap='steel')            # gas tube
     rc.box((-0.0085, BY - 0.0130, -0.6750), (0.0085, BY + 0.0260, -0.6400), 'steel', top='steel_top')       # gas block
     rc.box((-0.0100, BY - 0.0100, -0.8900), (0.0100, BY + 0.0150, -0.8720), 'steel', top='steel_top')       # front sight base
     rc.box((-0.0030, BY + 0.0100, -0.8860), (0.0030, BY + 0.0420, -0.8800), 'steel')                       # front post
@@ -106,10 +106,9 @@ def build(out_dir):
 
     # ---------------- curved box magazine ----------------
     mg = C.Part('magazine')
-    mag = K.chaikin([(-0.1600, 0.0260), (-0.2320, 0.0260), (-0.2600, -0.0100), (-0.2830, -0.0500), (-0.2940, -0.0880), (-0.2400, -0.0880),
-                     (-0.2220, -0.0520), (-0.1950, -0.0150)], 1)
+    mag = [(-0.1650, 0.0260), (-0.2250, 0.0260), (-0.2300, 0.0100), (-0.2370, -0.0460), (-0.1770, -0.0460), (-0.1710, 0.0100)]      # short straight box, ~10 deg forward
     mg.prism(mag, -0.0125, 0.0125, 'mag', side='steel')
-    mg.box((-0.0132, -0.0900, -0.2960), (0.0132, -0.0840, -0.2380), 'brass')
+    mg.prism([(-0.1760, -0.0460), (-0.2380, -0.0460), (-0.2390, -0.0520), (-0.1780, -0.0520)], -0.0132, 0.0132, 'brass', side='brass')
 
     objs = {}
     for p, ml in ((rc, 0.022), (fu, 0.020), (mg, 0.012)):
