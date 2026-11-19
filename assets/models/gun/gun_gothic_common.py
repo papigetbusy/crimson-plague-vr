@@ -596,7 +596,8 @@ def shell(part, outer, holes, hw, region='poly', bevel=0.0055, segs=2, bevel_hol
         hb = bevel_hole if bevel_hole is not None else bevel
         bmesh.ops.bevel(bm, geom=rim, offset=bevel, segments=segs, profile=0.5, affect='EDGES', clamp_overlap=True)
         live = [e for e in rim_h if e.is_valid]
-        bmesh.ops.bevel(bm, geom=live, offset=hb, segments=segs, profile=0.5, affect='EDGES', clamp_overlap=True)
+        if live:
+            bmesh.ops.bevel(bm, geom=live, offset=hb, segments=segs, profile=0.5, affect='EDGES', clamp_overlap=True)
     new = [f for f in bm.faces if f not in pre]
     bm.normal_update()
     for f in new:

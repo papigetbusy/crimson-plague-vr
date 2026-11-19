@@ -9,7 +9,7 @@ scrollwork and lancet-arch plates, dark walnut furniture with carved bone
 cross plaques and bone foregrip cap, brass straps, fin ring collars,
 compensator rings, cocking knob and drum band. Steel and brass share the
 locked 1911 metal material (metallic 1 / roughness 0.30); walnut + bone share
-one non-metal material; one 256 px atlas.
+one non-metal material; one 1024 px smooth albedo (v2: real rounded furniture, satin walnut).
 
 Build (repo root):
   blender -b --python assets/models/gun/build_drum_base.py -- --out-dir assets/models/gun
@@ -56,9 +56,10 @@ def paint_wood(A, r, seed=71, end=False):
     x0, y0, x1, y1 = A.reg[r]
     for y in range(y0, y1):
         for x in range(x0, x1):
-            n = K._vn(x * 0.18, y, 3, seed)
-            g = math.sin((y - y0) * 0.62 + 6.0 * n + 0.04 * (x - x0))
-            c = 'w_light' if g > 0.78 else 'w_mid' if g > 0.15 else 'w_dark' if g > -0.62 else 'w_shadow'
+            v = K._vn(x * 0.035, (y - y0) * 1.1, 4, seed) * 0.7 + K._vn(x * 0.10, (y - y0) * 2.6, 2, seed + 9) * 0.3
+            c = 'w_light' if v > 0.64 else 'w_dark' if v < 0.40 else 'w_mid'
+            if v < 0.22:
+                c = 'w_shadow'
             if end:
                 c = 'w_dark' if K._h(x, y, seed) > 0.3 else 'w_shadow'
             h = K._h(x, y, seed + 3)
@@ -110,14 +111,14 @@ def paint_drum_face(A, r):
 def build(out_dir):
     C.M.reset_scene()
     A = K.Atlas([
-        ('barrel', 128, 72), ('fins', 32, 32), ('panel', 112, 36), ('wood', 64, 64), ('drum_face', 64, 64), ('bone_inlay', 48, 48),
+        ('barrel', 128, 72), ('fins', 32, 32), ('panel', 112, 36), ('wood', 128, 48), ('drum_face', 64, 64), ('bone_inlay', 32, 32),
         ('drum_rim', 48, 16), ('steel', 48, 32), ('steel_top', 48, 24), ('muzzle', 28, 28), ('brass', 24, 24),
         ('bone_end', 16, 16), ('wood_end', 16, 16),
     ])
     A.install()
     A.steel('steel', seed=5, grime=0.84)
     A.steel('steel_top', ('steel_mid', 'steel_light', 'sheen', 'steel_edge'), seed=6, grime=0.74)
-    A.engraved('panel', seed=9, lam=22, grime=0.82)
+    A.engraved('panel', seed=9, lam=14, grime=0.84, arches=False)
     A.wrap('barrel', 12, 6, lambda j: 'eng' if j in (0, 6) else 'hi' if j == 3 else 'dark' if j == 9 else 'plain', seed=11, lam=18)
     A.wrap('fins', 8, 4, lambda j: 'hi' if j in (1, 2) else 'plain', seed=15)
     A.muzzle('muzzle'); A.brass('brass', engrave=True)
@@ -129,8 +130,8 @@ def build(out_dir):
     mats = C.make_materials(NAME, tex, furn='wood')
     mats[1].name = NAME + '_wood'
     b = mats[1].node_tree.nodes['Principled BSDF']
-    b.inputs['Roughness'].default_value = 0.55
-    b.inputs['Specular IOR Level'].default_value = 0.25
+    b.inputs['Roughness'].default_value = 0.40        # satin walnut
+    b.inputs['Specular IOR Level'].default_value = 0.35
 
     # ---------------- receiver + barrel group ----------------
     rc = C.Part('receiver')
@@ -145,20 +146,21 @@ def build(out_dir):
             rc.box((x0, R_Y0 - 0.001, zc - 0.0025), (x1, R_Y1 + 0.0015, zc + 0.0025), 'brass')
         rc.cyl((sgn * 0.0190, 0.0620, 0.0130), (sgn * 0.0225, 0.0620, 0.0130), 0.0032, 8, 'brass', cap='brass')
     # barrel, cooling fins, ring collars, Cutts-style compensator
-    K.revolve(rc, [(-0.150, 0.0095), (-0.352, 0.0095)], BY, segs=12, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
+    K.revolve(rc, [(-0.150, 0.0095), (-0.352, 0.0095)], BY, segs=10, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
     for i in range(11):
         z0 = -0.170 - i * 0.0165
-        K.revolve(rc, [(z0, 0.0140), (z0 - 0.0045, 0.0140)], BY, segs=8, region='fins', cap_f='steel', cap_b='steel')
-    K.revolve(rc, [(-0.1550, 0.0128), (-0.1630, 0.0128)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
-    K.revolve(rc, [(-0.3500, 0.0118), (-0.3930, 0.0118), (Z_MUZ, 0.0092)], BY, segs=12, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
+        K.revolve(rc, [(z0, 0.0140), (z0 - 0.0045, 0.0140)], BY, segs=6, region='fins', cap_f='steel', cap_b='steel')
+    K.revolve(rc, [(-0.1550, 0.0128), (-0.1630, 0.0128)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    K.revolve(rc, [(-0.3500, 0.0118), (-0.3930, 0.0118), (Z_MUZ, 0.0092)], BY, segs=10, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
     for z0, z1 in ((-0.3500, -0.3560), (-0.3860, -0.3910)):
-        K.revolve(rc, [(z0, 0.0130), (z1, 0.0130)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+        K.revolve(rc, [(z0, 0.0130), (z1, 0.0130)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass', phase=PH)
     for zz in (-0.3660, -0.3720, -0.3790):                                  # compensator slots
         rc.box((-0.0040, BY + 0.0104, zz - 0.0020), (0.0040, BY + 0.0118, zz + 0.0020), 'steel')
     # trigger guard + trigger
     K.tube(rc, [(-0.0520, 0.0345), (-0.0560, 0.0120), (-0.0480, -0.0140), (-0.0300, -0.0225), (-0.0185, -0.0160)], 0.0072, 0.0074, 'steel')
     rc.prism([(-0.0330, 0.0340), (-0.0270, 0.0340), (-0.0285, 0.0170), (-0.0310, 0.0070), (-0.0350, 0.0030), (-0.0385, 0.0035),
-              (-0.0365, 0.0110), (-0.0345, 0.0190)], -0.0020, 0.0020, 'brass', side='brass')
+              (-0.0365, 0.0110), (-0.0345, 0.0190)], -0.0020, 0.0020, 'steel', side='steel', top='steel_top')
+    rc.cyl((-0.0150, 0.0300, -0.0300), (0.0150, 0.0300, -0.0300), 0.0022, 8, 'brass', cap='brass')
     # rear sight (ladder posts, brass tips) + front sight (blade between ears, brass bead)
     rc.box((-0.0125, R_Y1 - 0.0005, -0.0385), (0.0125, 0.0905, -0.0185), 'steel', top='steel_top')
     for sgn in (-1, 1):
@@ -172,37 +174,42 @@ def build(out_dir):
     rc.box((-0.0028, 0.0800, -0.3825), (0.0028, Y_SIGHT - 0.0016, -0.3775), 'steel')
     rc.box((-0.0016, Y_SIGHT - 0.0016, -0.3818), (0.0016, Y_SIGHT, -0.3782), 'brass')
 
-    # ---------------- walnut furniture ----------------
+    # ---------------- walnut furniture: real rounded volume (K.shell) + bezelled bone cross inlays ----------------
     fu = C.Part('furniture')
-    stock = [(0.048, 0.082), (0.200, 0.078), (0.312, 0.068), (0.332, 0.062), (0.338, -0.046), (0.322, -0.052), (0.300, -0.030),
-             (0.200, 0.020), (0.130, 0.028), (0.048, 0.036)]
-    fu.prism(stock, -0.0175, 0.0175, 'wood', side='wood_end')
-    fu.prism([(0.3365, -0.0490), (0.3440, -0.0490), (0.3440, 0.0630), (0.3300, 0.0630)], -0.0185, 0.0185, 'brass', side='brass')
+    stock = [(0.046, 0.0805), (0.150, 0.0795), (0.240, 0.0755), (0.300, 0.0700), (0.334, 0.0655), (0.341, 0.0600), (0.342, 0.0300),
+             (0.338, -0.0300), (0.330, -0.0450), (0.318, -0.0470), (0.290, -0.0360), (0.250, -0.0100), (0.190, 0.0150), (0.120, 0.0310),
+             (0.046, 0.0355)]
+    K.shell(fu, K.chaikin(stock, 1), [], 0.0155, region='wood', bevel=0.0055, segs=2)
+    # brass butt plate
+    fu.prism([(0.3395, -0.0440), (0.3450, -0.0440), (0.3470, 0.0580), (0.3420, 0.0640), (0.3380, 0.0620)], -0.0130, 0.0130, 'brass', side='brass')
     for sgn in (-1, 1):
-        lo, hi = (0.0175, 0.0192) if sgn > 0 else (-0.0192, -0.0175)
-        fu.prism(K.chaikin([(0.212, 0.012), (0.212, 0.066), (0.274, 0.066), (0.274, 0.012)], 1), lo, hi, 'bone_inlay', side='bone_end')
-        fu.cyl((sgn * 0.0172, 0.0560, 0.082), (sgn * 0.0200, 0.0560, 0.082), 0.0034, 8, 'brass', cap='brass')   # stock bolt
-    # pistol grip
+        def xs(a, b):
+            return (sgn * a, sgn * b) if sgn > 0 else (sgn * b, sgn * a)
+        hwS = 0.0155
+        x0, x1 = xs(hwS - 0.0006, hwS + 0.0014)
+        fu.cyl((x0, 0.0310, 0.2600), (x1, 0.0310, 0.2600), 0.0156, 12, 'brass', cap='bone_inlay')           # brass-rimmed bone cross badge
+        fu.cyl((sgn * 0.0150, 0.0620, 0.0900), (sgn * 0.0166, 0.0620, 0.0900), 0.0030, 8, 'brass', cap='brass')   # stock bolt
+    # pistol grip (raked)
     grip = [(-0.0225, GRIP_TOP), (-0.0235, 0.020), (-0.0240, -0.015), (-0.0225, GRIP_BOT), (0.0205, GRIP_BOT), (0.0235, -0.030),
             (0.0245, 0.000), (0.0240, 0.030), (0.0220, GRIP_TOP)]
-    K.prism_ah(fu, K.chaikin(grip, 1), TH, -0.0135, 0.0135, 'wood', side='wood_end')
-    zb = K.ah_to_zy([(-0.0235, GRIP_BOT), (0.0212, GRIP_BOT), (0.0212, GRIP_BOT - 0.0070), (-0.0235, GRIP_BOT - 0.0070)], TH)
-    fu.prism(zb, -0.0148, 0.0148, 'brass', side='brass')
+    K.shell(fu, K.ah_to_zy(K.chaikin(grip, 1), TH), [], 0.0128, region='wood', bevel=0.0048, segs=1)
+    zb = K.ah_to_zy([(-0.0235, GRIP_BOT), (0.0212, GRIP_BOT), (0.0212, GRIP_BOT - 0.0060), (-0.0235, GRIP_BOT - 0.0060)], TH)
+    fu.prism(zb, -0.0125, 0.0125, 'brass', side='brass')
     for sgn in (-1, 1):
         zy = K.ah_to_zy([(0.0, 0.012)], TH)[0]
-        fu.cyl((sgn * 0.0132, zy[1], zy[0]), (sgn * 0.0152, zy[1], zy[0]), 0.0030, 8, 'brass', cap='brass')
-    # forend (under the barrel) + bone plaque, vertical foregrip with brass collar and bone cap
+        fu.cyl((sgn * 0.0124, zy[1], zy[0]), (sgn * 0.0140, zy[1], zy[0]), 0.0028, 8, 'brass', cap='brass')
+    # forend (under the barrel) with bezelled bone plaque; vertical foregrip with brass collar and bone cap
     fe = K.chaikin([(-0.158, 0.046), (-0.160, 0.014), (-0.172, 0.004), (-0.255, 0.004), (-0.264, 0.016), (-0.264, 0.044)], 1)
-    fu.prism(fe, -0.0165, 0.0165, 'wood', side='wood_end')
-    fu.box((-0.0172, 0.0020, -0.1660), (0.0172, 0.0480, -0.1610), 'brass')
+    K.shell(fu, fe, [], 0.0158, region='wood', bevel=0.0050, segs=1)
+    fu.box((-0.0166, 0.0020, -0.1660), (0.0166, 0.0480, -0.1618), 'brass')
     for sgn in (-1, 1):
-        lo, hi = (0.0165, 0.0180) if sgn > 0 else (-0.0180, -0.0165)
-        fu.prism(K.chaikin([(-0.250, 0.0085), (-0.250, 0.0405), (-0.218, 0.0405), (-0.218, 0.0085)], 1), lo, hi, 'bone_inlay', side='bone_end')
+        x0, x1 = (0.0158 - 0.0005, 0.0158 + 0.0014) if sgn > 0 else (-0.0158 - 0.0014, -0.0158 + 0.0005)
+        fu.cyl((x0, 0.0255, -0.2100), (x1, 0.0255, -0.2100), 0.0108, 12, 'brass', cap='bone_inlay')
     vg = K.chaikin([(-0.2335, 0.006), (-0.2380, -0.030), (-0.2320, -0.070), (-0.2200, -0.0925), (-0.2000, -0.0925), (-0.1920, -0.070),
                     (-0.1960, -0.030), (-0.1975, 0.006)], 1)
-    fu.prism(vg, -0.0125, 0.0125, 'wood', side='wood_end')
-    fu.box((-0.0133, -0.0040, -0.2385), (0.0133, 0.0060, -0.1925), 'brass')
-    fu.prism([(-0.2185, -0.0925), (-0.2015, -0.0925), (-0.2030, -0.0985), (-0.2170, -0.0985)], -0.0105, 0.0105, 'bone_end', side='bone_end')
+    K.shell(fu, vg, [], 0.0118, region='wood', bevel=0.0045, segs=1)
+    fu.box((-0.0126, -0.0040, -0.2385), (0.0126, 0.0060, -0.1925), 'brass')
+    fu.prism([(-0.2185, -0.0925), (-0.2015, -0.0925), (-0.2030, -0.0985), (-0.2170, -0.0985)], -0.0100, 0.0100, 'bone_end', side='bone_end')
 
     # ---------------- cocking knob (brass, slides back along the right side) ----------------
     ch = C.Part('cocking_handle')
@@ -219,7 +226,10 @@ def build(out_dir):
     mg.cyl((-0.0045, cy, cz), (0.0045, cy, cz), 0.0520, 16, 'brass', cap='brass')
     mg.box((-0.0150, 0.0300, cz - 0.0200), (0.0150, 0.0400, cz + 0.0200), 'steel')           # neck into the well
 
-    objs = {p.name: p.to_object(mats) for p in (rc, fu, ch, mg)}
+    objs = {}
+    for p, ml in ((rc, 0.024), (fu, 0.020), (ch, 0.014), (mg, 0.014)):
+        C.BEVEL_MINLEN = ml            # fewer bevelled edges on the busy receiver / furniture, full bevel on the drum rims
+        objs[p.name] = p.to_object(mats, smooth=(50 if p is fu else 35))
     return objs, mats
 
 

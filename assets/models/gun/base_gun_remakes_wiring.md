@@ -370,3 +370,10 @@ clear top-mag channel between steel-capped rails), extruded 35 mm and rounded wi
 the engraved steel plaque and the bone-cross badge sit in brass bezels flush with the shell. 2,852 tris. Sight empties unchanged: rear (0, 0.0960, 0.0500), front (0, 0.0960, -0.1120), muzzle (0, 0.047, -0.168),
 mag_well (0, 0.058, 0.040); `verify_ads.js smg` passes (dir (0,0,-1), rear on the eye axis at z = -0.18, bore 49 mm below the line, 0.113 deg). Polymer material: metallic 0, roughness 0.42, specular 0.14 (satin);
 metal: the locked 1911 material. The mag is now 0.226 m (z -0.0825..0.1435) and sits in the channel.
+
+## Batch 2 revision: `smg_drum` v2 (Thompson M1928, same bar as the bullpup v4)
+
+Rebuilt to the locked brief: 1024 px smooth albedo with LINEAR filtering, bevelled steel edges, and real rounded walnut furniture (slim curved stock, raked pistol grip, short forend, vertical foregrip are
+all `K.shell` bodies with rounded rims instead of flat extrusions), satin walnut (roughness 0.40, specular 0.35), brass-rimmed bone cross badges flush with the stock and forend, finer engraved receiver plates,
+steel trigger on a brass pivot. Same file, root `smg_drum`, meshes `receiver`, `furniture`, `cocking_handle`, `magazine`, same empties and sight line (rear (0, 0.1060, -0.0288), front (0, 0.1060, -0.3800), muzzle z -0.400,
+mag_well (0, 0.035, -0.105)). 2,992 tris. `verify_ads.js smg` passes. The notes above (smg_drum entry, `fore`, `slideTravel`) stay valid.
