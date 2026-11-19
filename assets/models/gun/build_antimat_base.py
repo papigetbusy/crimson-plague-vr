@@ -18,8 +18,8 @@ S, K, C, M, G = SN.S, SN.K, SN.C, SN.M, SN.G
 NAME = 'sniper_antimat_base'
 BY = 0.060
 RAIL_TOP = 0.0985
-Y_SIGHT = 0.1285
-Z_OC, Z_OBJ = 0.012, -0.352
+Y_SIGHT = 0.1400
+Z_OC, Z_OBJ = 0.050, -0.500
 Z_MUZ = -1.000
 PH = -math.pi / 12
 MAGW = (0.0, -0.0150, -0.1130)
@@ -27,8 +27,17 @@ MAGW = (0.0, -0.0150, -0.1130)
 # skeleton stock frame (outer triangle + cut-out), traced proportions from the M82A1 side photo
 FRAME = [(0.362, 0.0450), (0.362, -0.0600), (0.040, 0.0150), (0.040, 0.0450)]
 FRAME_HOLE = [(0.340, 0.0330), (0.340, -0.0379), (0.085, 0.0200), (0.085, 0.0330)]
-GRIP = [(0.100, -0.0200), (0.095, -0.0480), (0.082, -0.0900), (0.064, -0.1200), (0.034, -0.1180), (0.028, -0.0850), (0.012, -0.0450),
-        (0.002, -0.0100), (0.060, -0.0100)]
+RK = math.radians(20)
+
+
+def _gp(u, v, z0=0.060, y0=0.0000):
+    return (round(z0 + u * math.sin(RK) + v * math.cos(RK), 4), round(y0 - u * math.cos(RK) + v * math.sin(RK), 4))
+
+
+_FRONT = [(0.000, -0.0150), (0.016, -0.0165), (0.030, -0.0165), (0.040, -0.0125), (0.052, -0.0165), (0.064, -0.0165), (0.074, -0.0125),
+          (0.086, -0.0165), (0.098, -0.0165), (0.108, -0.0135), (0.118, -0.0140)]
+_BACK = [(0.118, 0.0150), (0.104, 0.0178), (0.084, 0.0168), (0.062, 0.0158), (0.040, 0.0168), (0.020, 0.0200), (0.000, 0.0180)]
+GRIP = [_gp(u, v) for u, v in _FRONT + _BACK]
 
 
 def build(out_dir):
@@ -54,13 +63,15 @@ def build(out_dir):
     rc = C.Part('receiver')
     rear = K.hexp(-0.0230, 0.0230, -0.0126, 0.0850, 0.0100)
     rc.loft([(0.040, rear), (-0.300, rear)], 'steel', top='steel_top')
+    low = K.hexp(-0.0205, 0.0205, -0.0126, 0.0300, 0.0080)
+    rc.loft([(0.105, low), (0.038, low)], 'steel', top='steel_top')                                          # lower receiver block the grip hangs from
     fore = K.hexp(-0.0210, 0.0210, 0.0120, 0.0850, 0.0090)
     rc.loft([(-0.300, fore), (-0.505, fore)], 'steel', top='steel_top')
     rc.box((-0.0085, 0.0848, -0.500), (0.0085, RAIL_TOP, 0.040), 'steel', top='steel_top')                      # Picatinny rail
     zz = 0.040
     while zz - 0.0120 > -0.500:
         rc.box((-0.0085, RAIL_TOP - 0.0006, zz - 0.0120), (0.0085, RAIL_TOP + 0.0014, zz), 'steel', top='steel_top')   # rail teeth
-        zz -= 0.0250
+        zz -= 0.0400
     for sgn in (-1, 1):
         a_, b_ = (0.0226, 0.0246) if sgn > 0 else (-0.0246, -0.0226)
         rc.prism(S.cham(-0.060, 0.025, 0.0080, 0.0700, 0.006), a_, b_, 'panel', side='steel', top='steel_top')
@@ -68,30 +79,39 @@ def build(out_dir):
         for zc in (0.0330, -0.0950, -0.2900):
             x0, x1 = (0.0224, 0.0250) if sgn > 0 else (-0.0250, -0.0224)
             rc.box((x0, -0.0136, zc - 0.0030), (x1, 0.0860, zc + 0.0030), 'brass')
-    # barrel + brake
-    K.revolve(rc, [(-0.480, 0.0140), (-0.700, 0.0128), (-0.930, 0.0112)], BY, segs=12, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
-    K.revolve(rc, [(-0.9300, 0.0112), (-0.9340, 0.0240), (-0.9980, 0.0240), (Z_MUZ, 0.0205)], BY, segs=12, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
-    for z0 in (-0.9340, -0.9640, -0.9900):
-        K.revolve(rc, [(z0, 0.0249), (z0 - 0.0050, 0.0249)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    # barrel + M82 chevron brake (arrowhead nose, three angled side ports each side)
+    K.revolve(rc, [(-0.480, 0.0140), (-0.700, 0.0128), (-0.930, 0.0118)], BY, segs=10, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
     for z0 in (-0.5100, -0.7000):
-        K.revolve(rc, [(z0, 0.0156), (z0 - 0.0060, 0.0156)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
-    # scope
-    SN.scope(rc, Y_SIGHT, Z_OC, Z_OBJ, r=0.0140, big=0.0245, rings=(0.20, 0.62), y_base=RAIL_TOP - 0.0020, base_w=0.0150)
-    # carry handle, folded bipod
-    K.tube(rc, [(-0.395, RAIL_TOP), (-0.395, 0.1200), (-0.450, 0.1200), (-0.450, RAIL_TOP)], 0.0100, 0.0070, 'steel')
-    rc.box((-0.0150, 0.0000, -0.3150), (0.0150, 0.0130, -0.2950), 'steel', top='steel_top')                      # bipod mount block
+        K.revolve(rc, [(z0, 0.0156), (z0 - 0.0060, 0.0156)], BY, segs=10, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    bk = K.hexp(-0.0250, 0.0250, BY - 0.0235, BY + 0.0235, 0.0085)
+    bn = K.hexp(-0.0170, 0.0170, BY - 0.0195, BY + 0.0195, 0.0085)
+    rc.loft([(-0.9250, bk), (-0.9780, bk), (Z_MUZ, bn)], 'steel', top='steel_top')
+    rc.cyl((0, BY, Z_MUZ + 0.0004), (0, BY, Z_MUZ - 0.0006), 0.0090, 8, 'muzzle', cap='muzzle')
+    rc.box((-0.0262, BY - 0.0245, -0.9270), (0.0262, BY + 0.0245, -0.9330), 'brass')                       # brass collar at the brake rear
     for sgn in (-1, 1):
-        rc.cyl((sgn * 0.0240, 0.0060, -0.3050), (sgn * 0.0240, 0.0060, -0.4950), 0.0050, 8, 'steel', cap='brass')
-        rc.cyl((sgn * 0.0240, 0.0060, -0.4300), (sgn * 0.0240, 0.0060, -0.4400), 0.0066, 8, 'brass', cap='brass')
+        xa, xb = (0.0248, 0.0256) if sgn > 0 else (-0.0256, -0.0248)
+        for z0 in (-0.9420, -0.9590):
+            rc.prism([(z0, BY - 0.0165), (z0 - 0.0048, BY - 0.0165), (z0 - 0.0090, BY), (z0 - 0.0042, BY)], xa, xb, 'muzzle', side='muzzle')
+            rc.prism([(z0 - 0.0042, BY), (z0 - 0.0090, BY), (z0 - 0.0048, BY + 0.0165), (z0, BY + 0.0165)], xa, xb, 'muzzle', side='muzzle')
+    # scope
+    SN.scope(rc, Y_SIGHT, Z_OC, Z_OBJ, r=0.0140, big=0.0340, rings=(0.12, 0.66), y_base=RAIL_TOP - 0.0020, base_w=0.0150)
+    # bipod folded under the barrel: clamp on the barrel, two legs with rubber feet, brace plate
+    rc.loft([(-0.600, K.hexp(-0.0190, 0.0190, BY - 0.0275, BY + 0.0150, 0.0090)), (-0.632, K.hexp(-0.0190, 0.0190, BY - 0.0275, BY + 0.0150, 0.0090))], 'steel', top='steel_top')
+    rc.box((-0.0196, BY - 0.0040, -0.6120), (0.0196, BY + 0.0020, -0.6200), 'brass')
+    for sgn in (-1, 1):
+        rc.cyl((sgn * 0.0120, BY - 0.0225, -0.6200), (sgn * 0.0120, BY - 0.0225, -0.8950), 0.0050, 8, 'steel', cap='steel')
+        rc.cyl((sgn * 0.0120, BY - 0.0225, -0.8950), (sgn * 0.0120, BY - 0.0225, -0.9100), 0.0068, 8, 'muzzle', cap='muzzle')   # rubber foot
+        rc.cyl((sgn * 0.0120, BY - 0.0225, -0.7600), (sgn * 0.0120, BY - 0.0225, -0.7700), 0.0064, 8, 'brass', cap='brass')
+    rc.loft([(-0.8000, K.hexp(-0.0185, 0.0185, BY - 0.0290, BY - 0.0100, 0.0070)), (-0.8100, K.hexp(-0.0185, 0.0185, BY - 0.0290, BY - 0.0100, 0.0070))], 'steel', top='steel_top')
     # trigger guard band + trigger
-    K.tube(rc, [(0.0200, -0.0100), (0.0170, -0.0350), (-0.0020, -0.0430), (-0.0200, -0.0310), (-0.0230, -0.0100)], 0.0090, 0.0060, 'steel')
+    K.tube(rc, [(0.0480, -0.0100), (0.0450, -0.0340), (0.0200, -0.0440), (-0.0040, -0.0420), (-0.0200, -0.0300), (-0.0230, -0.0100)], 0.0090, 0.0060, 'steel')
     rc.prism([(0.0030, -0.0100), (-0.0030, -0.0100), (-0.0025, -0.0200), (0.0000, -0.0290), (0.0050, -0.0300), (0.0040, -0.0200)], -0.0016, 0.0016, 'brass', side='brass')
 
     # ---------------- polymer furniture ----------------
     fu = C.Part('furniture')
     K.shell(fu, FRAME, [FRAME_HOLE], 0.0120, region='poly', bevel=0.0045, segs=2, bevel_hole=0.0035, gmap=True)
     K.shell(fu, K.chaikin([(0.4030, 0.0450), (0.4030, -0.0600), (0.3560, -0.0600), (0.3560, 0.0450)], 1), [], 0.0170, region='poly', bevel=0.0070, segs=2, gmap=True)
-    K.shell(fu, K.chaikin(GRIP, 1), [], 0.0140, region='poly', bevel=0.0050, segs=2, gmap=True)
+    K.shell(fu, GRIP, [], 0.0140, region='poly', bevel=0.0045, segs=2, gmap=True)
     for sgn in (-1, 1):
         x0, x1 = (0.0170 - 0.0005, 0.0170 + 0.0016) if sgn > 0 else (-0.0170 - 0.0016, -0.0170 + 0.0005)
         fu.cyl((x0, -0.0075, 0.3800), (x1, -0.0075, 0.3800), 0.0150, 12, 'brass', cap='bone_stock')               # brass-rimmed bone cross badge
