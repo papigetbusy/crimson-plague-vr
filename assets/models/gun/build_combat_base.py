@@ -108,33 +108,32 @@ def build(out_dir):
 
     # ---------------- walnut furniture ----------------
     fu = C.Part('furniture')
-    stock = [(0.040, 0.0795), (0.200, 0.0770), (0.312, 0.0680), (0.332, 0.0620), (0.338, -0.046), (0.322, -0.052), (0.300, -0.030),
-             (0.200, 0.020), (0.130, 0.028), (0.040, 0.036)]
-    fu.prism(stock, -0.0175, 0.0175, 'wood', side='wood_end')
-    fu.prism([(0.3365, -0.0490), (0.3440, -0.0490), (0.3440, 0.0630), (0.3300, 0.0630)], -0.0185, 0.0185, 'brass', side='brass')
+    # stock side profile traced from the Benelli M4 / L128A1 photo (/workspace/gun_brief/refs/shotgun_combat): tall butt pad, slim dropped neck
+    # rising into the receiver; scaled to this model's stock length
+    stock = [(0.040, 0.0700), (0.100, 0.0600), (0.160, 0.0470), (0.220, 0.0330), (0.262, 0.0260), (0.292, 0.0300), (0.312, 0.0390),
+             (0.330, 0.0430), (0.344, 0.0400), (0.344, -0.0800), (0.330, -0.0830), (0.314, -0.0760), (0.296, -0.0560), (0.262, -0.0440),
+             (0.220, -0.0380), (0.160, -0.0230), (0.100, -0.0040), (0.040, 0.0200)]
+    K.shell(fu, K.chaikin(stock, 1), [], 0.0165, region='wood', bevel=0.0050, segs=2, gmap=True)
+    fu.prism([(0.3430, -0.0800), (0.3500, -0.0800), (0.3500, 0.0400), (0.3430, 0.0400)], -0.0170, 0.0170, 'brass', side='brass')
     for sgn in (-1, 1):
-        lo, hi = (0.0175, 0.0194) if sgn > 0 else (-0.0194, -0.0175)
-        fu.prism(K.chaikin(S.cham(0.190, 0.262, 0.012, 0.066, 0.010), 1), lo, hi, 'bone_stock', side='bone_end')
-        fu.cyl((sgn * 0.0172, 0.0600, 0.0820), (sgn * 0.0204, 0.0600, 0.0820), 0.0034, 8, 'brass', cap='brass')
+        x0, x1 = (0.0160 - 0.0005, 0.0160 + 0.0016) if sgn > 0 else (-0.0160 - 0.0016, -0.0160 + 0.0005)
+        fu.cyl((x0, -0.0180, 0.3250), (x1, -0.0180, 0.3250), 0.0150, 12, 'brass', cap='bone_stock')          # brass-rimmed bone cross badge
     grip = [(-0.0225, GRIP_TOP), (-0.0235, 0.020), (-0.0240, -0.015), (-0.0225, GRIP_BOT), (0.0205, GRIP_BOT), (0.0235, -0.030),
             (0.0245, 0.000), (0.0240, 0.030), (0.0220, GRIP_TOP)]
-    K.prism_ah(fu, K.chaikin(grip, 1), TH, -0.0135, 0.0135, 'wood', side='wood_end')
+    K.shell(fu, K.ah_to_zy(K.chaikin(grip, 1), TH), [], 0.0135, region='wood', bevel=0.0045, segs=1, gmap=True)
     zb = K.ah_to_zy([(-0.0235, GRIP_BOT), (0.0212, GRIP_BOT), (0.0212, GRIP_BOT - 0.0070), (-0.0235, GRIP_BOT - 0.0070)], TH)
     fu.prism(zb, -0.0148, 0.0148, 'brass', side='brass')
-    for sgn in (-1, 1):
-        zy = K.ah_to_zy([(0.0, 0.012)], TH)[0]
-        fu.cyl((sgn * 0.0132, zy[1], zy[0]), (sgn * 0.0152, zy[1], zy[0]), 0.0030, 8, 'brass', cap='brass')
     # upper handguard over the gas tube (below the sight line) and lower handguard under the barrel
     fu.loft([(-0.2050, K.hexp(-0.0128, 0.0128, 0.0785, 0.0950, 0.0045)), (-0.3900, K.hexp(-0.0128, 0.0128, 0.0785, 0.0950, 0.0045))],
             'wood', top='wood', end='wood_end')
     fu.box((-0.0136, 0.0770, -0.3950), (0.0136, 0.0958, -0.3880), 'brass')
     fu.box((-0.0136, 0.0770, -0.2090), (0.0136, 0.0958, -0.2030), 'brass')
-    lg = K.chaikin([(-0.200, 0.0560), (-0.200, 0.0300), (-0.215, 0.0260), (-0.360, 0.0290), (-0.395, 0.0380), (-0.395, 0.0560)], 1)
-    fu.prism(lg, -0.0172, 0.0172, 'wood', side='wood_end')
-    fu.box((-0.0180, 0.0240, -0.4010), (0.0180, 0.0585, -0.3945), 'brass')
+    lg = K.chaikin([(-0.200, 0.0560), (-0.200, 0.0200), (-0.215, 0.0120), (-0.360, 0.0100), (-0.395, 0.0220), (-0.395, 0.0560)], 1)
+    K.shell(fu, lg, [], 0.0172, region='wood', bevel=0.0045, segs=1, gmap=True)
+    fu.box((-0.0180, 0.0170, -0.4010), (0.0180, 0.0585, -0.3945), 'brass')
     for sgn in (-1, 1):
-        lo, hi = (0.0172, 0.0189) if sgn > 0 else (-0.0189, -0.0172)
-        fu.prism(K.chaikin(S.cham(-0.338, -0.256, 0.0310, 0.0525, 0.0045), 1), lo, hi, 'bone_fore', side='bone_end')
+        x0, x1 = (0.0172 - 0.0005, 0.0172 + 0.0014) if sgn > 0 else (-0.0172 - 0.0014, -0.0172 + 0.0005)
+        fu.cyl((x0, 0.0330, -0.2960), (x1, 0.0330, -0.2960), 0.0100, 12, 'brass', cap='bone_fore')
 
     # ---------------- cocking knob (brass, right side, slides back) ----------------
     ch = C.Part('cocking_handle')
