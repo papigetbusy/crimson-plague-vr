@@ -117,15 +117,26 @@ def build(out_dir):
 
     # ---------------- polymer furniture ----------------
     fu = C.Part('furniture')
-    # one shell: stock side profile traced from the Benelli M4 / L128A1 photo with the pistol grip (raked ~20 deg) blended straight into the neck
-    stock = [(0.040, 0.0680), (0.100, 0.0560), (0.160, 0.0440), (0.220, 0.0320), (0.262, 0.0260), (0.292, 0.0300), (0.312, 0.0390),
-             (0.330, 0.0430), (0.344, 0.0400), (0.344, -0.0800), (0.330, -0.0830), (0.314, -0.0760), (0.296, -0.0560), (0.270, -0.0300),
-             (0.240, -0.0100), (0.200, 0.0000), (0.160, 0.0100), (0.130, 0.0190), (0.100, 0.0200), (0.072, 0.0160), (0.070, -0.0200),
-             (0.068, -0.0500), (0.056, -0.0700), (0.030, -0.0720), (0.014, -0.0620), (0.000, -0.0200), (-0.013, 0.0300)]
-    K.shell(fu, K.chaikin(stock, 1), [], 0.0150, region='poly', bevel=0.0050, segs=2, gmap=True)
+    # collapsible Benelli M4 style stock: two telescoping polymer tubes + slim rounded butt pad (no solid boot / wire frame)
+    SY = 0.0550
+    K.revolve(fu, [(0.0400, 0.0185), (0.1900, 0.0185)], SY, segs=12, region='poly', cap_f='poly', cap_b='poly', phase=PH)
+    K.revolve(fu, [(0.1850, 0.0160), (0.3040, 0.0160)], SY, segs=12, region='poly', cap_f='poly', cap_b='poly', phase=PH)
+    K.revolve(fu, [(0.1850, 0.0200), (0.1980, 0.0200)], SY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)      # collar between the tubes
+    K.revolve(fu, [(0.0380, 0.0202), (0.0480, 0.0202)], SY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)      # receiver collar
+    butt = [(0.3000, 0.0850), (0.3300, 0.0890), (0.3430, 0.0700), (0.3410, -0.0150), (0.3250, -0.0380), (0.3000, -0.0350), (0.2950, 0.0200)]
+    K.shell(fu, K.chaikin(butt, 1), [], 0.0170, region='poly', bevel=0.0060, segs=2, gmap=True)
     for sgn in (-1, 1):
-        x0, x1 = (0.0150 - 0.0005, 0.0150 + 0.0016) if sgn > 0 else (-0.0150 - 0.0016, -0.0150 + 0.0005)
-        fu.cyl((x0, -0.0180, 0.3250), (x1, -0.0180, 0.3250), 0.0150, 12, 'brass', cap='bone_stock')          # brass-rimmed bone cross badge
+        x0, x1 = (0.0170 - 0.0005, 0.0170 + 0.0016) if sgn > 0 else (-0.0170 - 0.0016, -0.0170 + 0.0005)
+        fu.cyl((x0, 0.0250, 0.3200), (x1, 0.0250, 0.3200), 0.0140, 12, 'brass', cap='bone_stock')          # brass-rimmed bone cross badge
+    # separate slim pistol grip: ~28 mm thick, 110 mm long, raked back 20 deg, finger grooves on the front edge
+    rk = math.radians(20); z0g, y0g = 0.0420, 0.0400
+    def gp(u, v):
+        return (round(z0g + u * math.sin(rk) + v * math.cos(rk), 4), round(y0g - u * math.cos(rk) + v * math.sin(rk), 4))
+    front = [(0.000, -0.0140), (0.016, -0.0150), (0.027, -0.0150), (0.035, -0.0112), (0.046, -0.0150), (0.056, -0.0150), (0.064, -0.0112),
+             (0.074, -0.0150), (0.084, -0.0150), (0.092, -0.0112), (0.102, -0.0150), (0.110, -0.0130)]
+    back = [(0.110, 0.0150), (0.098, 0.0172), (0.080, 0.0162), (0.060, 0.0152), (0.040, 0.0160), (0.020, 0.0190), (0.000, 0.0170)]
+    grip = [gp(u, v) for u, v in front + back]
+    K.shell(fu, K.chaikin(grip, 1), [], 0.0140, region='poly', bevel=0.0045, segs=2, gmap=True)
     # slim rounded polymer-style handguard wrapped around the barrel + tube (Benelli M4 forend)
     fg = [(-0.205, 0.0700), (-0.205, 0.0300), (-0.214, 0.0255), (-0.372, 0.0255), (-0.384, 0.0300), (-0.384, 0.0700)]
     K.shell(fu, K.chaikin(fg, 1), [], 0.0155, region='poly', bevel=0.0050, segs=2, gmap=True)
