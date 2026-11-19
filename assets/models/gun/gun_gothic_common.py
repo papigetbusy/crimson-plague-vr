@@ -65,6 +65,7 @@ class Atlas:
                 shelves.append([ytop, h, w]); self.reg[name] = (0, ytop, w, ytop + h); ytop += h
         assert ytop <= S, f'atlas overflow: {ytop}'
         self.used_px = sum(w * h for _, w, h in spec)
+        self.smooth_regions = []     # regions painted as continuous tone (bicubic upscale instead of the crisp label upscale)
 
     def install(self):
         C.REGION.clear(); C.REGION.update(self.reg)
@@ -472,9 +473,40 @@ class Atlas:
         used = set(self.buf)
         arr = np.array(self.buf, dtype=np.uint8).reshape(S, S, 3)
         up = hd_upscale(arr)
+        if self.smooth_regions:
+            cr = arr.astype(np.float32)
+            for _ in range(2):
+                cr = _cr_up2(_cr_up2(cr, 0), 1)
+            for r in self.smooth_regions:
+                x0, y0, x1, y1 = self.reg[r]
+                up[y0 * 4:y1 * 4, x0 * 4:x1 * 4] = np.clip(cr[y0 * 4:y1 * 4, x0 * 4:x1 * 4] + 0.5, 0, 255).astype(np.uint8)
         M._write_png(path, HD, HD, up.tobytes(), bottom_up=True)
         print('atlas colours', len(used), 'region px', self.used_px, 'hd', HD)
         return len(used)
+
+
+def paint_wood_smooth(A, r, seed=71, end=False):
+    """Walnut with smooth continuous long grain (tone ramp, no palette steps); registered for bicubic upscale."""
+    x0, y0, x1, y1 = A.reg[r]
+    A.smooth_regions.append(r)
+    stops = [(0.0, (14, 8, 5)), (0.35, (36, 20, 11)), (0.65, (58, 32, 17)), (0.88, (84, 50, 26)), (1.0, (104, 66, 36))]
+    def ramp(t):
+        t = max(0.0, min(1.0, t))
+        for (a, ca), (b, cb) in zip(stops, stops[1:]):
+            if t <= b:
+                f = (t - a) / (b - a)
+                return tuple(int(round(ca[k] + (cb[k] - ca[k]) * f)) for k in range(3))
+        return stops[-1][1]
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            u, v = x - x0, y - y0
+            warp = _vn(u * 0.020, v * 0.35, 5, seed) * 2.2
+            band = 0.5 + 0.5 * math.sin(v * 0.55 + warp * 3.0 + 0.010 * u)
+            fine = _vn(u * 0.06, v * 1.9, 2, seed + 4)
+            t = 0.20 + 0.50 * band + 0.30 * (fine - 0.5) + 0.20 * (_vn(u * 0.02, v * 0.2, 9, seed + 2) - 0.5)
+            if end:
+                t = 0.15 + 0.2 * _h(x, y, seed)
+            A.put(x, y, ramp(t))
 
 
 def _epx(a):

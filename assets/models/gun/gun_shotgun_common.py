@@ -18,20 +18,7 @@ def cham(z0, z1, y0, y1, c):
 
 
 def paint_wood(A, r, seed=71, end=False):
-    x0, y0, x1, y1 = A.reg[r]
-    for y in range(y0, y1):
-        for x in range(x0, x1):
-            n = K._vn(x * 0.18, y, 3, seed)
-            g = math.sin((y - y0) * 0.62 + 6.0 * n + 0.04 * (x - x0))
-            c = 'w_light' if g > 0.78 else 'w_mid' if g > 0.15 else 'w_dark' if g > -0.62 else 'w_shadow'
-            if end:
-                c = 'w_dark' if K._h(x, y, seed) > 0.3 else 'w_shadow'
-            h = K._h(x, y, seed + 3)
-            if h > 0.992:
-                c = 'w_hi'
-            elif h < 0.015:
-                c = 'w_shadow'
-            A.put(x, y, c)
+    K.paint_wood_smooth(A, r, seed, end)
 
 
 def paint_port(A, r, seed=81):
@@ -49,7 +36,7 @@ def paint_port(A, r, seed=81):
     A.rect(x0 + 5, y0 + 4, x1 - 5, y0 + 5, 'brass_light')
 
 
-def make_mats(name, tex, rough=0.55, spec=0.25):
+def make_mats(name, tex, rough=0.40, spec=0.35):
     mats = C.make_materials(name, tex, furn='wood')
     mats[1].name = name + '_wood'
     b = mats[1].node_tree.nodes['Principled BSDF']

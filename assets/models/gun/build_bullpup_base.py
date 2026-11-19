@@ -67,14 +67,15 @@ CH_Z0, CH_Z1 = -0.085, 0.148     # magazine channel (rails on both sides)
 
 # Side profile traced from the FN P90 photo (/workspace/bullpup_refs/fn_p90_right_side.jpg), scaled to 0.408 m shell length,
 # bore axis at y = 0.047; (z, y), top edge rear -> front, then front face, nose foot, grip, bottom, butt.
-OUTER = [(0.2835, 0.0770), (0.2815, 0.0369), (0.2823, 0.0017), (0.2842, -0.0207), (0.2837, -0.0263), (0.1711, -0.0263),
+OUTER = [(0.2825, 0.0640), (0.2840, 0.0450), (0.2835, 0.0150), (0.2820, -0.0050), (0.2790, -0.0190), (0.2720, -0.0252),
+         (0.2600, -0.0263), (0.1711, -0.0263),
          (0.1690, -0.0221), (0.1594, -0.0221), (0.1082, -0.0381), (0.1045, -0.0439), (0.0847, -0.0439), (0.0618, -0.0429),
          (0.0437, -0.0381), (0.0261, -0.0285), (0.0095, -0.0130), (0.0042, -0.0109), (-0.0086, -0.0109), (-0.0142, -0.0138),
          (-0.0158, -0.0197), (-0.0110, -0.0373), (-0.0110, -0.0415), (-0.0129, -0.0434), (-0.0427, -0.0434), (-0.0502, -0.0418),
          (-0.0641, -0.0349), (-0.0745, -0.0239), (-0.0803, -0.0111), (-0.0819, 0.0054), (-0.0843, 0.0089), (-0.0881, 0.0110),
          (-0.1030, 0.0110), (-0.1075, 0.0081), (-0.1091, 0.0038), (-0.1091, -0.0069), (-0.1121, -0.0087), (-0.1201, -0.0087),
          (-0.1230, 0.0097), (-0.1230, 0.0560), (-0.1190, 0.0640), (-0.1000, 0.0725), (-0.0850, TOP),
-         (CH_Z0, DECK), (CH_Z1, DECK), (CH_Z1, TOP), (0.2760, TOP)]
+         (CH_Z0, DECK), (CH_Z1, DECK), (CH_Z1, TOP), (0.2420, TOP), (0.2640, 0.0785), (0.2765, 0.0735)]
 THUMB = [(0.0823, -0.0117), (0.0543, -0.0002), (0.0466, 0.0054), (0.0439, 0.0107), (0.0434, 0.0161), (0.0461, 0.0230),
          (0.0501, 0.0270), (0.0554, 0.0291), (0.0863, 0.0291), (0.0954, 0.0259), (0.1015, 0.0203), (0.1047, 0.0123),
          (0.1047, 0.0049), (0.1026, -0.0010), (0.0954, -0.0087), (0.0890, -0.0114)]
@@ -106,8 +107,10 @@ def build(out_dir):
     mats = C.make_materials(NAME, tex, furn='polymer')
     mats[1].name = NAME + '_polymer'
     b = mats[1].node_tree.nodes['Principled BSDF']
-    b.inputs['Roughness'].default_value = 0.42        # satin polymer: visible specular roll-off over the rounded shell
-    b.inputs['Specular IOR Level'].default_value = 0.14
+    b.inputs['Roughness'].default_value = 0.45        # satin polymer: visible specular roll-off over the rounded shell
+    b.inputs['Specular IOR Level'].default_value = 0.17
+    b.inputs['Coat Weight'].default_value = 0.10
+    b.inputs['Coat Roughness'].default_value = 0.35
 
     bd = C.Part('body')
     # ---- polymer shell: traced P90 profile with the thumbhole and the trigger-hand hole, rounded sides ----
@@ -136,17 +139,18 @@ def build(out_dir):
         bd.prism(pl, x0, x1, 'panel', side='steel', top='steel_top')
         # bone cross badge: brass ring + bone disc
         cz, cy, R = 0.2330, 0.0170, 0.0135
-        x0, x1 = xs(HW - 0.0006, HW + 0.0006)
-        bd.cyl((x0, cy, cz), (x1, cy, cz), R + 0.0016, 14, 'brass', cap='brass')
-        x0, x1 = xs(HW - 0.0006, HW + 0.0014)
-        bd.cyl((x0, cy, cz), (x1, cy, cz), R, 14, 'bone_inlay', cap='bone_inlay')
+        x0, x1 = xs(HW - 0.0006, HW + 0.0010)
+        bd.cyl((x0, cy, cz), (x1, cy, cz), R + 0.0028, 18, 'brass', cap='brass')           # proud brass bezel
+        x0, x1 = xs(HW - 0.0006, HW + 0.0017)
+        bd.cyl((x0, cy, cz), (x1, cy, cz), R, 18, 'bone_inlay', cap='bone_inlay')          # bone cross sunk inside the bezel
         for (zz, yy) in ((0.1145, 0.0525), (0.2740, 0.0525), (0.1145, -0.0120)):
             bd.cyl((sgn * HW, yy, zz), (sgn * (HW + 0.0014), yy, zz), 0.0018, 8, 'brass', cap='brass')
         # brass pinstripe along the upper rear block
         x0, x1 = xs(HW - 0.0004, HW + 0.0005)
         bd.box((x0, 0.0640, 0.1520), (x1, 0.0654, 0.2740), 'brass')
     # thin brass butt pad
-    bd.box((-0.0128, -0.0235, Z_BUTT - 0.0006), (0.0128, 0.0715, Z_BUTT + 0.0020), 'brass')
+    rear = [(0.2825, 0.0640), (0.2840, 0.0450), (0.2835, 0.0150), (0.2820, -0.0050), (0.2790, -0.0190)]
+    bd.prism([(z + 0.0015, y) for z, y in rear] + [(z - 0.0010, y) for z, y in reversed(rear)], -0.0118, 0.0118, 'brass', side='brass')
     # ---- trigger: steel blade hung from a brass pivot pin, seated inside the trigger-hand hole ----
     trig = [(-0.0200, 0.0300), (-0.0262, 0.0300), (-0.0270, 0.0200), (-0.0298, 0.0100), (-0.0322, 0.0050), (-0.0305, 0.0034),
             (-0.0275, 0.0060), (-0.0243, 0.0120), (-0.0225, 0.0200)]

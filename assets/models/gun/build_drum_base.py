@@ -53,21 +53,7 @@ def cham(z0, z1, y0, y1, c):
 
 
 def paint_wood(A, r, seed=71, end=False):
-    x0, y0, x1, y1 = A.reg[r]
-    for y in range(y0, y1):
-        for x in range(x0, x1):
-            v = K._vn(x * 0.035, (y - y0) * 1.1, 4, seed) * 0.7 + K._vn(x * 0.10, (y - y0) * 2.6, 2, seed + 9) * 0.3
-            c = 'w_light' if v > 0.64 else 'w_dark' if v < 0.40 else 'w_mid'
-            if v < 0.22:
-                c = 'w_shadow'
-            if end:
-                c = 'w_dark' if K._h(x, y, seed) > 0.3 else 'w_shadow'
-            h = K._h(x, y, seed + 3)
-            if h > 0.992:
-                c = 'w_hi'
-            elif h < 0.015:
-                c = 'w_shadow'
-            A.put(x, y, c)
+    K.paint_wood_smooth(A, r, seed, end)
 
 
 def paint_drum_rim(A, r):
@@ -209,7 +195,7 @@ def build(out_dir):
                     (-0.1960, -0.030), (-0.1975, 0.006)], 1)
     K.shell(fu, vg, [], 0.0118, region='wood', bevel=0.0045, segs=1)
     fu.box((-0.0126, -0.0040, -0.2385), (0.0126, 0.0060, -0.1925), 'brass')
-    fu.prism([(-0.2185, -0.0925), (-0.2015, -0.0925), (-0.2030, -0.0985), (-0.2170, -0.0985)], -0.0100, 0.0100, 'bone_end', side='bone_end')
+    fu.prism([(-0.2185, -0.0925), (-0.2015, -0.0925), (-0.2030, -0.0985), (-0.2170, -0.0985)], -0.0100, 0.0100, 'brass', side='brass')
 
     # ---------------- cocking knob (brass, slides back along the right side) ----------------
     ch = C.Part('cocking_handle')
@@ -219,11 +205,11 @@ def build(out_dir):
     # ---------------- 50-round drum magazine ----------------
     mg = C.Part('magazine')
     cx, cy, cz = DRUM_C[0], DRUM_C[1], DRUM_C[2]
-    mg.cyl((-0.0235, cy, cz), (0.0235, cy, cz), DRUM_R, 16, 'drum_rim', cap='drum_rim')
+    mg.cyl((-0.0235, cy, cz), (0.0235, cy, cz), DRUM_R, 28, 'drum_rim', cap='drum_rim')
     for sgn in (-1, 1):
         a, b_ = (0.0235, 0.0270) if sgn > 0 else (-0.0270, -0.0235)
-        mg.cyl((a, cy, cz), (b_, cy, cz), 0.0400, 16, 'drum_rim', cap='drum_face')
-    mg.cyl((-0.0045, cy, cz), (0.0045, cy, cz), 0.0520, 16, 'brass', cap='brass')
+        mg.cyl((a, cy, cz), (b_, cy, cz), 0.0400, 28, 'drum_rim', cap='drum_face')
+    mg.cyl((-0.0045, cy, cz), (0.0045, cy, cz), 0.0520, 28, 'brass', cap='brass')
     mg.box((-0.0150, 0.0300, cz - 0.0200), (0.0150, 0.0400, cz + 0.0200), 'steel')           # neck into the well
 
     objs = {}
