@@ -13,6 +13,7 @@ Empties: muzzle, mag_well, rear_sight, front_sight (X=0, Y_SIGHT, parallel to th
 import math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gun_hmg_common as H
+from build_bullpup_base import dome_shell
 S, K, C, M, G = H.S, H.K, H.C, H.M, H.G
 
 NAME = 'hmg_drum_base'
@@ -37,7 +38,19 @@ def P(pts):
     return [(Z(x), Y(y)) for x, y in pts]
 
 
-STOCK_PX = [(800, 226), (860, 234), (930, 244), (985, 250), (993, 262), (982, 346), (950, 350), (905, 343), (884, 324), (868, 302), (850, 284), (822, 264), (800, 258)]
+# RPK club-foot stock traced from rpk_boxmag_side.png (963 px/m, receiver rear at px 812): thumb-rest dip on top, deep drop at the wrist,
+# thick belly sweeping down to a tall butt with a steel plate
+def SZ(x):
+    return round(0.0055 + (x - 812) / 963.0, 4)
+
+
+def SY(y):
+    return round(0.118 - (y - 207) * 1.12 / 963.0, 4)
+
+
+STOCK_PX = [(786, 207), (812, 207), (835, 216), (860, 228), (890, 236), (930, 244), (970, 252), (995, 259), (1005, 266), (1008, 290), (1005, 330), (996, 352), (980, 362),
+            (952, 360), (920, 348), (894, 330), (880, 308), (866, 286), (846, 266), (822, 252), (786, 244)]
+STOCK = [(SZ(x), SY(y)) for x, y in STOCK_PX]
 GRIP_PX = [(724, 336), (790, 336), (793, 376), (790, 416), (781, 441), (758, 441), (749, 420), (745, 378)]
 FORE_PX = [(415, 262), (566, 262), (570, 312), (528, 316), (440, 292), (415, 282)]
 
@@ -77,25 +90,30 @@ def build(out_dir):
     # trigger guard band + trigger
     K.tube(rc, [(-0.1500, 0.0000), (-0.1480, -0.0190), (-0.1200, -0.0280), (-0.0900, -0.0220), (-0.0810, 0.0000)], 0.0090, 0.0060, 'steel')
     rc.prism([(-0.1180, 0.0000), (-0.1240, 0.0000), (-0.1235, -0.0110), (-0.1210, -0.0200), (-0.1160, -0.0210), (-0.1170, -0.0100)], -0.0016, 0.0016, 'brass', side='brass')
-    # folded bipod under the barrel: clamp ring, two legs back along the barrel, feet, rear catch
-    K.revolve(rc, [(-0.7350, 0.0170), (-0.7500, 0.0170)], BY, segs=10, region='steel', cap_f='steel', cap_b='steel', phase=PH)
+    # folded bipod under the barrel: hinge block + clamp ring, two thick legs back along the barrel, big feet, cross brace, rear catch
+    K.revolve(rc, [(-0.7300, 0.0180), (-0.7520, 0.0180)], BY, segs=10, region='steel', cap_f='steel', cap_b='steel', phase=PH)
+    rc.box((-0.0230, BY - 0.0330, -0.7500), (0.0230, BY - 0.0150, -0.7280), 'steel', top='steel_top')
     for sgn in (-1, 1):
-        rc.cyl((sgn * 0.0120, BY - 0.0175, -0.7400), (sgn * 0.0120, BY - 0.0175, -0.5000), 0.0046, 8, 'steel', cap='steel')
-        rc.cyl((sgn * 0.0120, BY - 0.0175, -0.5000), (sgn * 0.0120, BY - 0.0175, -0.4900), 0.0066, 8, 'muzzle', cap='muzzle')
-    rc.box((-0.0150, BY - 0.0225, -0.7550), (0.0150, BY - 0.0130, -0.7250), 'steel', top='steel_top')
+        rc.cyl((sgn * 0.0190, BY - 0.0260, -0.7400), (sgn * 0.0190, BY - 0.0260, -0.4400), 0.0075, 8, 'steel', cap='steel')
+        rc.cyl((sgn * 0.0190, BY - 0.0260, -0.4400), (sgn * 0.0190, BY - 0.0260, -0.4150), 0.0110, 8, 'muzzle', cap='muzzle')
+        rc.box((sgn * 0.0190 - 0.0040, BY - 0.0350, -0.7300), (sgn * 0.0190 + 0.0040, BY - 0.0150, -0.7050), 'steel', top='steel_top')
+    rc.cyl((-0.0190, BY - 0.0260, -0.5600), (0.0190, BY - 0.0260, -0.5600), 0.0050, 6, 'steel', cap='steel')
 
     # ---------------- walnut furniture ----------------
     fu = C.Part('furniture')
-    K.shell(fu, K.chaikin(P(STOCK_PX), 1), [], 0.0175, region='wood', bevel=0.0050, segs=2, gmap=True)
+    dome_shell(fu, K.chaikin(STOCK, 1), [], 0.0215, bevel=0.0090, bevel_hole=0.0060, crown=0.0055, D=0.040, region='wood')
     K.shell(fu, K.chaikin(P(GRIP_PX), 1), [], 0.0150, region='wood', bevel=0.0045, segs=2, gmap=True)
     K.shell(fu, K.chaikin(P(FORE_PX), 1), [], 0.0215, region='wood', bevel=0.0045, segs=2, gmap=True)
     up = K.hexp(-0.0165, 0.0165, Y(268), Y(234), 0.0075)
     fu.loft([(Z(520), up), (Z(418), up)], 'wood', top='wood')                       # upper handguard over the gas tube
-    zb, yb = Z(930), Y(300)
+    zb, yb = SZ(930), SY(298)
     fu.prism([(Z(992), Y(250)), (Z(998), Y(250)), (Z(986), Y(348)), (Z(980), Y(348))], -0.0178, 0.0178, 'brass', side='brass') if False else None
-    fu.box((-0.0180, Y(348), Z(992)), (0.0180, Y(250), Z(996)), 'steel', top='steel_top')                         # steel butt plate
+    z0b, z1b, z2b, z3b = SZ(1008), SZ(1005), SZ(996), SZ(980)
+    fu.prism([(z0b, SY(266)), (z0b + 0.0030, SY(290)), (z1b + 0.0030, SY(330)), (z2b + 0.0030, SY(352)), (z3b + 0.0010, SY(362)),
+              (z3b - 0.0050, SY(362)), (z2b - 0.0050, SY(352)), (z1b - 0.0050, SY(330)), (z0b - 0.0050, SY(290)), (z0b - 0.0050, SY(266))],
+             -0.0220, 0.0220, 'steel', side='steel', top='steel_top')                                                    # steel butt plate
     for sgn in (-1, 1):
-        x0, x1 = (0.0175 - 0.0005, 0.0175 + 0.0016) if sgn > 0 else (-0.0175 - 0.0016, -0.0175 + 0.0005)
+        x0, x1 = (0.0268, 0.0290) if sgn > 0 else (-0.0290, -0.0268)
         fu.cyl((x0, yb, zb), (x1, yb, zb), 0.0140, 12, 'brass', cap='bone_stock')                         # brass-rimmed bone cross badge
         fu.cyl((sgn * 0.0212, Y(284), Z(470)), (sgn * 0.0226, Y(284), Z(470)), 0.0075, 10, 'brass', cap='bone_end')
 

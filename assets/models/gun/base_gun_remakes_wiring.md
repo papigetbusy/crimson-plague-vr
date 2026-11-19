@@ -454,3 +454,7 @@ use `C.BEVEL_MINLEN` 0.9 on the magazine part to save tris. Minigun/chain mag_we
 - smg_bullpup v6: 2,880 tris; sight hood now polymer dome_shell (chaikin outline, crown 0.0045), shell rear radii 74/60 px, bevel 0.0165; ring/bead sights on steel stems; 'round' atlas region = dull brass for rounds.
 - hmg_chain: 2,924 tris; mag_well now (0.0775, 0.0650-0.0750, -0.19) (can moved forward/smaller); 'leather' furniture region added via C.FURN_REGIONS in builder.
 - hmg_minigun: 1,960 tris, leather handle sleeve, round vertical foregrip (S.horn).
+
+### HMG stock pass
+- hmg_drum: RPK club-foot stock retraced (rpk_boxmag_side.png, 963 px/m, receiver rear px 812) as one dome_shell (crown 0.0055, hw 0.0215, region wood) + steel buttplate prism; bipod legs thicker. 2,956 tris. `dome_shell` gained a `region` kwarg (default poly, P90 unchanged).
+- hmg_chain: shoulder stock (polymer window shell, leather cheek rest + butt pad, steel collar). 2,908 tris. Barrel/shroud/hider segs reduced to 8, can bevel limited (BEVEL_MINLEN 0.075).

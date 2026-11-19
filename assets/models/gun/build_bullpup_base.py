@@ -69,10 +69,10 @@ def _dist_poly(pt, poly):
     return best
 
 
-def dome_shell(part, outer, holes, hw, bevel, bevel_hole, crown, D):
+def dome_shell(part, outer, holes, hw, bevel, bevel_hole, crown, D, region='poly'):
     """K.shell + a real geometric crown: interior cap edges are split once and every cap vertex is pushed outward by
     crown * ease(distance from the outline), so the big side faces are convex domes instead of flat planes."""
-    new = K.shell(part, outer, holes, hw, region='poly', bevel=bevel, segs=2, bevel_hole=bevel_hole, gmap=True)
+    new = K.shell(part, outer, holes, hw, region=region, bevel=bevel, segs=2, bevel_hole=bevel_hole, gmap=True)
     bm = part.bm
     def on_cap(v):
         return abs(abs(M.game_of(v.co).x) - hw) < 1e-5
