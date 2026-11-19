@@ -1,0 +1,30 @@
+pistol_1911_camo_common.glb node table identical: True | nodes ['frame', 'front_sight', 'mag_well', 'magazine', 'muzzle', 'pistol_1911', 'rear_sight', 'slide']
+  primitive keys identical: True
+   ('frame', 0) verts 1780 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('frame', 1) verts 192 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('magazine', 0) verts 216 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('slide', 0) verts 521 pos== False idx== False nrm== False uv== False mat factors same: True
+   ('frame', 0) triangle geometry identical (order-independent): True
+   ('frame', 1) triangle geometry identical (order-independent): True
+   ('magazine', 0) triangle geometry identical (order-independent): True
+   ('slide', 0) triangle geometry identical (order-independent): True
+pistol_1911_camo_uncommon.glb node table identical: True | nodes ['frame', 'front_sight', 'mag_well', 'magazine', 'muzzle', 'pistol_1911', 'rear_sight', 'slide']
+  primitive keys identical: True
+   ('frame', 0) verts 1780 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('frame', 1) verts 192 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('magazine', 0) verts 216 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('slide', 0) verts 521 pos== False idx== False nrm== False uv== False mat factors same: True
+   ('frame', 0) triangle geometry identical (order-independent): True
+   ('frame', 1) triangle geometry identical (order-independent): True
+   ('magazine', 0) triangle geometry identical (order-independent): True
+   ('slide', 0) triangle geometry identical (order-independent): True
+pistol_1911_camo_rare.glb node table identical: True | nodes ['frame', 'front_sight', 'mag_well', 'magazine', 'muzzle', 'pistol_1911', 'rear_sight', 'slide']
+  primitive keys identical: True
+   ('frame', 0) verts 1780 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('frame', 1) verts 192 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('magazine', 0) verts 216 pos== True idx== True nrm== True uv== False mat factors same: True
+   ('slide', 0) verts 521 pos== False idx== False nrm== False uv== False mat factors same: True
+   ('frame', 0) triangle geometry identical (order-independent): True
+   ('frame', 1) triangle geometry identical (order-independent): True
+   ('magazine', 0) triangle geometry identical (order-independent): True
+   ('slide', 0) triangle geometry identical (order-independent): True
