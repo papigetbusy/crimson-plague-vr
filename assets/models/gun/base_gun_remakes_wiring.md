@@ -409,3 +409,15 @@ normals on the cap faces (geometry stays flat; glTF exports the normals) - the l
 - double: barrel centres 34 mm apart joined by a flat brass rib (figure-eight muzzle), straight English stock, short splinter forend (to z -0.246), tall hammer ears on the sides of the action, brass top lever on the tang, receiver widened to +-27 mm (sideplates/straps/hammers shifted), solid guard band; receiver top no longer uses the bright steel_top strip.
 - combat: all furniture is glossy near-black polymer (bullpup polish3 recipe, `S.make_poly_mats`), one shell for stock + pistol grip raked ~20 deg (no brass foot plate), short slotted Picatinny rail on the receiver, slim front ghost-ring post on a low clamp, flat-band trigger guard.
 - blunderbuss: removed the brass fore-tip block; the flask is now a smooth ivory powder horn (`S.horn`, 10-sided, 7 stations) on the right of the stock with a thin brass strap over the comb; proper curved 8 x 5.5 mm brass trigger guard. mag_well empty is now at the horn centre (+0.025, 0.025, 0.170).
+
+## Snipers (HD pass)
+All four rebuilt on the HD shared builders: 1024 px albedo (256 grid, EPX + bicubic), glTF sampler LINEAR, two embedded materials (1911 steel metallic 1 / roughness 0.30; non-metal wood / polymer / bone), 4 empties, redDot:false, <3k tris, verify_ads pass on all. New shared module `gun_sniper_common.py` (`scope()`: engraved steel scope tube with ocular / objective bells, brass rings, turrets, dark lens caps, two steel mount rings). Stocks are `K.shell(... gmap=True)` polygons traced from the photos (real thumbholes / cut-outs).
+
+**Sight wiring (scoped rifles):** `rear_sight` = scope ocular centre, `front_sight` = scope objective centre, both X=0 at the scope axis height and parallel to the bore; `muzzle` at the barrel / brake / emitter end. `mag_well` sits where the magazine meets the receiver (bolt: floorplate stand-in).
+
+| slot | node (slot id) | traced from | scope axis above bore | tris |
+|---|---|---|---|---|
+| sniper_bolt | sniper_bolt_base.glb | Kar98k side (full walnut stock, round receiver, swept bolt + brass knob, tall rings) | 40.5 mm | 2,308 |
+| sniper_antimat | sniper_antimat_base.glb | Barrett M82A1 side mask (skeleton frame stock with cut-out, flat slab receiver + rail, slotted brake, folded bipod, carry handle, box mag); glossy near-black polymer stock + grip (polish3 recipe, `S.make_poly_mats`) | 68.5 mm | 2,788 |
+| sniper_marksman | sniper_marksman_base.glb | SVD Dragunov side (thumbhole stock + lightening hole, slotted handguard, AK receiver, gas tube, slotted flash hider, curved mag, PSO-style scope) | 68.5 mm | 2,716 |
+| sniper_rail | sniper_rail_base.glb | original gothic coil rifle (refs mood only): slab receiver with exposed capacitor tubes, twin rails with 8 brass coils, emitter cap, polymer skeleton stock + raked grip, battery-cell magazine | 68 mm | 2,652 |
