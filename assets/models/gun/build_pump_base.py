@@ -35,7 +35,7 @@ RIB_TOP, Y_SIGHT = 0.0610, 0.0650
 Z_MUZ = -0.560
 Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.1890, -0.5385
 PH = -math.pi / 12
-MAGW = (0.0, -0.0035, -0.1275)
+MAGW = (0.0, 0.0050, -0.1275)
 
 
 def build(out_dir):
@@ -95,7 +95,7 @@ def build(out_dir):
         rc.box((-0.0028, BY + RB - 0.0016, z - 0.0340), (0.0028, RIB_TOP, z), 'steel', top='steel_top')
         z -= 0.0395
     # trigger guard + trigger
-    K.tube(rc, [(-0.0640, 0.0120), (-0.0680, -0.0100), (-0.0480, -0.0235), (-0.0250, -0.0225), (-0.0080, -0.0060)], 0.0050, 0.0054, 'steel')
+    K.tube(rc, [(-0.0640, 0.0185), (-0.0680, -0.0100), (-0.0480, -0.0235), (-0.0250, -0.0225), (-0.0080, -0.0100), (0.0020, 0.0000)], 0.0050, 0.0054, 'steel')
     rc.prism([(-0.0370, 0.0110), (-0.0310, 0.0110), (-0.0325, -0.0020), (-0.0350, -0.0110), (-0.0390, -0.0140), (-0.0420, -0.0130),
               (-0.0400, -0.0050), (-0.0385, 0.0020)], -0.0014, 0.0014, 'brass', side='brass')
     S.sight_pair(rc, Y_SIGHT, Z_REAR_SIGHT, Z_FRONT_SIGHT, R_Y1 - 0.0005, RIB_TOP - 0.0005, rear_w=0.0090, rear_len=0.016)
@@ -131,6 +131,7 @@ def build(out_dir):
 
     # ---------------- shell at the loading gate (= magazine) ----------------
     mg = C.Part('magazine')
+    mg.box((-0.0110, 0.0140, -0.1650), (0.0110, 0.0166, -0.0870), 'brass')            # brass loading gate plate, bolted to the receiver floor
     sy = MAGW[1]
     mg.cyl((0, sy, -0.1520), (0, sy, -0.1060), 0.0090, 8, 'shell', cap='bone_end')
     mg.cyl((0, sy, -0.1060), (0, sy, -0.0930), 0.0096, 8, 'brass', cap='brass')

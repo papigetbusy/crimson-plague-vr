@@ -397,3 +397,9 @@ model's stock length). Format unchanged: 4 empties (muzzle, mag_well, rear_sight
 Butt top-rear and bottom-rear corners are now 3.5 cm radius arcs (5 segments each), brass parting-line seam band follows the arc, polymer is near-black
 (palette ~RGB 12-17) with roughness 0.30, specular 0.30, clearcoat weight 0.55 / roughness 0.10. The side-face crown is done with custom (domed) shading
 normals on the cap faces (geometry stays flat; glTF exports the normals) - the loader must not recompute normals. 2,980 tris, verify_ads pass.
+
+### Shotguns v4 (review fix pass)
+- shotgun_pump: loading-gate shell now seated on a brass gate plate under the receiver (magazine node = plate + shell); trigger guard runs from the receiver floor into the stock tang.
+- shotgun_double: true twin barrels (14-sided, 5 mm gap) with a brass rib between them, short coach-gun length (muzzle z -0.470, front sight z -0.4475; ADS re-verified), twin muzzle faces + brass rings, guard bow attached to the action and the stock tang enclosing the twin triggers.
+- shotgun_combat: re-themed to Benelli M4: slim rounded flat-top receiver with rail, octagonal ghost-ring rear sight + hooded front post, tubular magazine under the barrel to z -0.505 (no box mag), slim rounded forend, traced pistol-grip stock. `magazine` node is now a loading-gate shell stand-in (mag_well at the gate).
+- shotgun_blunderbuss: powder flask is a rounded 28 mm thick shell with a bone badge, strap and stopper; bell is 24-sided.

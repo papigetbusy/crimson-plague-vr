@@ -32,11 +32,11 @@ import gun_shotgun_common as S
 K, C, M, G = S.K, S.C, S.M, S.G
 
 NAME = 'shotgun_double_base'
-BY, RB, BX = 0.052, 0.0112, 0.0118        # bore height, barrel radius, barrel x offset
-RIB_TOP, Y_SIGHT = 0.0662, 0.0690
+BY, RB, BX = 0.052, 0.0108, 0.0135        # bore height, barrel radius, barrel x offset
+RIB_TOP, Y_SIGHT = 0.0650, 0.0690
 A_Y0, A_Y1 = 0.020, 0.0600
-Z_MUZ = -0.520
-Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.1350, -0.4975
+Z_MUZ = -0.470
+Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.1350, -0.4475
 TH = math.radians(14)
 GRIP_TOP, GRIP_BOT = 0.040, -0.062
 PH = -math.pi / 12
@@ -82,7 +82,7 @@ def build(out_dir):
     # short brass top lever on the top strap (opens the break)
     rc.prism([(-0.0750, 0.0596), (-0.0570, 0.0596), (-0.0510, 0.0610), (-0.0500, 0.0624), (-0.0570, 0.0622), (-0.0750, 0.0614)], -0.0030, 0.0030, 'brass', side='brass')
     # trigger guard + two triggers
-    K.tube(rc, [(-0.0840, 0.0210), (-0.0870, 0.0000), (-0.0680, -0.0200), (-0.0400, -0.0250), (-0.0220, -0.0140)], 0.0072, 0.0074, 'steel')
+    K.tube(rc, [(-0.0840, 0.0260), (-0.0870, 0.0000), (-0.0680, -0.0170), (-0.0400, -0.0210), (-0.0120, -0.0140), (0.0100, -0.0020), (0.0280, 0.0100)], 0.0062, 0.0064, 'steel')
     for zc in (-0.0300, -0.0520):
         rc.prism([(zc - 0.003, 0.0210), (zc + 0.003, 0.0210), (zc + 0.0015, 0.0040), (zc - 0.0030, -0.0070), (zc - 0.0065, -0.0060), (zc - 0.0040, 0.0030)],
                  -0.0018, 0.0018, 'brass', side='brass')
@@ -100,16 +100,13 @@ def build(out_dir):
     br = C.Part('barrels')
     for sgn in (-1, 1):
         cx = sgn * BX
-        K.revolve(br, [(-0.100, RB), (-0.505, RB)], BY, segs=12, region='barrel', cx=cx, cap_f='steel', cap_b='steel', phase=PH)
-        K.revolve(br, [(-0.5050, RB), (-0.5130, RB - 0.0006), (Z_MUZ, RB - 0.0016)], BY, segs=12, region='barrel', cx=cx, cap_f='muzzle', cap_b='steel', phase=PH)
-        K.revolve(br, [(-0.5000, RB + 0.0018), (-0.5080, RB + 0.0018)], BY, segs=12, region='brass', cx=cx, cap_f='brass', cap_b='brass', phase=PH)
-    br.box((-0.0075, BY - 0.0090, -0.118), (0.0075, BY + 0.0060, -0.513), 'steel', top='steel_top')   # fills the V between the bores
-    z = -0.118
-    while z - 0.0340 > -0.5000:
-        br.box((-0.0075, BY + RB - 0.0030, z - 0.0340), (0.0075, RIB_TOP, z), 'steel', top='steel_top')
-        z -= 0.0395
-    for z0, w in ((-0.1700, 0.0070), (-0.3050, 0.0060)):          # brass bands across both barrels
-        br.loft([(z0, K.hexp(-0.0262, 0.0262, BY - 0.0130, BY + 0.0130, 0.0060)), (z0 - w, K.hexp(-0.0262, 0.0262, BY - 0.0130, BY + 0.0130, 0.0060))], 'brass')
+        K.revolve(br, [(-0.100, RB), (-0.455, RB)], BY, segs=14, region='barrel', cx=cx, cap_f='steel', cap_b='steel', phase=PH)
+        K.revolve(br, [(-0.4550, RB), (-0.4630, RB - 0.0006), (Z_MUZ, RB - 0.0016)], BY, segs=14, region='barrel', cx=cx, cap_f='muzzle', cap_b='steel', phase=PH)
+        K.revolve(br, [(-0.4500, RB + 0.0018), (-0.4580, RB + 0.0018)], BY, segs=14, region='brass', cx=cx, cap_f='brass', cap_b='brass', phase=PH)
+    br.box((-0.0040, BY - 0.0070, -0.118), (0.0040, BY + 0.0070, -0.463), 'steel', top='steel_top')         # solder web between the bores
+    br.box((-0.0030, BY + RB - 0.0040, -0.118), (0.0030, RIB_TOP, -0.452), 'brass')       # raised rib riding the groove between the barrels
+    for z0, w in ((-0.1700, 0.0070), (-0.2900, 0.0060)):          # brass bands across both barrels
+        br.loft([(z0, K.hexp(-0.0252, 0.0252, BY - 0.0125, BY + 0.0125, 0.0070)), (z0 - w, K.hexp(-0.0252, 0.0252, BY - 0.0125, BY + 0.0125, 0.0070))], 'brass')
     S.sight_pair(br, Y_SIGHT, Z_REAR_SIGHT, Z_FRONT_SIGHT, RIB_TOP - 0.0005, RIB_TOP - 0.0005, rear_w=0.0075, rear_len=0.016, post_in=0.0026)
 
     # ---------------- walnut furniture ----------------

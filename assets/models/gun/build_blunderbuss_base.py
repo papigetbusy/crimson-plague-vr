@@ -70,7 +70,7 @@ def build(out_dir):
     rc = C.Part('receiver')
     K.revolve(rc, [(-0.040, 0.0160), (-0.090, 0.0150), (-0.200, 0.0125), (-0.285, 0.0108)], BY, segs=14, region='barrel',
               cap_f='steel', cap_b='steel', phase=PH)
-    K.revolve(rc, [(-0.2850, 0.0108), (-0.3200, 0.0132), (-0.3600, 0.0178), (-0.3960, 0.0238), (Z_MUZ, 0.0250)], BY, segs=14,
+    K.revolve(rc, [(-0.2850, 0.0108), (-0.3200, 0.0132), (-0.3600, 0.0178), (-0.3960, 0.0238), (Z_MUZ, 0.0250)], BY, segs=24,
               region='bell', cap_f='bellmouth', cap_b='steel', phase=PH)
     for z0, z1, r in ((-0.0950, -0.1050, 0.0180), (-0.1850, -0.1930, 0.0150), (-0.2800, -0.2880, 0.0128)):     # brass barrel bands
         K.revolve(rc, [(z0, r), (z1, r)], BY, segs=14, region='brass', cap_f='brass', cap_b='brass', phase=PH)
@@ -133,9 +133,15 @@ def build(out_dir):
     mg = C.Part('magazine')
     fl = K.chaikin([(0.1680, 0.0500), (0.1720, 0.0500), (0.1760, 0.0360), (0.2060, 0.0120), (0.2120, -0.0200), (0.1960, -0.0460),
                     (0.1440, -0.0460), (0.1280, -0.0200), (0.1340, 0.0120), (0.1640, 0.0360)], 1)
-    mg.prism(fl, -0.0300, -0.0170, 'brass', side='brass')
-    mg.box((-0.0262, 0.0500, 0.1660), (-0.0208, 0.0580, 0.1740), 'bone_end')
-    mg.box((-0.0306, -0.0060, 0.1440), (-0.0164, 0.0000, 0.1960), 'steel')
+    before = set(mg.bm.verts)
+    K.shell(mg, fl, [], 0.0140, region='brass', bevel=0.0045, segs=2)          # real volume: a rounded 28 mm thick flask
+    import bmesh as _bm
+    _bm.ops.translate(mg.bm, verts=[v for v in mg.bm.verts if v not in before], vec=G(-0.0295, 0, 0))
+    for sgn in (1,):
+        pass
+    mg.box((-0.0322, 0.0500, 0.1660), (-0.0268, 0.0580, 0.1740), 'bone_end')                       # bone stopper
+    mg.box((-0.0452, -0.0070, 0.1440), (-0.0138, 0.0000, 0.1960), 'steel')                          # steel strap round the flask belly
+    mg.cyl((-0.0450, 0.0200, 0.1700), (-0.0432, 0.0200, 0.1700), 0.0085, 12, 'brass', cap='bone_stock')   # brass-rimmed bone cross badge on the flask
 
     objs = {p.name: p.to_object(mats) for p in (rc, fu, hm, mg)}
     M.set_origin_world(objs['hammer'], G(*HAM_PIVOT))

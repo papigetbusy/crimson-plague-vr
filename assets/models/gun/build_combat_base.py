@@ -34,21 +34,21 @@ NAME = 'shotgun_combat_base'
 TH = math.radians(17)
 BY, RB = 0.062, 0.0115
 GY, RG = 0.0865, 0.0075            # gas tube centre height, radius
-R_Y0, R_Y1 = 0.030, 0.082
-COVER_TOP = 0.085
+R_Y0, R_Y1 = 0.030, 0.080
+TY, RT = 0.0395, 0.0100            # magazine tube centre height / radius (tube under the barrel, Benelli M4)
 Y_SIGHT = 0.1020
 Z_MUZ = -0.580
 Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.0300, -0.4500
 GRIP_TOP, GRIP_BOT = 0.045, -0.062
 PH = -math.pi / 12
-MAGW = (0.0, R_Y0, -0.1100)
+MAGW = (0.0, 0.0205, -0.1100)
 
 
 def build(out_dir):
     C.M.reset_scene()
     A = K.Atlas([
         ('barrel', 128, 72), ('tube', 96, 32), ('panel', 112, 36), ('wood', 64, 64), ('bone_stock', 48, 48), ('bone_fore', 48, 24),
-        ('mag', 64, 48), ('steel', 48, 32), ('steel_top', 48, 24), ('muzzle', 28, 28), ('brass', 24, 24), ('bone_end', 16, 16),
+        ('shell', 32, 16), ('steel', 48, 32), ('steel_top', 48, 24), ('muzzle', 28, 28), ('brass', 24, 24), ('bone_end', 16, 16),
         ('wood_end', 16, 16),
     ])
     A.install()
@@ -60,47 +60,54 @@ def build(out_dir):
     A.muzzle('muzzle'); A.brass('brass', engrave=True)
     A.bone('bone_stock', seed=37, motif='cross'); A.bone('bone_fore', seed=41, motif='cross'); A.bone('bone_end', motif=None, rim=False)
     S.paint_wood(A, 'wood'); S.paint_wood(A, 'wood_end', seed=75, end=True)
-    A.mag('mag', holes=True)
+    A.bone('shell', seed=45, motif=None, rim=False)
     tex = os.path.join(out_dir, NAME + '_albedo.png')
     A.save(tex)
     mats = S.make_mats(NAME, tex)
 
-    # ---------------- receiver + barrel group ----------------
+    # ---------------- receiver + barrel group (Benelli M4: slim rounded flat-top receiver, tube mag under the barrel) ----------------
     rc = C.Part('receiver')
-    prof = K.hexp(-0.0210, 0.0210, R_Y0, R_Y1, 0.0040)
+    prof = [(-0.0200, R_Y0 + 0.007), (-0.0168, R_Y0), (0.0168, R_Y0), (0.0200, R_Y0 + 0.007), (0.0200, R_Y1 - 0.011), (0.0158, R_Y1),
+            (-0.0158, R_Y1), (-0.0200, R_Y1 - 0.011)]
     rc.loft([(-0.200, prof), (0.040, prof)], 'steel', top='steel_top')
-    rc.box((-0.0150, R_Y1 - 0.0005, -0.1930), (0.0150, COVER_TOP, 0.0320), 'steel', top='steel_top')       # raised top cover
+    rc.box((-0.0085, R_Y1 - 0.0004, -0.1900), (0.0085, R_Y1 + 0.0028, 0.0300), 'steel', top='steel_top')       # flat-top rail
+    rc.box((-0.0012, R_Y1 + 0.0026, -0.1800), (0.0012, R_Y1 + 0.0033, 0.0200), 'brass')                       # brass inlay down the rail
     for sgn in (-1, 1):
-        a, b_ = (0.0206, 0.0240) if sgn > 0 else (-0.0240, -0.0206)
-        rc.prism(S.cham(-0.1850, -0.0400, 0.0345, 0.0765, 0.004), a, b_, 'panel', side='steel', top='steel_top')
-        for zc in (-0.1950, -0.0300, 0.0360):                                 # brass straps over plate joints
-            x0, x1 = (0.0204, 0.0244) if sgn > 0 else (-0.0244, -0.0204)
+        a_, b_ = (0.0196, 0.0228) if sgn > 0 else (-0.0228, -0.0196)
+        rc.prism(S.cham(-0.1750, -0.0450, 0.0345, 0.0725, 0.004), a_, b_, 'panel', side='steel', top='steel_top')
+        for zc in (-0.1950, 0.0360):                                          # brass straps over the receiver joints
+            x0, x1 = (0.0194, 0.0232) if sgn > 0 else (-0.0232, -0.0194)
             rc.box((x0, R_Y0 - 0.001, zc - 0.0024), (x1, R_Y1 + 0.0004, zc + 0.0024), 'brass')
-        rc.cyl((sgn * 0.0208, 0.0560, 0.0200), (sgn * 0.0246, 0.0560, 0.0200), 0.0032, 8, 'brass', cap='brass')
-        rc.cyl((sgn * 0.0208, 0.0380, -0.1700), (sgn * 0.0246, 0.0380, -0.1700), 0.0030, 8, 'brass', cap='brass')
-    # magazine well collar
-    rc.box((-0.0185, 0.0270, -0.1480), (0.0185, 0.0310, -0.0720), 'steel', top='steel_top')
-    # barrel, brake, rings
+        rc.cyl((sgn * 0.0197, 0.0560, 0.0200), (sgn * 0.0236, 0.0560, 0.0200), 0.0030, 8, 'brass', cap='brass')
+    # loading gate on the underside
+    rc.box((-0.0125, R_Y0 - 0.0030, -0.1450), (0.0125, R_Y0 + 0.0004, -0.0750), 'steel', top='steel_top')
+    # barrel + brake + rings
     K.revolve(rc, [(-0.190, RB), (-0.525, RB)], BY, segs=12, region='barrel', cap_f='steel', cap_b='steel', phase=PH)
     K.revolve(rc, [(-0.5250, 0.0125), (-0.5750, 0.0140), (Z_MUZ, 0.0120)], BY, segs=12, region='barrel', cap_f='muzzle', cap_b='steel', phase=PH)
     for z0, z1 in ((-0.5250, -0.5320), (-0.5700, -0.5760)):
         K.revolve(rc, [(z0, 0.0152), (z1, 0.0152)], BY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
     for zz in (-0.5400, -0.5480, -0.5560):                                      # brake slots (top)
         rc.box((-0.0040, BY + 0.0128, zz - 0.0022), (0.0040, BY + 0.0150, zz + 0.0022), 'steel')
-    # gas tube, cap and gas / front-sight block
-    K.revolve(rc, [(-0.200, RG), (-0.400, RG)], GY, segs=8, region='tube', cap_f='steel', cap_b='steel')
-    K.revolve(rc, [(-0.3960, RG + 0.0022), (-0.4040, RG + 0.0022)], GY, segs=8, region='brass', cap_f='brass', cap_b='brass')
+    # magazine tube under the barrel, running to near the muzzle, brass cap + barrel hanger
+    K.revolve(rc, [(-0.200, RT), (-0.505, RT)], TY, segs=12, region='tube', cap_f='steel', cap_b='steel', phase=PH)
+    K.revolve(rc, [(-0.4940, RT + 0.0022), (-0.5060, RT + 0.0022)], TY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    rc.box((-0.0060, TY + 0.0040, -0.5000), (0.0060, BY - RB + 0.0030, -0.4920), 'steel')
+    # front sight block on the barrel
     rc.box((-0.0100, BY - RB + 0.0010, -0.4700), (0.0100, 0.0975, -0.4300), 'steel', top='steel_top')
     # trigger guard + trigger
     K.tube(rc, [(-0.0560, 0.0310), (-0.0600, 0.0110), (-0.0480, -0.0100), (-0.0300, -0.0180), (-0.0190, -0.0120)], 0.0072, 0.0074, 'steel')
     rc.prism([(-0.0320, 0.0300), (-0.0260, 0.0300), (-0.0275, 0.0140), (-0.0300, 0.0040), (-0.0340, 0.0000), (-0.0375, 0.0005),
               (-0.0355, 0.0080), (-0.0335, 0.0160)], -0.0020, 0.0020, 'brass', side='brass')
-    # rear sight (base + two tall brass-topped posts) and front sight (ears + blade + brass bead)
-    rc.box((-0.0125, COVER_TOP - 0.0005, -0.0390), (0.0125, 0.0905, -0.0210), 'steel', top='steel_top')
+    # ghost-ring rear sight (octagonal aperture ring on twin posts, centred on the sight line) and front sight ears + blade + bead
+    ro, ri, rz0, rz1 = 0.0100, 0.0058, -0.0360, -0.0240
+    for k in range(8):
+        a0, a1 = math.radians(22.5 + 45 * k), math.radians(22.5 + 45 * (k + 1))
+        quad = [(ro * math.cos(a0), Y_SIGHT + ro * math.sin(a0)), (ro * math.cos(a1), Y_SIGHT + ro * math.sin(a1)),
+                (ri * math.cos(a1), Y_SIGHT + ri * math.sin(a1)), (ri * math.cos(a0), Y_SIGHT + ri * math.sin(a0))]
+        rc.loft([(rz0, quad), (rz1, quad)], 'steel', top='steel_top')
     for sgn in (-1, 1):
-        lo, hi = (0.0045, 0.0085) if sgn > 0 else (-0.0085, -0.0045)
-        rc.box((lo, 0.0905, -0.0360), (hi, Y_SIGHT, -0.0240), 'steel', top='steel_top')
-        rc.box((lo, Y_SIGHT - 0.0009, -0.0360), (hi, Y_SIGHT, -0.0240), 'brass')
+        lo, hi = (0.0060, 0.0100) if sgn > 0 else (-0.0100, -0.0060)
+        rc.box((lo, R_Y1 + 0.0020, -0.0350), (hi, Y_SIGHT - 0.0050, -0.0250), 'steel', top='steel_top')
         lo, hi = (0.0042, 0.0068) if sgn > 0 else (-0.0068, -0.0042)
         rc.box((lo, 0.0975, -0.4650), (hi, Y_SIGHT - 0.0005, -0.4350), 'steel', top='steel_top')
     rc.box((-0.0028, 0.0975, -0.4560), (0.0028, Y_SIGHT - 0.0016, -0.4440), 'steel')
@@ -123,29 +130,25 @@ def build(out_dir):
     K.shell(fu, K.ah_to_zy(K.chaikin(grip, 1), TH), [], 0.0135, region='wood', bevel=0.0045, segs=1, gmap=True)
     zb = K.ah_to_zy([(-0.0235, GRIP_BOT), (0.0212, GRIP_BOT), (0.0212, GRIP_BOT - 0.0070), (-0.0235, GRIP_BOT - 0.0070)], TH)
     fu.prism(zb, -0.0148, 0.0148, 'brass', side='brass')
-    # upper handguard over the gas tube (below the sight line) and lower handguard under the barrel
-    fu.loft([(-0.2050, K.hexp(-0.0128, 0.0128, 0.0785, 0.0950, 0.0045)), (-0.3900, K.hexp(-0.0128, 0.0128, 0.0785, 0.0950, 0.0045))],
-            'wood', top='wood', end='wood_end')
-    fu.box((-0.0136, 0.0770, -0.3950), (0.0136, 0.0958, -0.3880), 'brass')
-    fu.box((-0.0136, 0.0770, -0.2090), (0.0136, 0.0958, -0.2030), 'brass')
-    lg = K.chaikin([(-0.200, 0.0560), (-0.200, 0.0200), (-0.215, 0.0120), (-0.360, 0.0100), (-0.395, 0.0220), (-0.395, 0.0560)], 1)
-    K.shell(fu, lg, [], 0.0172, region='wood', bevel=0.0045, segs=1, gmap=True)
-    fu.box((-0.0180, 0.0170, -0.4010), (0.0180, 0.0585, -0.3945), 'brass')
+    # slim rounded polymer-style handguard wrapped around the barrel + tube (Benelli M4 forend)
+    fg = [(-0.205, 0.0700), (-0.205, 0.0300), (-0.214, 0.0255), (-0.372, 0.0255), (-0.384, 0.0300), (-0.384, 0.0700)]
+    K.shell(fu, K.chaikin(fg, 1), [], 0.0155, region='wood', bevel=0.0050, segs=2, gmap=True)
+    fu.loft([(-0.3840, K.hexp(-0.0160, 0.0160, 0.0245, 0.0712, 0.0060)), (-0.3910, K.hexp(-0.0160, 0.0160, 0.0245, 0.0712, 0.0060))], 'brass')
     for sgn in (-1, 1):
-        x0, x1 = (0.0172 - 0.0005, 0.0172 + 0.0014) if sgn > 0 else (-0.0172 - 0.0014, -0.0172 + 0.0005)
-        fu.cyl((x0, 0.0330, -0.2960), (x1, 0.0330, -0.2960), 0.0100, 12, 'brass', cap='bone_fore')
+        x0, x1 = (0.0155 - 0.0005, 0.0155 + 0.0014) if sgn > 0 else (-0.0155 - 0.0014, -0.0155 + 0.0005)
+        fu.cyl((x0, 0.0480, -0.2950), (x1, 0.0480, -0.2950), 0.0085, 12, 'brass', cap='bone_fore')
 
     # ---------------- cocking knob (brass, right side, slides back) ----------------
     ch = C.Part('cocking_handle')
     ch.box((0.0206, 0.0600, -0.0780), (0.0250, 0.0680, -0.0580), 'brass')
     ch.cyl((0.0250, 0.0640, -0.0680), (0.0330, 0.0640, -0.0680), 0.0072, 8, 'brass', cap='brass')
 
-    # ---------------- curved 8-round box magazine ----------------
+    # ---------------- loading-gate shell (= magazine node; the real magazine is the tube under the barrel) ----------------
     mg = C.Part('magazine')
-    mp = K.chaikin([(-0.0780, 0.0340), (-0.1420, 0.0340), (-0.1480, -0.0200), (-0.1800, -0.0860), (-0.1220, -0.0860), (-0.1100, -0.0220)], 1)
-    mg.prism(mp, -0.0158, 0.0158, 'mag', side='steel')
-    mg.prism([(-0.1235, -0.0850), (-0.1830, -0.0850), (-0.1830, -0.0950), (-0.1235, -0.0950)], -0.0170, 0.0170, 'brass', side='brass')
-    mg.box((-0.0163, -0.0030, -0.1480), (0.0163, 0.0050, -0.1000), 'brass')
+    mg.box((-0.0115, 0.0275, -0.1400), (0.0115, 0.0302, -0.0800), 'brass')
+    sy = MAGW[1]
+    mg.cyl((0, sy, -0.1300), (0, sy, -0.0950), 0.0072, 8, 'shell', cap='bone_end')
+    mg.cyl((0, sy, -0.0950), (0, sy, -0.0860), 0.0078, 8, 'brass', cap='brass')
 
     objs = {p.name: p.to_object(mats) for p in (rc, fu, ch, mg)}
     return objs, mats
