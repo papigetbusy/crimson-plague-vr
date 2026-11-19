@@ -377,3 +377,18 @@ Rebuilt to the locked brief: 1024 px smooth albedo with LINEAR filtering, bevell
 all `K.shell` bodies with rounded rims instead of flat extrusions), satin walnut (roughness 0.40, specular 0.35), brass-rimmed bone cross badges flush with the stock and forend, finer engraved receiver plates,
 steel trigger on a brass pivot. Same file, root `smg_drum`, meshes `receiver`, `furniture`, `cocking_handle`, `magazine`, same empties and sight line (rear (0, 0.1060, -0.0288), front (0, 0.1060, -0.3800), muzzle z -0.400,
 mag_well (0, 0.035, -0.105)). 2,992 tris. `verify_ads.js smg` passes. The notes above (smg_drum entry, `fore`, `slideTravel`) stay valid.
+
+## Shotguns v3 (HD bar + traced profiles) - pump, double, combat, blunderbuss
+
+All four rebuilt to /workspace/gun_brief/LOCKED_BRIEF.md: 1024x1024 smooth albedo (glTF sampler LINEAR; no src/ change, loader must not force
+NEAREST), bevelled steel on the locked 1911 sheen, satin walnut (roughness 0.40, spec 0.35) on `K.shell` rounded furniture with one continuous
+side UV projection (`K.shell(..., gmap=True)`, grain runs along the gun), brass-rimmed bone cross badges inset in the furniture, thin brass straps.
+Furniture side profiles are traced from the Wikimedia refs in /workspace/gun_brief/refs/ (silhouette mask -> top/bottom profile, scaled to the
+model's stock length). Format unchanged: 4 empties (muzzle, mag_well, rear_sight, front_sight), redDot:false, verify_ads pass on every gun.
+
+| slot | node (slot id) | traced from | tris |
+|---|---|---|---|
+| shotgun_pump | shotgun_pump_base.glb | Remington 870 Wingmaster side (stock + deeper forend with finger ridges) | 2,392 |
+| shotgun_double | shotgun_double_base.glb | side-by-side coach gun side (one-piece stock with drop + semi-pistol wrist, grip part removed) | 2,760 |
+| shotgun_combat | shotgun_combat_base.glb | Benelli M4 / L128A1 side (tall butt pad, slim dropped neck, pistol grip, deeper lower handguard) | 2,404 |
+| shotgun_blunderbuss | shotgun_blunderbuss_base.glb | Met flintlock blunderbuss side (raked butt, wedge stock, full-length slim forestock, realistic gentle bell, slimmer barrel, 14-sided) | 2,060 |

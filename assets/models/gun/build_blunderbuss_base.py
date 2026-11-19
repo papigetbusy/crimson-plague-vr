@@ -36,7 +36,7 @@ BY = 0.070
 Y_SIGHT = 0.1060
 Z_MUZ = -0.404
 Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.0650, -0.3920
-PH = -math.pi / 8
+PH = -math.pi / 14
 HAM_PIVOT = (0.0, 0.0460, 0.0100)
 FLASK_C = (-0.0235, -0.0020, 0.1700)
 MAGW = FLASK_C
@@ -55,12 +55,7 @@ def build(out_dir):
     A.wrap('barrel', 8, 9, lambda j: 'eng' if j in (0, 4) else 'hi' if j == 2 else 'dark' if j == 6 else 'plain', seed=11, lam=16)
     A.wrap('bell', 8, 8, lambda j: 'plain', seed=23, u_bands=[(0.0, 1.0, 'brass')])
     bx0, by0, bx1, by1 = A.reg['bell']
-    for j in range(8):                                   # engraved flutes + rings on the brass bell
-        ya = by0 + j * 8
-        for x in range(bx0 + 3, bx1 - 10):
-            if ((x - bx0) // 5) % 2 == 0:
-                A.rect(x, ya + 2, x + 1, ya + 6, 'brass_dark')
-    for xa in (bx0 + 1, bx1 - 9):
+    for xa in (bx0 + 1, bx1 - 9):                         # raised ring bands on the brass bell
         A.rect(xa, by0, xa + 2, by1, 'brass_shadow')
     A.rect(bx1 - 7, by0, bx1, by1, 'brass_light')
     A.rect(bx1 - 3, by0, bx1, by1, 'brass_dark')
@@ -73,12 +68,12 @@ def build(out_dir):
 
     # ---------------- barrel, bell, lock hardware ----------------
     rc = C.Part('receiver')
-    K.revolve(rc, [(-0.040, 0.0185), (-0.090, 0.0176), (-0.200, 0.0150), (-0.285, 0.0130)], BY, segs=8, region='barrel',
+    K.revolve(rc, [(-0.040, 0.0160), (-0.090, 0.0150), (-0.200, 0.0125), (-0.285, 0.0108)], BY, segs=14, region='barrel',
               cap_f='steel', cap_b='steel', phase=PH)
-    K.revolve(rc, [(-0.2850, 0.0130), (-0.3200, 0.0172), (-0.3600, 0.0238), (-0.3960, 0.0305), (Z_MUZ, 0.0312)], BY, segs=8,
+    K.revolve(rc, [(-0.2850, 0.0108), (-0.3200, 0.0132), (-0.3600, 0.0178), (-0.3960, 0.0238), (Z_MUZ, 0.0250)], BY, segs=14,
               region='bell', cap_f='bellmouth', cap_b='steel', phase=PH)
-    for z0, z1, r in ((-0.0950, -0.1050, 0.0206), (-0.1850, -0.1930, 0.0178), (-0.2800, -0.2880, 0.0160)):     # brass barrel bands
-        K.revolve(rc, [(z0, r), (z1, r)], BY, segs=8, region='brass', cap_f='brass', cap_b='brass', phase=PH)
+    for z0, z1, r in ((-0.0950, -0.1050, 0.0180), (-0.1850, -0.1930, 0.0150), (-0.2800, -0.2880, 0.0128)):     # brass barrel bands
+        K.revolve(rc, [(z0, r), (z1, r)], BY, segs=14, region='brass', cap_f='brass', cap_b='brass', phase=PH)
     rc.box((-0.0100, BY - 0.0040, -0.0420), (0.0100, BY + 0.0210, -0.0300), 'steel', top='steel_top')            # breech plug / touch-hole block
     # lock plate (right), brass pan, frizzen, tail screws; blank steel counter plate on the left
     plate = K.chaikin([(-0.0800, 0.0400), (-0.0640, 0.0580), (-0.0320, 0.0650), (0.0100, 0.0660), (0.0360, 0.0560), (0.0420, 0.0440),
@@ -93,35 +88,38 @@ def build(out_dir):
         rc.cyl((0.0196, yy, zz), (0.0226, yy, zz), 0.0030, 8, 'brass', cap='brass')
         rc.cyl((-0.0194, yy, zz), (-0.0224, yy, zz), 0.0030, 8, 'brass', cap='brass')
     # trigger guard (brass bow) + trigger
-    K.tube(rc, [(-0.0750, 0.0120), (-0.0780, -0.0140), (-0.0620, -0.0360), (-0.0420, -0.0400), (-0.0240, -0.0340)], 0.0066, 0.0070, 'brass')
-    rc.prism([(-0.0480, 0.0300), (-0.0430, 0.0300), (-0.0440, 0.0140), (-0.0460, 0.0000), (-0.0500, -0.0140), (-0.0530, -0.0170),
-              (-0.0555, -0.0120), (-0.0530, 0.0000), (-0.0495, 0.0150)], -0.0018, 0.0018, 'brass', side='brass')
+    K.tube(rc, [(-0.0750, 0.0350), (-0.0780, 0.0150), (-0.0640, 0.0020), (-0.0440, -0.0010), (-0.0260, 0.0080)], 0.0066, 0.0070, 'brass')
+    rc.prism([(-0.0480, 0.0360), (-0.0430, 0.0360), (-0.0440, 0.0250), (-0.0460, 0.0170), (-0.0500, 0.0080), (-0.0530, 0.0060),
+              (-0.0555, 0.0100), (-0.0530, 0.0170), (-0.0495, 0.0260)], -0.0018, 0.0018, 'brass', side='brass')
     # sights: two brass-tipped spires on the breech, bead on the bell rim
     rc.box((-0.0095, 0.0860, -0.0750), (0.0095, 0.0905, -0.0550), 'steel', top='steel_top')
     for sgn in (-1, 1):
         lo, hi = (0.0030, 0.0058) if sgn > 0 else (-0.0058, -0.0030)
         rc.box((lo, 0.0905, -0.0730), (hi, Y_SIGHT, -0.0570), 'steel', top='steel_top')
         rc.box((lo, Y_SIGHT - 0.0010, -0.0730), (hi, Y_SIGHT, -0.0570), 'brass')
-    rc.box((-0.0034, 0.0950, -0.3980), (0.0034, Y_SIGHT - 0.0016, -0.3860), 'steel', top='steel_top')
+    rc.box((-0.0034, 0.0930, -0.3980), (0.0034, Y_SIGHT - 0.0016, -0.3860), 'steel', top='steel_top')
     rc.box((-0.0018, Y_SIGHT - 0.0016, -0.3938), (0.0018, Y_SIGHT, -0.3902), 'brass')
 
     # ---------------- walnut stock ----------------
     fu = C.Part('furniture')
-    stock = [(-0.230, 0.0560), (-0.230, 0.0260), (-0.215, 0.0200), (-0.090, 0.0200), (-0.060, 0.0100), (-0.040, -0.0120), (-0.026, -0.0380),
-             (0.004, -0.0540), (0.044, -0.0460), (0.082, -0.0240), (0.170, -0.0300), (0.260, -0.0600), (0.300, -0.0880), (0.322, -0.0740),
-             (0.326, 0.0300), (0.322, 0.0460), (0.250, 0.0520), (0.150, 0.0580), (0.060, 0.0620), (0.030, 0.0600), (-0.030, 0.0560)]
-    fu.prism(stock, -0.0165, 0.0165, 'wood', side='wood_end')
-    fu.prism([(0.3225, 0.0480), (0.3310, 0.0480), (0.3310, -0.0720), (0.3010, -0.0930), (0.2960, -0.0850), (0.3225, -0.0690)], -0.0175, 0.0175, 'brass', side='brass')
+    # stock side profile traced from the Met flintlock blunderbuss photo (/workspace/gun_brief/refs/shotgun_blunderbuss): raked butt, straight
+    # wedge buttstock with a sharp heel drop, belly rising to the lock, slim full-length forestock
+    stock = [(0.329, 0.0200), (0.309, 0.0309), (0.289, 0.0347), (0.269, 0.0379), (0.249, 0.0412), (0.228, 0.0445), (0.208, 0.0487),
+             (0.188, 0.0538), (0.168, 0.0585), (0.130, 0.0620), (0.090, 0.0640), (0.030, 0.0640), (-0.050, 0.0640), (-0.150, 0.0640),
+             (-0.250, 0.0630), (-0.286, 0.0600), (-0.290, 0.0500), (-0.288, 0.0360), (-0.270, 0.0330), (-0.150, 0.0345), (-0.050, 0.0345),
+             (0.027, 0.0314), (0.060, 0.0290), (0.088, 0.0262), (0.108, 0.0200), (0.128, 0.0110), (0.148, 0.0030), (0.168, -0.0070),
+             (0.188, -0.0170), (0.208, -0.0270), (0.228, -0.0370), (0.249, -0.0465), (0.269, -0.0565), (0.289, -0.0660), (0.305, -0.0700)]
+    K.shell(fu, stock, [], 0.0165, region='wood', bevel=0.0050, segs=2, gmap=True)
+    fu.prism([(0.3290, 0.0200), (0.3370, 0.0200), (0.3130, -0.0700), (0.3050, -0.0700)], -0.0175, 0.0175, 'brass', side='brass')
     for sgn in (-1, 1):
         if sgn > 0:
-            lo, hi = 0.0165, 0.0184
-            fu.prism(K.chaikin(S.cham(0.152, 0.226, -0.020, 0.044, 0.010), 1), lo, hi, 'bone_stock', side='bone_end')
-        fu.cyl((sgn * 0.0162, 0.0480, 0.2900), (sgn * 0.0194, 0.0480, 0.2900), 0.0030, 8, 'brass', cap='brass')
+            x0, x1 = (0.0165 - 0.0005, 0.0165 + 0.0016)
+            fu.cyl((x0, -0.0020, 0.2350), (x1, -0.0020, 0.2350), 0.0145, 12, 'brass', cap='bone_stock')          # brass-rimmed bone cross badge
+        fu.cyl((sgn * 0.0162, 0.0320, 0.2900), (sgn * 0.0194, 0.0320, 0.2900), 0.0030, 8, 'brass', cap='brass')
     fu.prism([(0.0100, 0.0600), (0.0460, 0.0600), (0.0560, 0.0620), (0.0560, 0.0645), (0.0100, 0.0645)], -0.0090, 0.0090, 'brass', side='brass')   # brass tang plate
-    fu.prism([(-0.0050, -0.0520), (0.0220, -0.0600), (0.0420, -0.0500), (0.0400, -0.0440), (0.0000, -0.0430)], -0.0090, 0.0090, 'brass', side='brass')  # wrist cap
-    for zc in (-0.2250, -0.1650):                                              # brass fore bands around barrel + wood
-        fu.loft([(zc, K.hexp(-0.0185, 0.0185, 0.0180, 0.0860, 0.0070)), (zc - 0.0070, K.hexp(-0.0185, 0.0185, 0.0180, 0.0860, 0.0070))], 'brass')
-    fu.box((-0.0170, 0.0170, -0.2420), (0.0170, 0.0540, -0.2300), 'bone_end')  # bone fore tip
+    for zc in (-0.2400, -0.1650):                                              # brass fore bands around barrel + wood
+        fu.loft([(zc, K.hexp(-0.0185, 0.0185, 0.0320, 0.0840, 0.0070)), (zc - 0.0070, K.hexp(-0.0185, 0.0185, 0.0320, 0.0840, 0.0070))], 'brass')
+    fu.box((-0.0170, 0.0340, -0.2960), (0.0170, 0.0620, -0.2850), 'brass')  # brass fore tip
 
     # ---------------- flint cock (hammer; pivots at HAM_PIVOT) ----------------
     hm = C.Part('hammer')
