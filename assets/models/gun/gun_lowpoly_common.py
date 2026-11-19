@@ -28,6 +28,8 @@ G = M.G
 S = 256
 PAD = 2
 TEX_INTERP = 'Closest'   # gun_gothic_common switches this to 'Linear' (smooth HD albedo)
+BEVEL_MINLEN = 0.004   # metres: edges shorter than this are not bevelled
+BEVEL_ANGLE = 40     # degrees: only edges sharper than this get the small sheen bevel
 BEVEL_W = None       # metres; gun_gothic_common sets a small value so edges catch the sheen
 STEEL = {
     'recess':      (7, 8, 11),
@@ -324,8 +326,8 @@ class Part:
         if not w:
             return
         bm = self.bm
-        edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_length() > 6 * w
-                 and e.calc_face_angle(0.0) > math.radians(40)]
+        edges = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_length() > max(6 * w, BEVEL_MINLEN)
+                 and e.calc_face_angle(0.0) > math.radians(BEVEL_ANGLE)]
         if edges:
             bmesh.ops.bevel(bm, geom=edges, offset=w, segments=1, affect='EDGES', profile=0.5)
 

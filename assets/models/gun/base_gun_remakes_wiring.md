@@ -362,3 +362,11 @@ Papi's quality bar: crisp, shiny, no pixelated textures. What changed in the art
 * Key hard edges (> 40 deg, longer than 4 mm) get a 0.7 mm bevel so the locked 1911 steel sheen (metallic 1, roughness 0.30) catches them; this is what adds triangles (still < 3,000).
 * Polymer is now a matte material (roughness 0.68, specular 0.14) with a fine stipple instead of a blotchy hatch; steel, brass and bone are unchanged.
 * `export_lowpoly.py --max-tex 1024` is needed (the default cap for guns is 256 px); `--max-tris 3000 --allow-multi-material` as before.
+
+## Batch 2 revision: `smg_bullpup` v4 (traced P90 profile, real volume; supersedes v3 body numbers)
+
+Papi: "closer to the P90 shape, less bulky". The shell is now one continuous polymer body traced from the P90 side photo (thumbhole loop, forward trigger-hand hole, sloped nose over the short barrel,
+clear top-mag channel between steel-capped rails), extruded 35 mm and rounded with a 5.5 mm two-step bevel (3.2 mm on the hole rims) so there are no flat slab sides. Trigger is a steel blade hung from a brass pivot pin inside the hole;
+the engraved steel plaque and the bone-cross badge sit in brass bezels flush with the shell. 2,852 tris. Sight empties unchanged: rear (0, 0.0960, 0.0500), front (0, 0.0960, -0.1120), muzzle (0, 0.047, -0.168),
+mag_well (0, 0.058, 0.040); `verify_ads.js smg` passes (dir (0,0,-1), rear on the eye axis at z = -0.18, bore 49 mm below the line, 0.113 deg). Polymer material: metallic 0, roughness 0.42, specular 0.14 (satin);
+metal: the locked 1911 material. The mag is now 0.226 m (z -0.0825..0.1435) and sits in the channel.

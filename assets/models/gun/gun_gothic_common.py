@@ -21,6 +21,8 @@ M, G = C.M, C.G
 S = 256
 HD = 1024                      # final albedo size (smooth, anti-aliased); painters still work on the 256 logical grid
 C.TEX_INTERP = 'Linear'        # linear filtering for the HD albedo (glTF sampler LINEAR)
+C.BEVEL_MINLEN = 0.014          # only long edges get the small bevel (keeps tris down)
+C.BEVEL_ANGLE = 50             # the big shell rounding (45 deg steps) is not re-bevelled
 C.BEVEL_W = 0.0007             # small bevel on hard edges so the locked steel sheen catches them
 
 PAL = {
@@ -34,6 +36,7 @@ PAL = {
     'bone_light': (244, 238, 218), 'bone_cut': (74, 54, 38),
     'p_shadow': (7, 7, 8), 'p_dark': (12, 12, 14), 'p_mid': (21, 21, 24),
     'p_light': (33, 33, 37), 'p_high': (64, 64, 70),
+    'pf_dark': (22, 22, 26), 'pf_shadow': (19, 19, 23), 'pf_mid': (27, 27, 32),
 }
 FURN = {'bone', 'bone_panel', 'bone_inlay', 'poly', 'poly_dark', 'bone_end'}
 
@@ -338,7 +341,7 @@ class Atlas:
             for y in range(y0, y1):
                 for x in range(x0, x1):
                     hv = _h(x, y, seed)
-                    c = 'p_shadow' if hv < 0.38 else 'p_mid' if hv > 0.985 else 'p_dark'
+                    c = 'pf_shadow' if hv < 0.38 else 'pf_mid' if hv > 0.985 else 'pf_dark'
                     self.put(x, y, c)
             return
         for y in range(y0, y1):
@@ -566,6 +569,41 @@ def hd_upscale(arr, sig=0.55, beta=12.0):
 
 
 # ---- mesh helpers ----------------------------------------------------------
+def shell(part, outer, holes, hw, region='poly', bevel=0.0055, segs=2, bevel_hole=None):
+    """One continuous polymer shell: side profile `outer` (z, y) with closed `holes` (thumbhole, trigger hole ...) extruded
+    across X (+-hw), then every rim edge (cap/strip) is rounded with a `segs`-step bevel so the sides read as real
+    contoured volume instead of a flat cutout. Caps are filled with holes (triangle_fill)."""
+    bm = part.bm
+    pre = set(bm.faces)
+    loops = [outer] + list(holes)
+    Ls = [[bm.verts.new(G(-hw, y, z)) for z, y in lp] for lp in loops]
+    Rs = [[bm.verts.new(G(hw, y, z)) for z, y in lp] for lp in loops]
+    for L, R in zip(Ls, Rs):
+        n = len(L)
+        for k in range(n):
+            bm.faces.new((L[k], L[(k + 1) % n], R[(k + 1) % n], R[k]))
+    rim, rim_h = [], []
+    for X in (Ls, Rs):
+        edges = []
+        for li, r in enumerate(X):
+            for k in range(len(r)):
+                e = bm.edges.get((r[k], r[(k + 1) % len(r)]))
+                edges.append(e); (rim if li == 0 else rim_h).append(e)
+        bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False, edges=edges)
+    new = [f for f in bm.faces if f not in pre]
+    bmesh.ops.recalc_face_normals(bm, faces=new)
+    if bevel:
+        hb = bevel_hole if bevel_hole is not None else bevel
+        bmesh.ops.bevel(bm, geom=rim, offset=bevel, segments=segs, profile=0.5, affect='EDGES', clamp_overlap=True)
+        live = [e for e in rim_h if e.is_valid]
+        bmesh.ops.bevel(bm, geom=live, offset=hb, segments=segs, profile=0.5, affect='EDGES', clamp_overlap=True)
+    new = [f for f in bm.faces if f not in pre]
+    bm.normal_update()
+    for f in new:
+        part._uv_face(f, region)
+    return new
+
+
 def ah_to_zy(poly, theta):
     """(a = along BACK, h = along UP) grip-space -> (z, y) game space."""
     s, c = math.sin(theta), math.cos(theta)
@@ -701,8 +739,9 @@ def render_gun(glb, out_dir, gid, relief=0.30, small=False):
     k = L / 0.22
     cam, ground = M.setup_preview_scene()
     sc = bpy.context.scene
-    sc.cycles.samples = 48
-    rx, ry = 1200, 700
+    quick = bool(os.environ.get('QR'))
+    sc.cycles.samples = 12 if quick else 48
+    rx, ry = (900, 525) if quick else (1200, 700)
     sc.render.resolution_x, sc.render.resolution_y = rx, ry
     ground.location = G(center.x, mn.y - 0.002, center.z); ground.scale = (k * 1.5,) * 3
     bg = sc.world.node_tree.nodes['Background']
