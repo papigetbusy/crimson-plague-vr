@@ -37,21 +37,17 @@ def cage_parts():
     ys = yc - b + 0.0004
     zs = [-0.1500, -0.1375, -0.1250, -0.1125, -0.1000, -0.0875]
     amp = [0.0128, 0.0146, 0.0160, 0.0160, 0.0150, 0.0136]
-    for side in (1, -1):
-        for j, z0 in enumerate(zs):
-            zj = z0 + (0.0030 if side < 0 else 0.0)
-            pts = []
-            n = 6
-            for k in range(n):
-                t = k / (n - 1)
-                ph = math.pi * t
-                x = side * (amp[j] * math.sin(ph) ** 0.8 * (1.0 + 0.10 * math.sin(2 * ph)) + 0.0006 * (1 - t) )
-                y = yc - b * (1 - math.cos(ph)) * 0.5
-                z = zj - 0.0090 * t ** 1.4
-                pts.append((x, y, z))
-            rx = [0.0032, 0.0021, 0.0016, 0.0018, 0.0027, 0.0034]
-            ry = [0.0023, 0.0016, 0.0012, 0.0014, 0.0018, 0.0020]
-            S.tube_path(bone, pts, rx, ry, segs=5, tex='bonetex', up=(0, 1, 0), caps=(False, True), phase=math.pi / 5)
+    a_ = 0.0128
+    for j in range(7):
+        z0 = -0.1500 + 0.0115 * j
+        pts = []
+        n = 9
+        for k in range(n):
+            ph = math.pi * k / (n - 1)
+            pts.append((a_ * math.cos(ph), yc - b * math.sin(ph), z0 - 0.0085 * math.sin(ph) ** 1.3))
+        r = 0.0021
+        prof = [0.62, 0.92, 1.0, 1.0, 1.0, 1.0, 1.0, 0.92, 0.62]
+        S.tube_path(bone, pts, [r * q for q in prof], [r * 0.85 * q for q in prof], segs=7, tex='bonetex', up=(0, 1, 0), caps=(True, True), phase=math.pi / 7)
     # beaded sternum spine joining the ribs
     zst = [-0.1700 + 0.0050 * i for i in range(17)]
     pts = [(0, ys, z) for z in zst]
@@ -144,8 +140,8 @@ def rune_ribbons(side):
     bm = bmesh.new(); M._tex_layer(bm)
     z0, z1 = LY.SLIDE_Z; y0, y1 = LY.SLIDE_Y
     sd = 'R' if side > 0 else 'L'
-    x = side * (M.SLIDE_W * 0.5 + 0.00030)
-    hw = 0.00120
+    x = side * (M.SLIDE_W * 0.5 + 0.00012)
+    hw = 0.00090
     def pos(px, py):
         uu = px / RN.W; vv = 1.0 - py / RN.H
         z = (z1 - uu * (z1 - z0)) if sd == 'R' else (z0 + uu * (z1 - z0))

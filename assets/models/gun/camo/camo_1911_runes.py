@@ -13,13 +13,14 @@ SIGILS = {
  'blackletter': [[(.0, 0), (.22, 0)], [(.78, 0), (1, 0)], [(.1, 0), (.1, 1), (.5, .5), (.9, 1), (.9, 0)], [(.1, 1), (.0, .86)]],
 }
 W, H = 992, 114
-GLYPH_H = 62.0; GLYPH_W = 56.0
+GLYPH_H = 40.0; GLYPH_W = 34.0
+FRAME_W, FRAME_H = 54.0, 66.0
 CY = 0.52 * H
 SLOTS = {   # side -> list of (u centre, sigil)
  'L': [(0.115, 'cross_thorn'), (0.215, 'seal'), (0.315, 'blackletter'), (0.415, 'leviathan'), (0.515, 'horned'), (0.615, 'trident'), (0.715, 'cross_thorn')],
  'R': [(0.245, 'seal'), (0.625, 'blackletter'), (0.715, 'cross_thorn'), (0.805, 'horned'), (0.895, 'leviathan')],
 }
-STROKE_PX = 11.5
+STROKE_PX = 9.0
 
 def polylines(side):
     out = []
@@ -27,4 +28,12 @@ def polylines(side):
         cx = uc * W
         for pl in SIGILS[name]:
             out.append([(cx - GLYPH_W / 2 + x * GLYPH_W, CY + (0.5 - y) * GLYPH_H) for x, y in pl])
+    return out
+
+def frames(side):
+    """closed rectangular cartouche outlines (px) around each sigil, with notched corners"""
+    out = []
+    for uc, name in SLOTS[side]:
+        cx = uc * W; x0, x1 = cx - FRAME_W / 2, cx + FRAME_W / 2; y0, y1 = CY - FRAME_H / 2, CY + FRAME_H / 2; k = 6
+        out.append([(x0 + k, y0), (x1 - k, y0), (x1, y0 + k), (x1, y1 - k), (x1 - k, y1), (x0 + k, y1), (x0, y1 - k), (x0, y0 + k), (x0 + k, y0)])
     return out

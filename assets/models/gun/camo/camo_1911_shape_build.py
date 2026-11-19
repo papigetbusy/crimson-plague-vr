@@ -266,7 +266,7 @@ def epic_spine():
     return bm, bmc
 
 # ------------------------------------------------------------------ build
-EMIT = {'epic': ((0.52, 0.16, 1.0), 5.0), 'legendary': ((1.0, 0.02, 0.05), 0.9)}
+EMIT = {'epic': ((0.52, 0.16, 1.0), 5.0), 'legendary': ((1.0, 0.02, 0.05), 0.45)}
 
 def build(tier, out_dir):
     name = f'pistol_1911_camo_{tier}'

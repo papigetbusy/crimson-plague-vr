@@ -38,7 +38,7 @@ def paint_cells64(tier, atlas):
         'black': ramp_cell(dict(shadow=C(4, 4, 6), base=C(9, 10, 14), hi=C(18, 20, 28), streak=C(40, 44, 58))),
         'steel_hi': ramp_cell(dict(shadow=P_['hi'], base=P_['streak'], hi=P_['edge'], streak=P_['silver_hi'])),
     }
-    if tier == 'legendary': cells['crimson'] = np.tile(C(196, 6, 22), (64, 64, 1)).astype(np.float32)
+    if tier == 'legendary': cells['crimson'] = np.tile(C(120, 3, 14), (64, 64, 1)).astype(np.float32)
     for name, img in cells.items():
         x0, y0, x1, y1 = LY.cell64_rect(name)
         atlas[y0:y1, x0:x1] = img[::-1]
@@ -206,22 +206,23 @@ def slide_art_legendary(side, w, h):
     ink.line([(xd, 0.09 * h), (xd, 0.91 * h)], 1.4); ink.line([(xd + (5 if R_side else -5), 0.12 * h), (xd + (5 if R_side else -5), 0.88 * h)], 1.0)
     return ink.mask()
 
-def rune_channel(side, w, h):
-    """dark engraved channel + painted crimson fallback line under the emissive ribbons (sigil polylines)"""
-    chan = Ink(w, h); core = Ink(w, h)
-    for pl in RN.polylines(side):
-        chan.line(pl, RN.STROKE_PX + 4.5); core.line(pl, RN.STROKE_PX)
-    return chan.mask(), core.mask()
+CRIM_RAMP = dict(shadow=C(40, 0, 6), base=C(112, 3, 16), hi=C(158, 10, 24), streak=C(196, 44, 52))
+
+def sigil_masks(side, w, h):
+    sg = Ink(w, h); fr = Ink(w, h)
+    for pl in RN.polylines(side): sg.line(pl, RN.STROKE_PX)
+    for pl in RN.frames(side): fr.line(pl, 1.3)
+    return sg.mask(), fr.mask()
 
 def slide_panel_legendary(side, w, h):
     R_side = side == 'R'
     img = P.steel_panel('legendary', w, h, 3 if R_side else 4)
     ser = (0.0, 0.153) if R_side else (0.847, 1.0)
     img = P.apply_serr(img, 'legendary', w, h, *ser)
-    img = metal_inlay(img, slide_art_legendary(side, w, h), 'legendary', h, GOLD)
-    chan, core = rune_channel(side, w, h)
-    img = P.over(img, C(4, 3, 5), chan * 0.92)
-    img = P.over(img, CRIMSON, core)
+    sg, fr = sigil_masks(side, w, h)
+    gold = np.clip(slide_art_legendary(side, w, h) + fr, 0, 1)
+    img = metal_inlay(img, gold, 'legendary', h, GOLD)
+    img = metal_inlay(img, sg, 'legendary', h, CRIM_RAMP, groove=1.6)     # engraved, deep-crimson inlay
     return img
 
 def frame_panel_legendary(side, w, h):
