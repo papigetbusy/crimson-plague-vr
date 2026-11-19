@@ -601,7 +601,7 @@ def hd_upscale(arr, sig=0.55, beta=12.0):
 
 
 # ---- mesh helpers ----------------------------------------------------------
-def shell(part, outer, holes, hw, region='poly', bevel=0.0055, segs=2, bevel_hole=None):
+def shell(part, outer, holes, hw, region='poly', bevel=0.0055, segs=2, bevel_hole=None, gmap=False):
     """One continuous polymer shell: side profile `outer` (z, y) with closed `holes` (thumbhole, trigger hole ...) extruded
     across X (+-hw), then every rim edge (cap/strip) is rounded with a `segs`-step bevel so the sides read as real
     contoured volume instead of a flat cutout. Caps are filled with holes (triangle_fill)."""
@@ -632,6 +632,18 @@ def shell(part, outer, holes, hw, region='poly', bevel=0.0055, segs=2, bevel_hol
             bmesh.ops.bevel(bm, geom=live, offset=hb, segments=segs, profile=0.5, affect='EDGES', clamp_overlap=True)
     new = [f for f in bm.faces if f not in pre]
     bm.normal_update()
+    if gmap:
+        # one continuous side projection over the whole shell (grain runs along the gun, no per-face re-fit of the region)
+        x0, y0, x1, y1 = C.REGION[region]
+        u0, v0, u1, v1 = (x0 + C.PAD) / C.S, (y0 + C.PAD) / C.S, (x1 - C.PAD) / C.S, (y1 - C.PAD) / C.S
+        P = {f: [(-M.game_of(l.vert.co).z, M.game_of(l.vert.co).y + 0.6 * M.game_of(l.vert.co).x) for l in f.loops] for f in new}
+        allp = [q for v in P.values() for q in v]
+        mnx, mxx = min(q[0] for q in allp), max(q[0] for q in allp); mny, mxy = min(q[1] for q in allp), max(q[1] for q in allp)
+        for f in new:
+            for l, q in zip(f.loops, P[f]):
+                l[part.uv].uv = (u0 + (u1 - u0) * (q[0] - mnx) / (mxx - mnx), v0 + (v1 - v0) * (q[1] - mny) / (mxy - mny))
+            f.material_index = 1 if region in C.FURN_REGIONS else 0
+        return new
     for f in new:
         part._uv_face(f, region)
     return new
