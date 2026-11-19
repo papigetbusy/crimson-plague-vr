@@ -433,3 +433,19 @@ Shared engine change: `gun_lowpoly_common.mat_index(region)` + `ENERGY_REGIONS` 
 - sniper_antimat v3: raked pistol grip + lower receiver block, M82 chevron brake with side ports, 1.5x scope with large objective bell, bipod folded under the barrel.
 - sniper_marksman v2: short straight 10 rd box mag, thicker barrel.
 - sniper_rail v2: crimson emissive energy channel (3rd material `sniper_rail_base_energy`, emission strength 1.0) between top/bottom rails, helical copper wire coils (`SN.coil`), ribbed receiver with glow slits and bone inlays, solid sculpted polymer stock.
+
+## HMGs (hmg_belt, hmg_minigun, hmg_drum, hmg_chain)
+
+All four: HD builders (`gun_hmg_common.py`: make_atlas / finish_mats / grip_poly / rail / slotted_hider / round_belt), 1024 px LINEAR smooth albedo, locked 1911 steel material + glossy
+near-black polymer (polish3 recipe) or satin wood (drum), brass bands, bone cross badge. 1911 GLB format with 4 empties (muzzle, mag_well, rear_sight, front_sight), redDot:false,
+verify_ads passes on all. Sight empties sit at X=0, Y_SIGHT, parallel to the bore axis.
+
+| slot | file | tris | Y_SIGHT | rear z | front z | muzzle z | mag_well |
+|---|---|---|---|---|---|---|---|
+| hmg_belt (M249/M60) | hmg_belt_base.glb | 2,760 | 0.134 | -0.02 | -0.60 | -0.70 | (0,-0.012,-0.125) |
+| hmg_minigun (handheld M134) | hmg_minigun_base.glb | 1,996 | 0.162 | 0.085 | -0.755 | -0.80 | (0,0.020,-0.080) |
+| hmg_drum (RPK + drum) | hmg_drum_base.glb | 2,308 | 0.134 | -0.27 | -0.765 | -0.80 | drum centre (y -0.100, z -0.165) |
+| hmg_chain (handheld M230) | hmg_chain_base.glb | 2,520 | 0.160 | 0.125 | -0.51 | -0.86 | (0.085,-0.010,-0.145) |
+
+Notes: drum + belt traced from the refs (RPK de-rotated 10.5 deg). Minigun/chain have a carry handle arching above the sight line (sights under it). Belt/chain ammo boxes
+use `C.BEVEL_MINLEN` 0.9 on the magazine part to save tris. Minigun/chain mag_well is the ammo can, offset right on the chain gun (x 0.085).
