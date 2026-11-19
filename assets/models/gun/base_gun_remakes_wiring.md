@@ -449,3 +449,8 @@ verify_ads passes on all. Sight empties sit at X=0, Y_SIGHT, parallel to the bor
 
 Notes: drum + belt traced from the refs (RPK de-rotated 10.5 deg). Minigun/chain have a carry handle arching above the sight line (sights under it). Belt/chain ammo boxes
 use `C.BEVEL_MINLEN` 0.9 on the magazine part to save tris. Minigun/chain mag_well is the ammo can, offset right on the chain gun (x 0.085).
+
+### Polish pass (P90 + chain/minigun fixes)
+- smg_bullpup v6: 2,880 tris; sight hood now polymer dome_shell (chaikin outline, crown 0.0045), shell rear radii 74/60 px, bevel 0.0165; ring/bead sights on steel stems; 'round' atlas region = dull brass for rounds.
+- hmg_chain: 2,924 tris; mag_well now (0.0775, 0.0650-0.0750, -0.19) (can moved forward/smaller); 'leather' furniture region added via C.FURN_REGIONS in builder.
+- hmg_minigun: 1,960 tris, leather handle sleeve, round vertical foregrip (S.horn).
