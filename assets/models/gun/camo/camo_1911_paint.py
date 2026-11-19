@@ -142,7 +142,7 @@ def paint_cell(tier, name):
         n = fbm(T, T, 10, 10, 40 + sum(map(ord, name)) % 50, 2)
         a = a * smooth(-0.3, 0.9, n)
         mott = fbm(T, T, 40, 40, 7, 2)
-        img = img * (1 + 0.06 * mott[..., None])
+        img = img * (1 + 0.0 * mott[..., None])
     img = over(img, wc, a)
     # mipmap bleed guard: outside the mapped region just extend (already smooth)
     return img
@@ -375,28 +375,28 @@ def wear_alpha(w, h, seed, ends=(), strength=1.0):
     top = np.exp(-(rows - 0.0) / 0.045) + np.exp(-(rows - 0.0) / 0.012) * 0.6
     bot = np.exp(-(1 - rows) / 0.05)
     e = np.zeros((1, w), np.float32)
-    for x0, wid in ends: e = np.maximum(e, 0.55 * np.exp(-np.abs(cols - x0) / wid))
+    for x0, wid in ends: e = np.maximum(e, 0.30 * np.exp(-np.abs(cols - x0) / wid))
     rpx = np.arange(h, dtype=np.float32)[:, None]
     force = (np.exp(-rpx / 1.2) + np.exp(-(h - 1 - rpx) / 1.2)) * 0.6
     prox = np.clip(top * 1.0 + bot * 0.9 + e * 0.9 + force, 0, 1.6)
-    m = prox * 0.98 + 0.30 * n1 + 0.12 * n2 - 0.86
-    a = smooth(0.0, 0.10, m) * strength
+    m = prox * 0.98 + 0.07 * n1 + 0.02 * n2 - 0.80
+    a = smooth(0.0, 0.16, m) * strength * 0.5
     # tiny crisp nicks / scratches
     rng = np.random.default_rng(seed + 9)
     nk = Ink(w, h)
-    for _ in range(int(w / 70)):
+    for _ in range(0):
         x, y = rng.uniform(0, w), rng.uniform(0.05, 0.95) * h
         L = rng.uniform(2, 9); ang = rng.normal(0, 0.35) + (0 if rng.random() < 0.7 else math.pi / 2)
         nk.line([(x, y), (x + L * math.cos(ang), y + L * math.sin(ang))], rng.uniform(0.7, 1.4))
-    return np.clip(a + nk.mask() * 0.5, 0, 1), n1
+    return np.clip(a, 0, 1), n1
 
 def worn_steel(tier, w, h, seed, ends=()):
     img = steel_panel(tier, w, h, seed)
     P = PAL[tier]
     mott = fbm(h, w, 14, 70, seed + 21, 3)
-    img *= (1 + 0.14 * mott)[..., None]                          # mottled blue-black
+    img *= (1 + 0.0 * mott)[..., None]                          # mottled blue-black
     brown = smooth(0.4, 1.6, fbm(h, w, 9, 45, seed + 31, 3))
-    img = over(img, C(46, 36, 34), brown * 0.22)                 # plum/brown fade where the bluing thinned
+    img = over(img, C(46, 36, 34), brown * 0.0)                 # plum/brown fade where the bluing thinned
     a, n1 = wear_alpha(w, h, seed, ends)
     bare = np.repeat(vramp(h, C(92, 100, 114), C(128, 137, 150), C(164, 172, 184), C(204, 210, 220)), w, axis=1)
     grain = 1 + 0.06 * noise(h, w, 1, 30, seed + 3)[..., None]
