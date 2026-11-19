@@ -307,14 +307,9 @@ def build(tier, out_dir):
     add_base('controls', M.build_controls, 'controls', 'frame')
     add_base('magazine', M.build_magazine, 'magazine', 'magazine')
     if tier == 'epic':
-        sk, eyes, teeth, mp, tip = skull_brake('epic')
-        add_new('skull', sk, 'frame', mp); add_new('skull_eyes', eyes, 'frame'); add_new('skull_teeth', teeth, 'frame')
-        muzzle_tip = tip
-        rail, strips = epic_frame_parts()
-        add_new('thorn_shroud', rail, 'frame'); add_new('shroud_strip', strips, 'frame')
-        add_new('beavertail', epic_beavertail(), 'frame')
-        sp, cord = epic_spine()
-        add_new('spine', sp, 'slide'); add_new('spine_cord', cord, 'slide')
+        import camo_1911_epic2 as E2
+        E2.init(sys.modules[__name__])
+        muzzle_tip = E2.add_epic(add_new, objs_by_group)
     else:
         muzzle_tip = LG.add_legendary(sys.modules[__name__], add_base, add_new, objs_by_group)
     objs = {g: B.join(lst, g) if len(lst) > 1 else lst[0] for g, lst in objs_by_group.items()}
