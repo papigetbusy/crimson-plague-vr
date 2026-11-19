@@ -458,3 +458,6 @@ use `C.BEVEL_MINLEN` 0.9 on the magazine part to save tris. Minigun/chain mag_we
 ### HMG stock pass
 - hmg_drum: RPK club-foot stock retraced (rpk_boxmag_side.png, 963 px/m, receiver rear px 812) as one dome_shell (crown 0.0055, hw 0.0215, region wood) + steel buttplate prism; bipod legs thicker. 2,956 tris. `dome_shell` gained a `region` kwarg (default poly, P90 unchanged).
 - hmg_chain: shoulder stock (polymer window shell, leather cheek rest + butt pad, steel collar). 2,908 tris. Barrel/shroud/hider segs reduced to 8, can bevel limited (BEVEL_MINLEN 0.075).
+
+### hmg_drum v3
+- Long RPK stock (0.31 m from receiver rear, butt 0.15 m tall, overall length 1.15 m, butt z +0.33), steel butt plate prism on the back edge, deployed A-frame bipod (feet y -0.198). 2,536 tris. mag_well/sights unchanged.
