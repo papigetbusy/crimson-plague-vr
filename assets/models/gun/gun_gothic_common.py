@@ -766,7 +766,7 @@ def write_wiring_dump(prefix):
 
 
 # ---- previews ----------------------------------------------------------------
-def render_gun(glb, out_dir, gid, relief=0.30, small=False):
+def render_gun(glb, out_dir, gid, relief=0.30, small=False, three_y=0.24):
     """Sheen-style renders (same rig as the approved 1911 sheen previews) from the
     exported GLB: <gid>_side.png, <gid>_three.png (uncropped, 5% margin) and
     <gid>_sights.png (eye on the sight line at the ADS eye relief)."""
@@ -816,7 +816,7 @@ def render_gun(glb, out_dir, gid, relief=0.30, small=False):
         print('rendered', path)
 
     for name, direction, lens in (('side', Vector((-1.0, 0.04, 0.0)), 60),
-                                  ('three', Vector((0.72, 0.24, -0.65)), 60)):
+                                  ('three', Vector((0.72, three_y, -0.65)), 60)):
         dirv = G(direction.normalized())
         cam.data.lens = lens
         dist, loc = C.preview_fit_distance(look, look + dirv * 2.0, corners, lens, rx, ry, margin=0.05)

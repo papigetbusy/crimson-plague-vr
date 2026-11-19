@@ -32,8 +32,8 @@ import gun_shotgun_common as S
 K, C, M, G = S.K, S.C, S.M, S.G
 
 NAME = 'shotgun_double_base'
-BY, RB, BX = 0.052, 0.0105, 0.0170        # bore height, barrel radius, barrel x offset
-RIB_TOP, Y_SIGHT = 0.0630, 0.0690
+BY, RB, BX = 0.0530, 0.0100, 0.0100        # bore height, barrel radius, barrel x offset
+RIB_TOP, Y_SIGHT = 0.0640, 0.0700
 A_Y0, A_Y1 = 0.020, 0.0600
 Z_MUZ = -0.470
 Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.1350, -0.4475
@@ -91,12 +91,13 @@ def build(out_dir):
 
     # exposed hammers (coach-gun style), one each side, outside the sideplates
     hm = C.Part('hammers')
-    hamp = K.chaikin([(0.0100, 0.0440), (0.0160, 0.0440), (0.0200, 0.0520), (0.0170, 0.0620), (0.0130, 0.0690), (0.0070, 0.0735),
-                      (-0.0010, 0.0745), (0.0000, 0.0690), (0.0020, 0.0620), (0.0040, 0.0540)], 1)
+    hamp = K.chaikin([(0.0060, 0.0430), (0.0060, 0.0500), (0.0075, 0.0620), (0.0095, 0.0720), (0.0120, 0.0800), (0.0170, 0.0845),
+                      (0.0250, 0.0855), (0.0320, 0.0825), (0.0365, 0.0775), (0.0370, 0.0730), (0.0335, 0.0745), (0.0310, 0.0780),
+                      (0.0250, 0.0795), (0.0200, 0.0765), (0.0185, 0.0700), (0.0195, 0.0600), (0.0215, 0.0520), (0.0210, 0.0430)], 1)
     for sgn in (-1, 1):
-        lo, hi = (0.0297, 0.0331) if sgn > 0 else (-0.0331, -0.0297)
+        lo, hi = (0.0297, 0.0358) if sgn > 0 else (-0.0358, -0.0297)
         hm.prism(hamp, lo, hi, 'steel_top', side='steel')
-        hm.cyl((sgn * 0.0297, 0.0455, 0.0130), (sgn * 0.0341, 0.0455, 0.0130), 0.0032, 8, 'brass', cap='brass')
+        hm.cyl((sgn * 0.0297, 0.0455, 0.0130), (sgn * 0.0368, 0.0455, 0.0130), 0.0040, 8, 'brass', cap='brass')
 
     # ---------------- barrels ----------------
     br = C.Part('barrels')
@@ -105,10 +106,9 @@ def build(out_dir):
         K.revolve(br, [(-0.100, RB), (-0.455, RB)], BY, segs=14, region='barrel', cx=cx, cap_f='steel', cap_b='steel', phase=PH)
         K.revolve(br, [(-0.4550, RB), (-0.4630, RB - 0.0006), (Z_MUZ, RB - 0.0016)], BY, segs=14, region='barrel', cx=cx, cap_f='muzzle', cap_b='steel', phase=PH)
         K.revolve(br, [(-0.4500, RB + 0.0018), (-0.4580, RB + 0.0018)], BY, segs=14, region='brass', cx=cx, cap_f='brass', cap_b='brass', phase=PH)
-    br.box((-0.0100, BY - 0.0070, -0.118), (0.0100, BY + 0.0070, -0.463), 'steel', top='steel_top')         # solder web between the bores
-    br.box((-BX + 0.0030, BY + RB - 0.0045, -0.118), (BX - 0.0030, BY + RB, -0.452), 'brass')   # flat rib joining the barrel tops       # raised rib riding the groove between the barrels
+    br.box((-0.0078, BY + 0.0072, -0.118), (0.0078, BY + RB + 0.0010, -0.452), 'brass')                       # flat brass rib across the groove on top
     for z0, w in ((-0.1700, 0.0070), (-0.2900, 0.0060)):          # brass bands across both barrels
-        br.loft([(z0, K.hexp(-0.0300, 0.0300, BY - 0.0128, BY + 0.0128, 0.0090)), (z0 - w, K.hexp(-0.0300, 0.0300, BY - 0.0128, BY + 0.0128, 0.0090))], 'brass')
+        br.loft([(z0, K.hexp(-0.0226, 0.0226, BY - 0.0126, BY + 0.0126, 0.0090)), (z0 - w, K.hexp(-0.0226, 0.0226, BY - 0.0126, BY + 0.0126, 0.0090))], 'brass')
     S.sight_pair(br, Y_SIGHT, Z_REAR_SIGHT, Z_FRONT_SIGHT, RIB_TOP - 0.0005, RIB_TOP - 0.0005, rear_w=0.0075, rear_len=0.016, post_in=0.0026)
 
     # ---------------- walnut furniture ----------------
@@ -167,7 +167,7 @@ def finish(out_dir):
 
 
 def render(glb, render_dir, *_):
-    K.render_gun(glb, render_dir, 'shotgun_double', relief=0.16)
+    K.render_gun(glb, render_dir, 'shotgun_double', relief=0.16, three_y=0.50)
 
 
 if __name__ == '__main__':
