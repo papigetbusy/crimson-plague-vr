@@ -403,3 +403,9 @@ normals on the cap faces (geometry stays flat; glTF exports the normals) - the l
 - shotgun_double: true twin barrels (14-sided, 5 mm gap) with a brass rib between them, short coach-gun length (muzzle z -0.470, front sight z -0.4475; ADS re-verified), twin muzzle faces + brass rings, guard bow attached to the action and the stock tang enclosing the twin triggers.
 - shotgun_combat: re-themed to Benelli M4: slim rounded flat-top receiver with rail, octagonal ghost-ring rear sight + hooded front post, tubular magazine under the barrel to z -0.505 (no box mag), slim rounded forend, traced pistol-grip stock. `magazine` node is now a loading-gate shell stand-in (mag_well at the gate).
 - shotgun_blunderbuss: powder flask is a rounded 28 mm thick shell with a bone badge, strap and stopper; bell is 24-sided.
+
+### Shotguns v5
+- pump: trigger guard is now a 9 x 6 mm flat band.
+- double: barrel centres 34 mm apart joined by a flat brass rib (figure-eight muzzle), straight English stock, short splinter forend (to z -0.246), tall hammer ears on the sides of the action, brass top lever on the tang, receiver widened to +-27 mm (sideplates/straps/hammers shifted), solid guard band; receiver top no longer uses the bright steel_top strip.
+- combat: all furniture is glossy near-black polymer (bullpup polish3 recipe, `S.make_poly_mats`), one shell for stock + pistol grip raked ~20 deg (no brass foot plate), short slotted Picatinny rail on the receiver, slim front ghost-ring post on a low clamp, flat-band trigger guard.
+- blunderbuss: removed the brass fore-tip block; the flask is now a smooth ivory powder horn (`S.horn`, 10-sided, 7 stations) on the right of the stock with a thin brass strap over the comb; proper curved 8 x 5.5 mm brass trigger guard. mag_well empty is now at the horn centre (+0.025, 0.025, 0.170).

@@ -54,3 +54,45 @@ def sight_pair(part, y_top, z_rear, z_front, y_base_rear, y_base_front, rear_w=0
         part.box((lo, y_top - 0.0008, z_rear - rear_len * 0.35), (hi, y_top, z_rear + rear_len * 0.35), 'brass')
     part.box((-0.0030, y_base_front, z_front - 0.0030), (0.0030, y_top - bead_h, z_front + 0.0030), 'steel', top='steel_top')
     part.box((-0.0018, y_top - bead_h, z_front - 0.0018), (0.0018, y_top, z_front + 0.0018), 'brass')
+
+
+def make_poly_mats(name, tex):
+    """Glossy near-black molded polymer (bullpup polish3 recipe) + the locked 1911 steel."""
+    mats = C.make_materials(name, tex, furn='polymer')
+    mats[1].name = name + '_polymer'
+    b = mats[1].node_tree.nodes['Principled BSDF']
+    b.inputs['Roughness'].default_value = 0.30
+    b.inputs['Specular IOR Level'].default_value = 0.30
+    b.inputs['Coat Weight'].default_value = 0.55
+    b.inputs['Coat Roughness'].default_value = 0.10
+    return mats
+
+
+def horn(part, path, radii, segs=10, regions=None, cap_region='brass'):
+    """Smooth curved horn / tapered tube swept along a game-space polyline path [(x, y, z)] with per-station radii.
+    regions: per-band region names (len(path)-1). Frames are built perpendicular to the path (path must lie in a plane of constant X)."""
+    import bmesh
+    from mathutils import Vector
+    bm = part.bm
+    n = len(path)
+    rings = []
+    for i, (x, y, z) in enumerate(path):
+        a = Vector(path[max(i - 1, 0)]); b = Vector(path[min(i + 1, n - 1)])
+        t = (b - a).normalized()
+        u = Vector((1, 0, 0)); v = t.cross(u).normalized()
+        ring = []
+        for k in range(segs):
+            ang = 2 * math.pi * k / segs
+            q = Vector((x, y, z)) + radii[i] * (math.cos(ang) * u + math.sin(ang) * v)
+            ring.append(bm.verts.new(G(q.x, q.y, q.z)))
+        rings.append(ring)
+    faces = []
+    for bi, (A, B) in enumerate(zip(rings, rings[1:])):
+        for k in range(segs):
+            k2 = (k + 1) % segs
+            f = bm.faces.new((A[k], A[k2], B[k2], B[k])); faces.append((f, (regions[bi] if regions else 'brass')))
+    c0 = bm.faces.new(list(reversed(rings[0]))); c1 = bm.faces.new(rings[-1])
+    part._fix_normals([f for f, _ in faces] + [c0, c1], rings)
+    for f, r in faces:
+        part._uv_face(f, r)
+    part._uv_face(c0, cap_region); part._uv_face(c1, cap_region)

@@ -38,7 +38,7 @@ Z_MUZ = -0.404
 Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.0650, -0.3920
 PH = -math.pi / 14
 HAM_PIVOT = (0.0, 0.0460, 0.0100)
-FLASK_C = (-0.0235, -0.0020, 0.1700)
+FLASK_C = (0.0250, 0.0250, 0.1700)
 MAGW = FLASK_C
 
 
@@ -88,7 +88,7 @@ def build(out_dir):
         rc.cyl((0.0196, yy, zz), (0.0226, yy, zz), 0.0030, 8, 'brass', cap='brass')
         rc.cyl((-0.0194, yy, zz), (-0.0224, yy, zz), 0.0030, 8, 'brass', cap='brass')
     # trigger guard (brass bow) + trigger
-    K.tube(rc, [(-0.0750, 0.0350), (-0.0780, 0.0150), (-0.0640, 0.0020), (-0.0440, -0.0010), (-0.0260, 0.0080)], 0.0066, 0.0070, 'brass')
+    K.tube(rc, K.chaikin([(-0.0750, 0.0390), (-0.0790, 0.0220), (-0.0680, 0.0090), (-0.0480, 0.0040), (-0.0280, 0.0110), (-0.0100, 0.0260), (0.0020, 0.0390)], 2)[2:-2], 0.0080, 0.0055, 'brass')
     rc.prism([(-0.0480, 0.0360), (-0.0430, 0.0360), (-0.0440, 0.0250), (-0.0460, 0.0170), (-0.0500, 0.0080), (-0.0530, 0.0060),
               (-0.0555, 0.0100), (-0.0530, 0.0170), (-0.0495, 0.0260)], -0.0018, 0.0018, 'brass', side='brass')
     # sights: two brass-tipped spires on the breech, bead on the bell rim
@@ -119,7 +119,6 @@ def build(out_dir):
     fu.prism([(0.0100, 0.0600), (0.0460, 0.0600), (0.0560, 0.0620), (0.0560, 0.0645), (0.0100, 0.0645)], -0.0090, 0.0090, 'brass', side='brass')   # brass tang plate
     for zc in (-0.2400, -0.1650):                                              # brass fore bands around barrel + wood
         fu.loft([(zc, K.hexp(-0.0185, 0.0185, 0.0320, 0.0840, 0.0070)), (zc - 0.0070, K.hexp(-0.0185, 0.0185, 0.0320, 0.0840, 0.0070))], 'brass')
-    fu.box((-0.0170, 0.0340, -0.2960), (0.0170, 0.0620, -0.2850), 'brass')  # brass fore tip
 
     # ---------------- flint cock (hammer; pivots at HAM_PIVOT) ----------------
     hm = C.Part('hammer')
@@ -129,19 +128,14 @@ def build(out_dir):
     hm.box((0.0190, 0.0820, -0.0400), (0.0222, 0.0900, -0.0300), 'bone_end')                            # flint
     hm.cyl((0.0186, 0.0460, 0.0100), (0.0236, 0.0460, 0.0100), 0.0036, 8, 'brass', cap='brass')
 
-    # ---------------- brass powder flask on the left of the stock (= magazine) ----------------
+    # ---------------- ivory powder horn on a thin brass strap (= magazine) ----------------
     mg = C.Part('magazine')
-    fl = K.chaikin([(0.1680, 0.0500), (0.1720, 0.0500), (0.1760, 0.0360), (0.2060, 0.0120), (0.2120, -0.0200), (0.1960, -0.0460),
-                    (0.1440, -0.0460), (0.1280, -0.0200), (0.1340, 0.0120), (0.1640, 0.0360)], 1)
-    before = set(mg.bm.verts)
-    K.shell(mg, fl, [], 0.0140, region='brass', bevel=0.0045, segs=2)          # real volume: a rounded 28 mm thick flask
-    import bmesh as _bm
-    _bm.ops.translate(mg.bm, verts=[v for v in mg.bm.verts if v not in before], vec=G(-0.0295, 0, 0))
-    for sgn in (1,):
-        pass
-    mg.box((-0.0322, 0.0500, 0.1660), (-0.0268, 0.0580, 0.1740), 'bone_end')                       # bone stopper
-    mg.box((-0.0452, -0.0070, 0.1440), (-0.0138, 0.0000, 0.1960), 'steel')                          # steel strap round the flask belly
-    mg.cyl((-0.0450, 0.0200, 0.1700), (-0.0432, 0.0200, 0.1700), 0.0085, 12, 'brass', cap='bone_stock')   # brass-rimmed bone cross badge on the flask
+    hp = [(0.0250, 0.0000, 0.2150), (0.0250, 0.0150, 0.2100), (0.0250, 0.0270, 0.1950), (0.0250, 0.0360, 0.1750), (0.0250, 0.0430, 0.1550),
+          (0.0250, 0.0470, 0.1350), (0.0250, 0.0490, 0.1200)]
+    S.horn(mg, hp, [0.0140, 0.0130, 0.0112, 0.0090, 0.0066, 0.0046, 0.0030], segs=10,
+           regions=['brass', 'bone_end', 'bone_end', 'bone_end', 'bone_end', 'brass'], cap_region='brass')
+    mg.box((0.0166, 0.0400, 0.1500), (0.0192, 0.0625, 0.1545), 'brass')            # thin strap up the stock side ...
+    mg.box((-0.0192, 0.0602, 0.1500), (0.0192, 0.0626, 0.1545), 'brass')             # ... and over the comb
 
     objs = {p.name: p.to_object(mats) for p in (rc, fu, hm, mg)}
     M.set_origin_world(objs['hammer'], G(*HAM_PIVOT))

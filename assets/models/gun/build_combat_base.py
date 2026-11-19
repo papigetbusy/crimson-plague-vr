@@ -31,7 +31,7 @@ import gun_shotgun_common as S
 K, C, M, G = S.K, S.C, S.M, S.G
 
 NAME = 'shotgun_combat_base'
-TH = math.radians(17)
+TH = math.radians(20)
 BY, RB = 0.062, 0.0115
 GY, RG = 0.0865, 0.0075            # gas tube centre height, radius
 R_Y0, R_Y1 = 0.030, 0.080
@@ -47,9 +47,8 @@ MAGW = (0.0, 0.0205, -0.1100)
 def build(out_dir):
     C.M.reset_scene()
     A = K.Atlas([
-        ('barrel', 128, 72), ('tube', 96, 32), ('panel', 112, 36), ('wood', 64, 64), ('bone_stock', 48, 48), ('bone_fore', 48, 24),
+        ('barrel', 128, 72), ('tube', 96, 32), ('panel', 112, 36), ('poly', 128, 40), ('bone_stock', 48, 48), ('bone_fore', 48, 24),
         ('shell', 32, 16), ('steel', 48, 32), ('steel_top', 48, 24), ('muzzle', 28, 28), ('brass', 24, 24), ('bone_end', 16, 16),
-        ('wood_end', 16, 16),
     ])
     A.install()
     A.steel('steel', seed=5, grime=0.84)
@@ -59,19 +58,22 @@ def build(out_dir):
     A.wrap('tube', 8, 4, lambda j: 'hi' if j == 2 else 'dark' if j == 6 else 'plain', seed=17, lam=16)
     A.muzzle('muzzle'); A.brass('brass', engrave=True)
     A.bone('bone_stock', seed=37, motif='cross'); A.bone('bone_fore', seed=41, motif='cross'); A.bone('bone_end', motif=None, rim=False)
-    S.paint_wood(A, 'wood'); S.paint_wood(A, 'wood_end', seed=75, end=True)
+    A.poly('poly', seed=43, fine=True)
     A.bone('shell', seed=45, motif=None, rim=False)
     tex = os.path.join(out_dir, NAME + '_albedo.png')
     A.save(tex)
-    mats = S.make_mats(NAME, tex)
+    mats = S.make_poly_mats(NAME, tex)
 
     # ---------------- receiver + barrel group (Benelli M4: slim rounded flat-top receiver, tube mag under the barrel) ----------------
     rc = C.Part('receiver')
     prof = [(-0.0200, R_Y0 + 0.007), (-0.0168, R_Y0), (0.0168, R_Y0), (0.0200, R_Y0 + 0.007), (0.0200, R_Y1 - 0.011), (0.0158, R_Y1),
             (-0.0158, R_Y1), (-0.0200, R_Y1 - 0.011)]
     rc.loft([(-0.200, prof), (0.040, prof)], 'steel', top='steel_top')
-    rc.box((-0.0085, R_Y1 - 0.0004, -0.1900), (0.0085, R_Y1 + 0.0028, 0.0300), 'steel', top='steel_top')       # flat-top rail
-    rc.box((-0.0012, R_Y1 + 0.0026, -0.1800), (0.0012, R_Y1 + 0.0033, 0.0200), 'brass')                       # brass inlay down the rail
+    rc.box((-0.0085, R_Y1 - 0.0004, -0.1500), (0.0085, R_Y1 + 0.0012, 0.0300), 'steel', top='steel_top')        # short Picatinny rail base
+    zz = 0.0300
+    while zz - 0.0100 > -0.1500:
+        rc.box((-0.0085, R_Y1 + 0.0010, zz - 0.0100), (0.0085, R_Y1 + 0.0032, zz), 'steel', top='steel_top')   # rail cross-slot teeth
+        zz -= 0.0150
     for sgn in (-1, 1):
         a_, b_ = (0.0196, 0.0228) if sgn > 0 else (-0.0228, -0.0196)
         rc.prism(S.cham(-0.1750, -0.0450, 0.0345, 0.0725, 0.004), a_, b_, 'panel', side='steel', top='steel_top')
@@ -92,10 +94,11 @@ def build(out_dir):
     K.revolve(rc, [(-0.200, RT), (-0.505, RT)], TY, segs=12, region='tube', cap_f='steel', cap_b='steel', phase=PH)
     K.revolve(rc, [(-0.4940, RT + 0.0022), (-0.5060, RT + 0.0022)], TY, segs=12, region='brass', cap_f='brass', cap_b='brass', phase=PH)
     rc.box((-0.0060, TY + 0.0040, -0.5000), (0.0060, BY - RB + 0.0030, -0.4920), 'steel')
-    # front sight block on the barrel
-    rc.box((-0.0100, BY - RB + 0.0010, -0.4700), (0.0100, 0.0975, -0.4300), 'steel', top='steel_top')
+    # slim front sight: low clamp on the barrel + thin post with two thin protective ears and a brass bead
+    rc.box((-0.0065, BY + RB - 0.0030, -0.4650), (0.0065, BY + RB + 0.0030, -0.4350), 'steel', top='steel_top')
+    rc.box((-0.0018, BY + RB, -0.4570), (0.0018, Y_SIGHT - 0.0016, -0.4430), 'steel', top='steel_top')
     # trigger guard + trigger
-    K.tube(rc, [(-0.0560, 0.0310), (-0.0600, 0.0110), (-0.0480, -0.0100), (-0.0300, -0.0180), (-0.0190, -0.0120)], 0.0072, 0.0074, 'steel')
+    K.tube(rc, [(-0.0560, 0.0310), (-0.0600, 0.0110), (-0.0480, -0.0100), (-0.0300, -0.0180), (0.0000, -0.0140)], 0.0090, 0.0060, 'steel')
     rc.prism([(-0.0320, 0.0300), (-0.0260, 0.0300), (-0.0275, 0.0140), (-0.0300, 0.0040), (-0.0340, 0.0000), (-0.0375, 0.0005),
               (-0.0355, 0.0080), (-0.0335, 0.0160)], -0.0020, 0.0020, 'brass', side='brass')
     # ghost-ring rear sight (octagonal aperture ring on twin posts, centred on the sight line) and front sight ears + blade + bead
@@ -108,31 +111,24 @@ def build(out_dir):
     for sgn in (-1, 1):
         lo, hi = (0.0060, 0.0100) if sgn > 0 else (-0.0100, -0.0060)
         rc.box((lo, R_Y1 + 0.0020, -0.0350), (hi, Y_SIGHT - 0.0050, -0.0250), 'steel', top='steel_top')
-        lo, hi = (0.0042, 0.0068) if sgn > 0 else (-0.0068, -0.0042)
-        rc.box((lo, 0.0975, -0.4650), (hi, Y_SIGHT - 0.0005, -0.4350), 'steel', top='steel_top')
-    rc.box((-0.0028, 0.0975, -0.4560), (0.0028, Y_SIGHT - 0.0016, -0.4440), 'steel')
+        lo, hi = (0.0046, 0.0062) if sgn > 0 else (-0.0062, -0.0046)
+        rc.box((lo, BY + RB + 0.0020, -0.4590), (hi, 0.0975, -0.4410), 'steel', top='steel_top')
     rc.box((-0.0016, Y_SIGHT - 0.0016, -0.4530), (0.0016, Y_SIGHT, -0.4470), 'brass')
 
-    # ---------------- walnut furniture ----------------
+    # ---------------- polymer furniture ----------------
     fu = C.Part('furniture')
-    # stock side profile traced from the Benelli M4 / L128A1 photo (/workspace/gun_brief/refs/shotgun_combat): tall butt pad, slim dropped neck
-    # rising into the receiver; scaled to this model's stock length
-    stock = [(0.040, 0.0700), (0.100, 0.0600), (0.160, 0.0470), (0.220, 0.0330), (0.262, 0.0260), (0.292, 0.0300), (0.312, 0.0390),
-             (0.330, 0.0430), (0.344, 0.0400), (0.344, -0.0800), (0.330, -0.0830), (0.314, -0.0760), (0.296, -0.0560), (0.262, -0.0440),
-             (0.220, -0.0380), (0.160, -0.0230), (0.100, -0.0040), (0.040, 0.0200)]
-    K.shell(fu, K.chaikin(stock, 1), [], 0.0165, region='wood', bevel=0.0050, segs=2, gmap=True)
-    fu.prism([(0.3430, -0.0800), (0.3500, -0.0800), (0.3500, 0.0400), (0.3430, 0.0400)], -0.0170, 0.0170, 'brass', side='brass')
+    # one shell: stock side profile traced from the Benelli M4 / L128A1 photo with the pistol grip (raked ~20 deg) blended straight into the neck
+    stock = [(0.040, 0.0680), (0.100, 0.0560), (0.160, 0.0440), (0.220, 0.0320), (0.262, 0.0260), (0.292, 0.0300), (0.312, 0.0390),
+             (0.330, 0.0430), (0.344, 0.0400), (0.344, -0.0800), (0.330, -0.0830), (0.314, -0.0760), (0.296, -0.0560), (0.270, -0.0300),
+             (0.240, -0.0100), (0.200, 0.0000), (0.160, 0.0100), (0.130, 0.0190), (0.100, 0.0200), (0.072, 0.0160), (0.070, -0.0200),
+             (0.068, -0.0500), (0.056, -0.0700), (0.030, -0.0720), (0.014, -0.0620), (0.000, -0.0200), (-0.013, 0.0300)]
+    K.shell(fu, K.chaikin(stock, 1), [], 0.0150, region='poly', bevel=0.0050, segs=2, gmap=True)
     for sgn in (-1, 1):
-        x0, x1 = (0.0160 - 0.0005, 0.0160 + 0.0016) if sgn > 0 else (-0.0160 - 0.0016, -0.0160 + 0.0005)
+        x0, x1 = (0.0150 - 0.0005, 0.0150 + 0.0016) if sgn > 0 else (-0.0150 - 0.0016, -0.0150 + 0.0005)
         fu.cyl((x0, -0.0180, 0.3250), (x1, -0.0180, 0.3250), 0.0150, 12, 'brass', cap='bone_stock')          # brass-rimmed bone cross badge
-    grip = [(-0.0225, GRIP_TOP), (-0.0235, 0.020), (-0.0240, -0.015), (-0.0225, GRIP_BOT), (0.0205, GRIP_BOT), (0.0235, -0.030),
-            (0.0245, 0.000), (0.0240, 0.030), (0.0220, GRIP_TOP)]
-    K.shell(fu, K.ah_to_zy(K.chaikin(grip, 1), TH), [], 0.0135, region='wood', bevel=0.0045, segs=1, gmap=True)
-    zb = K.ah_to_zy([(-0.0235, GRIP_BOT), (0.0212, GRIP_BOT), (0.0212, GRIP_BOT - 0.0070), (-0.0235, GRIP_BOT - 0.0070)], TH)
-    fu.prism(zb, -0.0148, 0.0148, 'brass', side='brass')
     # slim rounded polymer-style handguard wrapped around the barrel + tube (Benelli M4 forend)
     fg = [(-0.205, 0.0700), (-0.205, 0.0300), (-0.214, 0.0255), (-0.372, 0.0255), (-0.384, 0.0300), (-0.384, 0.0700)]
-    K.shell(fu, K.chaikin(fg, 1), [], 0.0155, region='wood', bevel=0.0050, segs=2, gmap=True)
+    K.shell(fu, K.chaikin(fg, 1), [], 0.0155, region='poly', bevel=0.0050, segs=2, gmap=True)
     fu.loft([(-0.3840, K.hexp(-0.0160, 0.0160, 0.0245, 0.0712, 0.0060)), (-0.3910, K.hexp(-0.0160, 0.0160, 0.0245, 0.0712, 0.0060))], 'brass')
     for sgn in (-1, 1):
         x0, x1 = (0.0155 - 0.0005, 0.0155 + 0.0014) if sgn > 0 else (-0.0155 - 0.0014, -0.0155 + 0.0005)

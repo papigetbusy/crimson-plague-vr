@@ -32,8 +32,8 @@ import gun_shotgun_common as S
 K, C, M, G = S.K, S.C, S.M, S.G
 
 NAME = 'shotgun_double_base'
-BY, RB, BX = 0.052, 0.0108, 0.0135        # bore height, barrel radius, barrel x offset
-RIB_TOP, Y_SIGHT = 0.0650, 0.0690
+BY, RB, BX = 0.052, 0.0105, 0.0170        # bore height, barrel radius, barrel x offset
+RIB_TOP, Y_SIGHT = 0.0630, 0.0690
 A_Y0, A_Y1 = 0.020, 0.0600
 Z_MUZ = -0.470
 Z_REAR_SIGHT, Z_FRONT_SIGHT = -0.1350, -0.4475
@@ -67,34 +67,36 @@ def build(out_dir):
 
     # ---------------- action ----------------
     rc = C.Part('receiver')
-    prof = K.hexp(-0.0245, 0.0245, A_Y0, A_Y1, 0.0050)
-    rc.loft([(-0.118, prof), (0.030, prof)], 'steel', top='steel_top')
+    prof = K.hexp(-0.0270, 0.0270, A_Y0, A_Y1, 0.0050)
+    rc.loft([(-0.118, prof), (0.030, prof)], 'steel', top='steel')
     lock = K.chaikin([(-0.088, 0.032), (-0.062, 0.052), (-0.012, 0.0545), (0.018, 0.0500), (0.024, 0.0400), (0.010, 0.0300), (-0.040, 0.0265)], 1)
     for sgn in (-1, 1):
-        a, b_ = (0.0242, 0.0272) if sgn > 0 else (-0.0272, -0.0242)
+        a, b_ = (0.0267, 0.0297) if sgn > 0 else (-0.0297, -0.0267)
         rc.prism(lock, a, b_, 'lock', side='steel', top='steel_top')
-        xa, xb = (0.0240, 0.0276) if sgn > 0 else (-0.0276, -0.0240)
+        xa, xb = (0.0265, 0.0301) if sgn > 0 else (-0.0301, -0.0265)
         rc.box((xa, A_Y0 - 0.001, -0.1155), (xb, A_Y1 + 0.0004, -0.1100), 'brass')               # brass strap at the action front
         rc.box((xa, A_Y0 - 0.001, 0.0260), (xb, A_Y1 + 0.0004, 0.0305), 'brass')
-        rc.cyl((sgn * 0.0240, 0.0300, -0.0950), (sgn * 0.0285, 0.0300, -0.0950), 0.0046, 8, 'brass', cap='brass')   # hinge pin heads
-        rc.cyl((sgn * 0.0240, 0.0465, 0.0050), (sgn * 0.0282, 0.0465, 0.0050), 0.0030, 8, 'brass', cap='brass')
-    rc.cyl((-0.0245, 0.0300, -0.0950), (0.0245, 0.0300, -0.0950), 0.0036, 8, 'brass', cap='brass')
-    # short brass top lever on the top strap (opens the break)
-    rc.prism([(-0.0750, 0.0596), (-0.0570, 0.0596), (-0.0510, 0.0610), (-0.0500, 0.0624), (-0.0570, 0.0622), (-0.0750, 0.0614)], -0.0030, 0.0030, 'brass', side='brass')
+        rc.cyl((sgn * 0.0265, 0.0300, -0.0950), (sgn * 0.0310, 0.0300, -0.0950), 0.0046, 8, 'brass', cap='brass')   # hinge pin heads
+        rc.cyl((sgn * 0.0265, 0.0465, 0.0050), (sgn * 0.0307, 0.0465, 0.0050), 0.0030, 8, 'brass', cap='brass')
+    rc.cyl((-0.0270, 0.0300, -0.0950), (0.0270, 0.0300, -0.0950), 0.0036, 8, 'brass', cap='brass')
+    # brass top lever swinging on the tang between the hammers (opens the break)
+    rc.prism(K.chaikin([(0.0300, 0.0600), (0.0120, 0.0600), (-0.0040, 0.0612), (-0.0100, 0.0636), (-0.0040, 0.0660), (0.0120, 0.0658), (0.0300, 0.0630)], 1),
+             -0.0034, 0.0034, 'brass', side='brass')
+    rc.cyl((0, 0.0594, 0.0200), (0, 0.0640, 0.0200), 0.0042, 8, 'brass', cap='brass')
     # trigger guard + two triggers
-    K.tube(rc, [(-0.0840, 0.0260), (-0.0870, 0.0000), (-0.0680, -0.0170), (-0.0400, -0.0210), (-0.0120, -0.0140), (0.0100, -0.0020), (0.0280, 0.0100)], 0.0062, 0.0064, 'steel')
+    K.tube(rc, [(-0.0840, 0.0260), (-0.0870, 0.0000), (-0.0680, -0.0170), (-0.0400, -0.0210), (-0.0120, -0.0140), (0.0100, -0.0020), (0.0280, 0.0100)], 0.0090, 0.0060, 'steel')
     for zc in (-0.0300, -0.0520):
         rc.prism([(zc - 0.003, 0.0210), (zc + 0.003, 0.0210), (zc + 0.0015, 0.0040), (zc - 0.0030, -0.0070), (zc - 0.0065, -0.0060), (zc - 0.0040, 0.0030)],
                  -0.0018, 0.0018, 'brass', side='brass')
 
     # exposed hammers (coach-gun style), one each side, outside the sideplates
     hm = C.Part('hammers')
-    hamp = K.chaikin([(-0.0040, 0.0440), (0.0060, 0.0440), (0.0150, 0.0520), (0.0260, 0.0600), (0.0310, 0.0640), (0.0315, 0.0668),
-                      (0.0230, 0.0670), (0.0160, 0.0620), (0.0070, 0.0560), (-0.0040, 0.0510)], 1)
+    hamp = K.chaikin([(0.0100, 0.0440), (0.0160, 0.0440), (0.0200, 0.0520), (0.0170, 0.0620), (0.0130, 0.0690), (0.0070, 0.0735),
+                      (-0.0010, 0.0745), (0.0000, 0.0690), (0.0020, 0.0620), (0.0040, 0.0540)], 1)
     for sgn in (-1, 1):
-        lo, hi = (0.0272, 0.0304) if sgn > 0 else (-0.0304, -0.0272)
+        lo, hi = (0.0297, 0.0331) if sgn > 0 else (-0.0331, -0.0297)
         hm.prism(hamp, lo, hi, 'steel_top', side='steel')
-        hm.cyl((sgn * 0.0272, 0.0455, 0.0030), (sgn * 0.0316, 0.0455, 0.0030), 0.0032, 8, 'brass', cap='brass')
+        hm.cyl((sgn * 0.0297, 0.0455, 0.0130), (sgn * 0.0341, 0.0455, 0.0130), 0.0032, 8, 'brass', cap='brass')
 
     # ---------------- barrels ----------------
     br = C.Part('barrels')
@@ -103,21 +105,20 @@ def build(out_dir):
         K.revolve(br, [(-0.100, RB), (-0.455, RB)], BY, segs=14, region='barrel', cx=cx, cap_f='steel', cap_b='steel', phase=PH)
         K.revolve(br, [(-0.4550, RB), (-0.4630, RB - 0.0006), (Z_MUZ, RB - 0.0016)], BY, segs=14, region='barrel', cx=cx, cap_f='muzzle', cap_b='steel', phase=PH)
         K.revolve(br, [(-0.4500, RB + 0.0018), (-0.4580, RB + 0.0018)], BY, segs=14, region='brass', cx=cx, cap_f='brass', cap_b='brass', phase=PH)
-    br.box((-0.0040, BY - 0.0070, -0.118), (0.0040, BY + 0.0070, -0.463), 'steel', top='steel_top')         # solder web between the bores
-    br.box((-0.0030, BY + RB - 0.0040, -0.118), (0.0030, RIB_TOP, -0.452), 'brass')       # raised rib riding the groove between the barrels
+    br.box((-0.0100, BY - 0.0070, -0.118), (0.0100, BY + 0.0070, -0.463), 'steel', top='steel_top')         # solder web between the bores
+    br.box((-BX + 0.0030, BY + RB - 0.0045, -0.118), (BX - 0.0030, BY + RB, -0.452), 'brass')   # flat rib joining the barrel tops       # raised rib riding the groove between the barrels
     for z0, w in ((-0.1700, 0.0070), (-0.2900, 0.0060)):          # brass bands across both barrels
-        br.loft([(z0, K.hexp(-0.0252, 0.0252, BY - 0.0125, BY + 0.0125, 0.0070)), (z0 - w, K.hexp(-0.0252, 0.0252, BY - 0.0125, BY + 0.0125, 0.0070))], 'brass')
+        br.loft([(z0, K.hexp(-0.0300, 0.0300, BY - 0.0128, BY + 0.0128, 0.0090)), (z0 - w, K.hexp(-0.0300, 0.0300, BY - 0.0128, BY + 0.0128, 0.0090))], 'brass')
     S.sight_pair(br, Y_SIGHT, Z_REAR_SIGHT, Z_FRONT_SIGHT, RIB_TOP - 0.0005, RIB_TOP - 0.0005, rear_w=0.0075, rear_len=0.016, post_in=0.0026)
 
     # ---------------- walnut furniture ----------------
     fu = C.Part('furniture')
     # stock side profile traced from the side-by-side coach gun photo (/workspace/gun_brief/refs/shotgun_double), z stretched to this model's stock length
     top_t = [(0.3378, 0.0162), (0.3177, 0.0214), (0.2969, 0.0236), (0.2768, 0.0259), (0.2560, 0.0281), (0.2352, 0.0311), (0.2151, 0.0325),
-             (0.1943, 0.0348), (0.1742, 0.0370), (0.1534, 0.0392), (0.1326, 0.0415), (0.1125, 0.0377), (0.0917, 0.0325), (0.0716, 0.0370),
-             (0.0508, 0.0444), (0.0300, 0.0549)]
+             (0.1943, 0.0348), (0.1742, 0.0370), (0.1534, 0.0392), (0.1326, 0.0415), (0.1000, 0.0430), (0.0700, 0.0470),
+             (0.0508, 0.0510), (0.0300, 0.0549)]
     bot_t = [(0.3378, -0.0924), (0.3155, -0.0968), (0.2925, -0.0886), (0.2694, -0.0797), (0.2464, -0.0715), (0.2233, -0.0626), (0.2010, -0.0544),
-             (0.1780, -0.0455), (0.1549, -0.0373), (0.1319, -0.0329), (0.1088, -0.0366), (0.0858, -0.0381), (0.0754, -0.0202), (0.0642, -0.0069),
-             (0.0530, 0.0006), (0.0419, 0.0050), (0.0300, 0.0058)]
+             (0.1780, -0.0455), (0.1549, -0.0373), (0.1100, -0.0240), (0.0800, -0.0140), (0.0540, -0.0060), (0.0419, -0.0020), (0.0300, 0.0058)]
     zs = lambda z: 0.030 + (z - 0.030) * (0.352 - 0.030) / (0.3400 - 0.030)
     stock = [(zs(z), y) for z, y in top_t] + [(zs(z), y) for z, y in reversed(bot_t)]
     stock[0] = (0.352, stock[0][1]); stock[-1] = (0.352, stock[-1][1])
@@ -128,13 +129,13 @@ def build(out_dir):
         fu.cyl((x0, -0.0150, 0.2000), (x1, -0.0150, 0.2000), 0.0150, 12, 'brass', cap='bone_stock')       # brass-rimmed bone cross badge
         fu.cyl((sgn * 0.0148, 0.0480, 0.0300), (sgn * 0.0166, 0.0480, 0.0300), 0.0030, 8, 'brass', cap='brass')    # tang bolt
     # splinter forend under the barrels + brass tip + bone plaques
-    fe = K.chaikin([(-0.118, 0.0420), (-0.118, 0.0200), (-0.180, 0.0190), (-0.250, 0.0235), (-0.286, 0.0300), (-0.290, 0.0420)], 1)
+    fe = K.chaikin([(-0.118, 0.0420), (-0.118, 0.0200), (-0.170, 0.0190), (-0.215, 0.0235), (-0.242, 0.0300), (-0.246, 0.0420)], 1)
     K.shell(fu, fe, [], 0.0212, region='wood', bevel=0.0045, segs=1, gmap=True)
-    fu.box((-0.0220, 0.0285, -0.2960), (0.0220, 0.0438, -0.2860), 'brass')
+    fu.box((-0.0220, 0.0285, -0.2520), (0.0220, 0.0438, -0.2430), 'brass')
     fu.box((-0.0220, 0.0170, -0.1250), (0.0220, 0.0430, -0.1180), 'brass')
     for sgn in (-1, 1):
         x0, x1 = (0.0212 - 0.0005, 0.0212 + 0.0014) if sgn > 0 else (-0.0212 - 0.0014, -0.0212 + 0.0005)
-        fu.cyl((x0, 0.0300, -0.2000), (x1, 0.0300, -0.2000), 0.0090, 12, 'brass', cap='bone_fore')
+        fu.cyl((x0, 0.0300, -0.1800), (x1, 0.0300, -0.1800), 0.0090, 12, 'brass', cap='bone_fore')
     # shell cuff straps on the left of the buttstock (the shells are the magazine node)
     for zc in (0.1500, 0.2020):
         fu.box((-0.0388, -0.0140, zc - 0.0030), (-0.0148, 0.0310, zc + 0.0030), 'brass')
