@@ -421,3 +421,15 @@ All four rebuilt on the HD shared builders: 1024 px albedo (256 grid, EPX + bicu
 | sniper_antimat | sniper_antimat_base.glb | Barrett M82A1 side mask (skeleton frame stock with cut-out, flat slab receiver + rail, slotted brake, folded bipod, carry handle, box mag); glossy near-black polymer stock + grip (polish3 recipe, `S.make_poly_mats`) | 68.5 mm | 2,788 |
 | sniper_marksman | sniper_marksman_base.glb | SVD Dragunov side (thumbhole stock + lightening hole, slotted handguard, AK receiver, gas tube, slotted flash hider, curved mag, PSO-style scope) | 68.5 mm | 2,716 |
 | sniper_rail | sniper_rail_base.glb | original gothic coil rifle (refs mood only): slab receiver with exposed capacitor tubes, twin rails with 8 brass coils, emitter cap, polymer skeleton stock + raked grip, battery-cell magazine | 68 mm | 2,652 |
+
+## smg_bullpup v5 - P90 SHAPE REBUILD
+Rebuilt from the FN P90 photos (outline traced, 1653 px/m, 0.505 m long): translucent smoked top magazine with 12 brass rounds (3rd glTF material `smg_bullpup_base_glass`, alpha-blended 0.8; the atlas region is also painted smoked + brass discs as an opaque fallback), bulbous polymer lower shell with teardrop thumbhole + trigger hole and a real geometric crown (`dome_shell`: cap edges subdivided + domed 8.5 mm), steel sight housing arching over the magazine with a hollow window, round brass-rimmed ring-sight caps, ring sight + front bead on top, slotted flash hider, charging rods + tabs on both sides, brass trigger. Meshes: body, receiver, magazine (under mag_well at the mag centre). Sight empties: rear_sight = ring centre (z -0.0568), front_sight = bead (z -0.130), both y 0.1571 (bore 0.050), muzzle z -0.2086. 2,240 tris, verify_ads pass.
+Shared engine change: `gun_lowpoly_common.mat_index(region)` + `ENERGY_REGIONS` give an optional 3rd material (index 2; used for the rail's emissive energy and the P90 glass); empty by default so the other guns are unchanged.
+
+## Fix pass 6 (review round)
+- shotgun_double v6: barrels 20 mm touching + flat brass rib, big curled hammers, raised camera (`render_gun(three_y=...)`).
+- shotgun_combat v6: separate raked finger-groove pistol grip, collapsible two-tube stock + slim butt pad.
+- sniper_bolt v3: no nose block, barrel +30%, turned-down right-side bolt handle with round brass knob.
+- sniper_antimat v3: raked pistol grip + lower receiver block, M82 chevron brake with side ports, 1.5x scope with large objective bell, bipod folded under the barrel.
+- sniper_marksman v2: short straight 10 rd box mag, thicker barrel.
+- sniper_rail v2: crimson emissive energy channel (3rd material `sniper_rail_base_energy`, emission strength 1.0) between top/bottom rails, helical copper wire coils (`SN.coil`), ribbed receiver with glow slits and bone inlays, solid sculpted polymer stock.
